@@ -1,1 +1,5 @@
 numpy
+pandas
+pysam
+viennarna
+primer3-py
