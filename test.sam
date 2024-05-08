@@ -1,0 +1,8 @@
+@HD	VN:1.5	SO:unsorted	GO:query
+@SQ	SN:sequence_1	LN:300
+@PG	ID:bowtie2	PN:bowtie2	VN:2.5.3	CL:"/Users/caihuaiyuan/opt/anaconda3/envs/uprob/bin/bowtie2-align-s --wrapper basic-0 -x test -t -k 100 --very-sensitive-local -p 1 -S ./test.sam -U ./test.fq"
+1	4	*	0	0	*	*	0	0	ATGCAGGGTTAAC	~~~~~~~~~~~~~	YT:Z:UU	YF:Z:SC
+2	4	*	0	0	*	*	0	0	ATGCAGCTACGTT	~~~~~~~~~~~~~	YT:Z:UU	YF:Z:SC
+3	4	*	0	0	*	*	0	0	ATGCAAGGTTAAC	~~~~~~~~~~~~~	YT:Z:UU	YF:Z:SC
+4	4	*	0	0	*	*	0	0	ATGCAGGGTTAAC	~~~~~~~~~~~~~	YT:Z:UU	YF:Z:SC
+5	4	*	0	0	*	*	0	0	ATGCAAGGTTAAC	~~~~~~~~~~~~~	YT:Z:UU	YF:Z:SC
