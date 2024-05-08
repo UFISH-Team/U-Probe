@@ -1,10 +1,4 @@
-import sys
-import os
-
-sys.path.append(os.path.abspath('/U-Probe'))
-
-
-from uprobe.filters.filters import filter_tm, filter_circle_fold_score
+from uprobe.filters._filters import filter_tm, filter_circle_fold_score
 import pandas as pd
 
 def test_filter_tm():
