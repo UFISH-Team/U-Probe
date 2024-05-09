@@ -1,0 +1,5 @@
+mypy
+mkdocs
+mkdocs-material
+mkdocstrings[python]
+mkdocs-autorefs

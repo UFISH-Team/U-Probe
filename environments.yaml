@@ -1,0 +1,16 @@
+name: uprobe
+
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pysam
+  - bowtie2
+  - blast
+  - mmseqs2
+  - pip
+  - pip:
+    - -r requirements.txt

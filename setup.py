@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 import re
+import os
 
 
 classifiers = [
@@ -48,22 +49,26 @@ def get_requirements_from_file(filename):
     return requirements
 
 
+posix_requires = [
+    "pysam"
+]
+
+
 def get_install_requires():
-    return get_requirements_from_file('requirements.txt')
+    reqs = get_requirements_from_file('requirements.txt')
+    # Add posix_requires if the OS is posix(Linux, MacOS, etc.)
+    if os.name == 'posix':
+        reqs += posix_requires
+    return reqs
 
 
-def get_doc_requires():
-    return get_requirements_from_file('docs/requirements.txt')
-
-
-requires_test = ['pytest', 'pytest-cov', 'pytest-asyncio', 'flake8', 'mypy']
-packages_for_dev = ["pip", "setuptools", "wheel", "twine", "ipdb"]
-
-requires_dev = packages_for_dev + requires_test + get_doc_requires()
+packages_for_dev = get_requirements_from_file("requirements-dev.txt")
+packages_for_docs = get_requirements_from_file("docs/requirements.txt")
+requires_dev = packages_for_dev + packages_for_docs
 
 
 setup(
-    name='ufish',
+    name='uprobe',
     author='Weize Xu, Huaiyuan Cai, Qian Zhang, Yu Chen',
     author_email='vet.xwz@gmail.com',
     version=get_version(),

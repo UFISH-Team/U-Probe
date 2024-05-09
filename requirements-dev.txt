@@ -1,0 +1,9 @@
+pip
+setuptools
+wheel
+twine
+ipdb
+pytest
+pytest-cov
+pytest-asyncio
+flake8

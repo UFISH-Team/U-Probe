@@ -3,7 +3,6 @@ import typing as t
 import primer3
 import RNA
 import subprocess as subp
-import pysam
 import pandas as pd
 from ..utils import get_logger, reverse_complement
 
@@ -15,6 +14,7 @@ Block = t.Tuple[str, str, t.List[Aln]]  # query_name, query_seq, alignments
 def read_sam_align_blocks(
         sam_path: str
         ) -> t.Iterable[Block]:
+    import pysam
     def yield_cond(old, rec, block, end=False):
         res = (old is not None)
         if res and not end:
