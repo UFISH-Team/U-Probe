@@ -56,6 +56,7 @@ def bowtie2_align_se_sen(
     subp.check_call(cmd, shell=True)
     return sam_path
 
+
 def write_fastq(outdir, gene, recname2seq: t.Mapping[str, str]):
     fq = f'{outdir}/{gene}.fq'
     with open(fq, 'w') as f:

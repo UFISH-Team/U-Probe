@@ -1,5 +1,6 @@
 from uprobe.attributes._attributes import cal_temp, cal_fold, cal_gc_content, cal_target_fold_score
 from uprobe.attributes._attributes import cal_target_blocks, cal_self_match, count_n_bowtie2_aligned_genes
+from uprobe.tools.aligner import build_mmseqs_index, build_bowtie2_index, build_blast_index
 
 def test_cal_temp(seq="ATGC"):
     s = cal_temp(seq)
@@ -35,7 +36,8 @@ def test_cal_n_mapped_genes():
     }
     name = "test"
     index_prefix = "./test_genome/test"
-    threads = 1
+    threads = 1 
+    build_bowtie2_index("./test_genome/test.fa", index_prefix)
     n_mapped_genes = count_n_bowtie2_aligned_genes(".", recname2seq, name, index_prefix, threads)
     print(n_mapped_genes)
     assert isinstance(n_mapped_genes, dict), "Expected dict, got {}".format(type(n_mapped_genes))
