@@ -8,7 +8,7 @@ import pandas as pd
 from .utils import get_logger
 from .attributes import add_attributes
 from .tools.aligner import build_genome
-#from .gen import generate_target_seqs
+from .gen import generate_target_seqs
 from .gen.probe import construct_probes
 from .post_process import post_process
 
@@ -28,22 +28,22 @@ def check_genome_yaml(res: dict):
     pass
 
 
-def generate_target_seqs(
-        target_genes: T.List[str],
-        fasta_path: str,
-        gtf_path: str,
-        length: int = 40,
-        overlap: int = 20,
-        ):
-    return pd.DataFrame({
-        "id": ["target1", "target2", "target3"],
-        "gene": ["gene1", "gene2", "gene3"],
-        "target_region": [
-            "ATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTT",
-            "GTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTT",
-            "CTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTT",
-        ]
-    })
+#def generate_target_seqs(
+#        target_genes: T.List[str],
+#        fasta_path: str,
+#        gtf_path: str,
+#        length: int = 40,
+#        overlap: int = 20,
+#        ):
+#    return pd.DataFrame({
+#        "id": ["target1", "target2", "target3"],
+#        "gene": ["gene1", "gene2", "gene3"],
+#        "target_region": [
+#            "ATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTT",
+#            "GTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTT",
+#            "CTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTT",
+#        ]
+#    })
 
 
 def construct_workflow(

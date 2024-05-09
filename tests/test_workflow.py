@@ -30,5 +30,5 @@ def test_workflow():
     workflow = construct_workflow(
         protocol_yaml, genomes_yaml,
         HERE / "output.probe.csv",
-        HERE)
+        ".")
     workflow()

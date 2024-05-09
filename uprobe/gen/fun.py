@@ -62,6 +62,7 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
             chr_, start, end, strand = str(row['chr']), row['start'], row['end'], row['strand']
             name = '_'.join([chr_, str(start), str(end), strand])
             n_trans = row['type']
+            chr_ = chr_.replace('chr', '')
             seq = fa[chr_][start:end].seq.upper()
             if strand == '-':
                 seq = reverse_complement(seq)
@@ -76,8 +77,8 @@ def get_exon_seq(targetseqs, fa, gtf):
     gene2exons = extract_exons_rca(df_gtf, fa, genelist, min_length=40)
     return gene2exons
 
-def exon_cut(targetseqs, fa, gtf, min_length=40, overlap=10):
-    exon_info = get_exon_seq(targetseqs, fa, gtf)
+def generate_target_seqs(target_genes, fasta_path, gtf_path, length=40, overlap=10):
+    exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
     data = pd.DataFrame()
     for gene_name, exon_list in exon_info.items():
         global_slice_count = 1
@@ -85,12 +86,12 @@ def exon_cut(targetseqs, fa, gtf, min_length=40, overlap=10):
             exon_id, seq, n_trans = exon_data
             chr_name = exon_id.split('_')[0]  # 从exon_id解析染色体名称
             # 计算子序列并写入CSV文件
-            for i in range(0, len(seq) - min_length + 1, min_length - overlap):
-                tem = seq[i:i + min_length]
+            for i in range(0, len(seq) - length + 1, length - overlap):
+                tem = seq[i:i + length]
                 # 确保最后一个片段至少有min_length的长度
-                if len(tem) == min_length:
+                if len(tem) == length:
                     start = i + 1  # 人类可读的位置应该从1开始
-                    end = i + min_length
+                    end = i + length
                     # 生成片段的唯一标识符，例如RPS4Y1.1，增加全局片段编号
                     gene_id = f"{gene_name}.{global_slice_count}"
                     df = pd.DataFrame([[gene_id, chr_name, start, end, tem, n_trans]], 
@@ -98,6 +99,8 @@ def exon_cut(targetseqs, fa, gtf, min_length=40, overlap=10):
                     data = pd.concat([data, df], ignore_index=True)
                     # 更新全局片段编号
                     global_slice_count += 1
+    data['target_region'] = data['tem']
+    data['id'] = data['gene_id']
     return data
 
 

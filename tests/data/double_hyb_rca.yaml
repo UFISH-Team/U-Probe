@@ -4,10 +4,7 @@ description: Protocol for designing probe for hybridization RCA experiment with 
 genome: hg38
 
 targets:
-  - gene1
-  - gene2
-  - gene3
-  - gene4
+  - SRY
 
 barcode_set:
   A-488: xxxxxxxxxA1
