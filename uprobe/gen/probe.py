@@ -14,8 +14,8 @@ def circle_part1(
     return tem1_re
 
 def circle_part2(
-        barcode1: str = '',
-        barcode2: str = ''
+        barcode1: str,
+        barcode2: str 
         )-> str:
     if barcode2 is not None:
         part2 = barcode1 + "A" + barcode2
@@ -32,8 +32,8 @@ def circle_part3(
 def circle_probe(
         target_part1: str,
         target_part2: str,
-        barcode1: str = '',
-        barcode2: str = ''
+        barcode1: str,
+        barcode2: str
         ) -> str:
     part1 = circle_part1(target_part1)
     part2 = circle_part2(barcode1, barcode2)
@@ -53,8 +53,8 @@ def amp_part2(
         target_region: str,
         target_part1: str,
         target_part2: str,
-        barcode1: str = '',
-        barcode2: str = ''
+        barcode1: str,
+        barcode2: str
         ) -> str:
     circle_part2_seq = circle_part2(barcode1, barcode2)
     circle_part2_re = reverse_complement(circle_part2_seq[(len(circle_part2_seq) // 2):])
@@ -65,13 +65,13 @@ def amp_probe(target_region: str,
               target_part1: str,
               target_part2: str,
               target_part3: str,
-              barcode2:str
+              barcode1: str,
+              barcode2: str
               ) -> str:
     part1 = amp_part1(target_part3)
-    part2 = amp_part2(target_region, target_part1, target_part2, barcode2)
+    part2 = amp_part2(target_region, target_part1, target_part2, barcode1, barcode2)
     return part1 + part2
 
-import random
 def construct_probes(config, target_seqs):
     probes = []        
     barcode1 = 'AAACCCTTGGCC'
@@ -84,7 +84,7 @@ def construct_probes(config, target_seqs):
         
         circle_probe_seq = circle_probe(target_part1, target_part2, barcode1, barcode2)
         target_part3 = target_region[len1+len3+1:]
-        amp_probe_seq = amp_probe(target_region, target_part1, target_part2, target_part3, barcode2)
+        amp_probe_seq = amp_probe(target_region, target_part1, target_part2, target_part3, barcode1, barcode2)
     
         probe = {
             'circle_probe': circle_probe_seq,
