@@ -1,6 +1,7 @@
 name: uprobe
 
 channels:
+  - anaconda
   - bioconda
   - conda-forge
   - defaults
