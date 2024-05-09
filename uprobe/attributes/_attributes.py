@@ -119,7 +119,3 @@ def cal_target_blocks(seq: str, offset: int, whole_fold: t.Tuple[str, int, int])
 
 def cal_self_match(seq: str):
     return self_match(seq)
-
-
-
-
