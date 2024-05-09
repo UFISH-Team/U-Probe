@@ -167,3 +167,4 @@ condaenv.*
 tmp/
 *.sam
 *.fq
+*.probe.csv

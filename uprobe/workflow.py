@@ -9,6 +9,7 @@ from .utils import get_logger
 from .attributes import add_attributes
 from .tools.aligner import build_genome
 #from .gen import generate_target_seqs
+from .gen.probe import construct_probes
 
 
 def parse_yaml(path: Path) -> dict:
@@ -36,7 +37,7 @@ def generate_target_seqs(
     return pd.DataFrame({
         "id": ["target1", "target2", "target3"],
         "gene": ["gene1", "gene2", "gene3"],
-        "seq": [
+        "target_region": [
             "ATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTT",
             "GTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTT",
             "CTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTT",
@@ -47,7 +48,8 @@ def generate_target_seqs(
 def construct_workflow(
         protocol_yaml: Path,
         genomes_yaml: Path,
-        workdir: Path,
+        output_csv: Path,
+        workdir: Path = Path("."),
         ) -> T.Callable:
     log = get_logger("workflow")
     protocol = parse_yaml(protocol_yaml)
@@ -73,6 +75,29 @@ def construct_workflow(
             overlap=20,
             length=40,
             )
-        seqs = df_targets["seq"].to_list()
+        seqs = df_targets["target_region"].to_list()
+        probe_df = construct_probes(protocol, seqs)
+        assert probe_df.shape[0] == df_targets.shape[0]
+        df = pd.concat([df_targets, probe_df], axis=1)
+        df = add_attributes(df, protocol, genome, workdir)
+        print(df)
+        df.to_csv(output_csv, index=False)
 
     return workflow
+
+
+if __name__ == "__main__":
+    import fire
+    def main(
+            protocol_yaml: str,
+            genomes_yaml: str,
+            output_csv: str,
+            workdir: str = "."):
+        workflow = construct_workflow(
+            Path(protocol_yaml),
+            Path(genomes_yaml),
+            Path(output_csv),
+            Path(workdir)
+        )
+        workflow()
+    fire.Fire(main)

@@ -22,3 +22,13 @@ def test_construct_workflow():
     genomes_yaml = HERE / "data" / "genomes.yaml"
     protocol_yaml = HERE / "data" / "double_hyb_rca.yaml"
     construct_workflow(protocol_yaml, genomes_yaml, HERE)
+
+
+def test_workflow():
+    genomes_yaml = HERE / "data" / "genomes.yaml"
+    protocol_yaml = HERE / "data" / "double_hyb_rca.yaml"
+    workflow = construct_workflow(
+        protocol_yaml, genomes_yaml,
+        HERE / "output.probe.csv",
+        HERE)
+    workflow()

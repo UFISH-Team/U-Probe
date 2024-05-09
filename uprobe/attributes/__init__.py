@@ -26,6 +26,8 @@ def add_attributes(
         recname2seq = dict(zip(seqnames, target_seqs))
         attr_type: str = attr['type']
         if attr_type == "n_mapped_genes":
+            # TODO
+            continue
             if attr['aligner'] == "bowtie2":
                 assert genome['bowtie2_index'] is not None
                 vals = count_n_bowtie2_aligned_genes(
@@ -41,7 +43,7 @@ def add_attributes(
             vals = [cal_temp(seq) for seq in target_seqs]
         elif attr_type.lower() == "gc_content":
             vals = [cal_gc_content(seq) for seq in target_seqs]
-        elif attr_type.lower() == "target_fold_score":
+        elif attr_type.lower() == "fold_score":
             vals = [cal_target_fold_score(seq) for seq in target_seqs]
         elif attr_type.lower() == "self_match":
             vals = [cal_self_match(seq) for seq in target_seqs]

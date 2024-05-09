@@ -46,6 +46,7 @@ def build_genome(genome: dict) -> dict:
     index = str(fasta_path.parent / prefix)
     for aligner in aligner_index:
         log.info("Building index for %s" % aligner)
+        genome[f"{aligner}_index"] = index
         if aligner == "bowtie2":
             if (fasta_path.parent / f"{prefix}.1.bt2").exists():
                 log.info(f"Index {index} already exists.")
@@ -59,7 +60,6 @@ def build_genome(genome: dict) -> dict:
             build_mmseqs_index(fasta_path, index)
         else:
             raise NotImplementedError(f"Aligner {aligner} is not implemented.")
-        genome[f"{aligner}_index"] = index
     trans_index = genome.get("transcripts_index")
     if trans_index:
         log.info("Building index for transcripts")
