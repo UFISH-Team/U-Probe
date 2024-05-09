@@ -4,3 +4,4 @@ pysam
 viennarna
 primer3-py
 pathos
+fire
