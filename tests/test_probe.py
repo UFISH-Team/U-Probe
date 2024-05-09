@@ -1,18 +1,33 @@
-from uprobe.gen.probe import circle_probe, amp_probe
+import pandas as pd
+from uprobe.gen.probe import construct_probes
+from uprobe.workflow import parse_yaml, check_probe_yaml
+from pathlib import Path
 
-def test_circle_probe():
-    target_part1 = "AAGG"
-    target_part2 = "TTCC"
-    barcode1 = "CGCG"
-    barcode2 = "CGCG"
-    probe = circle_probe(target_part1, target_part2, barcode1, barcode2)
-    assert probe == "CCTTCGCGACGCGGGAA"
 
-def test_amp_probe():
-    target_region = "AAGGTTCCCGGGG"
-    target_part1 = "AAGG"
-    target_part2 = "TTCC"
-    target_part3 = "GGAA"
-    barcode2 = "CGTA"
-    probe = amp_probe(target_region, target_part1, target_part2, target_part3, barcode2)
-    assert probe == "TTCCCTACG"
+HERE = Path(__file__).parent
+
+
+def fake_target_seqs():
+    return [
+        "ATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTT",
+        "GTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTT",
+        "CTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTT",
+    ]
+
+
+def test_constrct_probes():
+    config = parse_yaml(HERE / "double_hyb_rca.yaml")
+    check_probe_yaml(config)
+    target_seqs = fake_target_seqs()
+    probes = construct_probes(config, target_seqs)
+    assert isinstance(probes, pd.DataFrame)
+    assert probes.shape[0] == 3
+    assert "circle_probe:part1" in probes.columns
+    # ensure part1 length is 13
+    assert all(probes["circle_probe:part1"].apply(len) == 13)
+    assert "circle_probe:part2" in probes.columns
+    assert "circle_probe:part3" in probes.columns
+    # ensure part1 length is 13
+    assert all(probes["circle_probe:part3"].apply(len) == 13)
+    assert "amp_probe:part1" in probes.columns
+    assert "amp_probe:part2" in probes.columns
