@@ -1,7 +1,6 @@
 
 from uprobe.utils import reverse_complement
 
-
 # target_region: the target mRNA region of the probe
 # target_part1: the 5' part of the target_region
 # target_part2: the middle part of the target_region
@@ -54,7 +53,7 @@ def amp_part2(
         barcode2:str
         )-> str:
     barcode2_re = reverse_complement(barcode2)
-    part2 =  target_region[len(target_part1)+len(target_part2)]+barcode2_re[:-2]
+    part2 =  target_region[len(target_part1)+len(target_part2)]+barcode2_re
     return part2
     
 def amp_probe(target_region: str,

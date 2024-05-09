@@ -16,4 +16,4 @@ def test_sort_n_trans():
 
     df = pd.DataFrame(data)
     res_df = sort_n_trans(df, is_ascending=False)
-    assert res_df['n_trans'] == [600, 500, 400]
+    assert res_df['n_trans'].to_list() == [600, 500, 400]
