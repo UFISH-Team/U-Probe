@@ -19,11 +19,11 @@ jobs:
         activate-environment: uprobe
 
     - name: Install package
+      shell: bash -l {0}
       run: |
-        conda activate uprobe
         pip install -e ".[dev]"
 
     - name: Run tests
+      shell: bash -l {0}
       run: |
-        conda activate uprobe
         pytest -s tests/
