@@ -1,5 +1,8 @@
+import os
+import typing as T
 from pathlib import Path
 import yaml
+from .utils import get_logger
 
 
 def parse_yaml(path: Path) -> dict:
@@ -15,3 +18,16 @@ def check_probe_yaml(res: dict):
 
 def check_genome_yaml(res: dict):
     pass
+
+
+def config_to_workflow(
+        config: dict,
+        workdir: Path,
+        ) -> T.Callable:
+    log = get_logger("workflow")
+
+    def workflow():
+        os.chdir(workdir)
+        log.log(config['name'])
+
+    return workflow
