@@ -10,6 +10,7 @@ from .attributes import add_attributes
 from .tools.aligner import build_genome
 #from .gen import generate_target_seqs
 from .gen.probe import construct_probes
+from .post_process import post_process
 
 
 def parse_yaml(path: Path) -> dict:
@@ -80,6 +81,7 @@ def construct_workflow(
         assert probe_df.shape[0] == df_targets.shape[0]
         df = pd.concat([df_targets, probe_df], axis=1)
         df = add_attributes(df, protocol, genome, workdir)
+        df = post_process(df, protocol, genome)
         print(df)
         df.to_csv(output_csv, index=False)
 

@@ -83,9 +83,9 @@ filters:
   fold_score_circle:
     condition: circle_fold_score <= 80
 
-sort:
-  - circle_fold_score
-  - amp_fold_score
-
-process:
+post_process:
+  - sort:
+    - circle_fold_score
+    - amp_fold_score
   - remove_overlap
+
