@@ -1,9 +1,9 @@
 name: uprobe
 
 channels:
+  - conda-forge
   - anaconda
   - bioconda
-  - conda-forge
   - defaults
 
 dependencies:
