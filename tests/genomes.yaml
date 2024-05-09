@@ -4,7 +4,5 @@
   - fasta: "tests/data/hg38.fa"
   - gtf: "tests/data/hg38.gtf"
   - aligner_index:
-    - bowtie2: true
-    - blast: false
-    - mmseq2: false
+    - bowtie2
   - jellyfish: false
