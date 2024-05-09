@@ -3,7 +3,6 @@ import typing as t
 import primer3
 import RNA
 import subprocess as subp
-import pandas as pd
 from ..utils import get_logger, reverse_complement
 
 log = get_logger(__name__)
@@ -49,11 +48,18 @@ def bowtie2_align_se_sen(
     cmd += ["-t", "-k", "100", "--very-sensitive-local"]
     cmd += ["-p", str(threads)]
     cmd += ["-S", sam_path]
-    cmd = " ".join(cmd)
+    cmd_str = " ".join(cmd)
     if log_file:
-        cmd += f" > {log_file} 2>&1"
+        cmd_str += f" > {log_file} 2>&1"
     log.info(f"Call cmd: {cmd}")
-    subp.check_call(cmd, shell=True)
+    try:
+        subp.check_call(cmd_str, shell=True)
+    except subp.CalledProcessError as e:
+        log.error(f"Error: {e}")
+        if log_file:
+            # print log file
+            with open(log_file) as f:
+                log.error(f.read())
     return sam_path
 
 def write_fastq(outdir, gene, recname2seq: t.Mapping[str, str]):
