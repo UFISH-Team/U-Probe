@@ -5,8 +5,7 @@ genome: hg38
 
 targets:
   - gene1
-  - gene2:
-    - sequence: xxxxxxxxxx
+  - gene2
   - gene3
   - gene4
 

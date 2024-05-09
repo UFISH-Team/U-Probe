@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import subprocess as subp
 
@@ -39,21 +40,29 @@ def build_mmseqs_index(fa_path, output_path):
 
 
 def build_genome(genome: dict) -> dict:
-    aligner_index: list = genome['aligner_index']
+    aligner_index: list = genome['genome_index']
     fasta_path = Path(genome['fasta'])
     prefix = fasta_path.stem
-    index = prefix
+    index = str(fasta_path.parent / prefix)
     for aligner in aligner_index:
         log.info("Building index for %s" % aligner)
         if aligner == "bowtie2":
+            if (fasta_path.parent / f"{prefix}.1.bt2").exists():
+                log.info(f"Index {index} already exists.")
+                continue
             build_bowtie2_index(fasta_path, index)
         elif aligner == "blast":
+            # TODO: check index exist or not
             build_blast_index(fasta_path, index)
         elif aligner == "mmseqs":
+            # TODO: check index exist or not
             build_mmseqs_index(fasta_path, index)
         else:
             raise NotImplementedError(f"Aligner {aligner} is not implemented.")
         genome[f"{aligner}_index"] = index
+    trans_index = genome.get("transcripts_index")
+    if trans_index:
+        log.info("Building index for transcripts")
     return genome
 
 
