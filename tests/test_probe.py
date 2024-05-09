@@ -24,5 +24,5 @@ def test_constrct_probes():
     print(probes['circle_probe'][0])
     assert probes['circle_probe'][0] == circle_probe
     print(probes['amp_probe'][0])
-    assert probes['amp_probe'][0] == 'CTTCATAACCGGCTGAAATTTTCCCC'
+    assert probes['amp_probe'][0] == 'CTTCATAACCGGCTGAAATTTTCCCCT'
 
