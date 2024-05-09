@@ -56,24 +56,21 @@ probes:
 attributes:
   n_mapped_gene:
     target: target_region
-    type: count_out_target
+    type: n_mapped_gene
     aligner: bowtie2
     similarity_threshold_ratio: 0.75
-  target_gc_ratio:
+  target_gc_content:
     target: target_region
-    type: gc_content_ratio
+    type: gc_content
   tm1:
     target: circle_probe:part1
-    type: annealing temperature
+    type: annealing_temperature
   tm2:
     target: circle_probe:part3
-    type: annealing temperature
+    type: annealing_temperature
   tm3:
     target: amp_probe:part2
-    type: anneling temperature
-  tm_range:
-    target: [tm1, tm2, tm3]
-    type: temperature range
+    type: anneling_temperature
   circle_fold_score:
     target: circle_probe
     type: fold_score

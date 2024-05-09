@@ -1,7 +1,5 @@
 import pandas as pd
-import typing as t
 
-# Path: uprobe/filters/tm.py
 
 def filter_tm(res_df: pd.DataFrame,
               tm_range=(35, 45)  # default range
@@ -17,9 +15,11 @@ def filter_circle_fold_score(res_df: pd.DataFrame,
     res_df = res_df[res_df['circle_fold_score'] <= circle_fold_thresh]
     return res_df
 
+
 def filter_primer_circle(res_df: pd.DataFrame) -> pd.DataFrame:
     res_df = res_df[res_df['primer_circle'].str.match("^[AT].*[AT]$")]
     return res_df
+
 
 def filter_n_mapped_genes(res_df: pd.DataFrame,
                           n_mapped_genes_thresh: int = 10 
