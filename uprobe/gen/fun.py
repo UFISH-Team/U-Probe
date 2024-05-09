@@ -1,13 +1,11 @@
 import pandas as pd
 import os
 import typing as t
-
 from pyfaidx import Fasta
 from typing import List
 
-os.listdir(os.getcwd())
+from ..utils import get_logger, reverse_complement
 
-# 读取gtf
 GTF_FIELDS = [
     'chr', 'source', 'type', 'start', 'end', 'score', 'strand', 'score', 'info'
 ]
@@ -40,10 +38,9 @@ def read_gtf(
     return df
 
 
-Exon = t.Tuple[str, str, str, int]  # (tyep, name, seq, n_trans)
 def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
                   genelist: pd.DataFrame, min_length: int=40
-                  ) -> t.Mapping[str, t.List[Exon]]:
+                  ) :
     """Extract all exons of each gene"""
     #import ipdb; ipdb.set_trace()
     gene2exons = {}
@@ -72,6 +69,36 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
             gene2exons[gene].append(exon)
     return gene2exons
 
+def get_exon_seq(targetseqs, fa, gtf):
+    fa = Fasta(fa)
+    genelist = pd.DataFrame(targetseqs, columns=['geneID'])
+    df_gtf = read_gtf(gtf, extract_fields=['gene_name'], get_length=True)
+    gene2exons = extract_exons_rca(df_gtf, fa, genelist, min_length=40)
+    return gene2exons
+
+def exon_cut(targetseqs, fa, gtf, min_length=40, overlap=10):
+    exon_info = get_exon_seq(targetseqs, fa, gtf)
+    data = pd.DataFrame()
+    for gene_name, exon_list in exon_info.items():
+        global_slice_count = 1
+        for exon_data in exon_list:
+            exon_id, seq, n_trans = exon_data
+            chr_name = exon_id.split('_')[0]  # 从exon_id解析染色体名称
+            # 计算子序列并写入CSV文件
+            for i in range(0, len(seq) - min_length + 1, min_length - overlap):
+                tem = seq[i:i + min_length]
+                # 确保最后一个片段至少有min_length的长度
+                if len(tem) == min_length:
+                    start = i + 1  # 人类可读的位置应该从1开始
+                    end = i + min_length
+                    # 生成片段的唯一标识符，例如RPS4Y1.1，增加全局片段编号
+                    gene_id = f"{gene_name}.{global_slice_count}"
+                    df = pd.DataFrame([[gene_id, chr_name, start, end, tem, n_trans]], 
+                  columns=['gene_id', 'chr_name', 'start', 'end', 'tem', 'n_trans'])
+                    data = pd.concat([data, df], ignore_index=True)
+                    # 更新全局片段编号
+                    global_slice_count += 1
+    return data
 
 
 
