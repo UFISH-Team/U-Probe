@@ -163,3 +163,4 @@ cython_debug/
 
 *.sam
 *.bt2
+condaenv.*

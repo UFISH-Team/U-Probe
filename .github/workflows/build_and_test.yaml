@@ -14,9 +14,9 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: true
-        python-version: 3.10
-        environment-file: environments.txt
-        activate-environment: myenv
+        python-version: 3.9
+        environment-file: environments.yaml
+        activate-environment: uprobe
 
     - name: Install package
       run: |
@@ -24,4 +24,4 @@ jobs:
 
     - name: Run tests
       run: |
-        pytest
+        pytest -s tests/

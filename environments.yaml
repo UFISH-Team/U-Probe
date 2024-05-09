@@ -1,16 +1,17 @@
 name: uprobe
 
 channels:
-  - bioconda
   - conda-forge
+  - bioconda
+  - anaconda
   - defaults
 
 dependencies:
-  - python=3.10
+  - python=3.9
   - pysam
   - bowtie2
   - blast
   - mmseqs2
   - pip
   - pip:
-    - -r requirements.txt
+      - -r requirements.txt
