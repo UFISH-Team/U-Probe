@@ -12,7 +12,20 @@ def filter_tm(res_df: pd.DataFrame,
 
 
 def filter_circle_fold_score(res_df: pd.DataFrame,
-                             circle_fold_thresh=80  # default threshold
+                             circle_fold_thresh: int = 80  # default threshold
                              ) -> pd.DataFrame:
     res_df = res_df[res_df['circle_fold_score'] <= circle_fold_thresh]
     return res_df
+
+def filter_primer_circle(res_df: pd.DataFrame) -> pd.DataFrame:
+    res_df = res_df[res_df['primer_circle'].str.match("^[AT].*[AT]$")]
+    return res_df
+
+def filter_n_mapped_genes(res_df: pd.DataFrame,
+                          n_mapped_genes_thresh: int = 10 
+                          # default threshold
+                          ) -> pd.DataFrame:
+    res_df = res_df[res_df['n_mapped_genes'] <= n_mapped_genes_thresh]
+    return res_df
+
+

@@ -45,7 +45,14 @@ def get_tmp_dir(basename):
     os.mkdir(dirname())
     return dirname()
 
-
-def count_gc_ratio(seq):
-    s = seq.lower()
-    return (s.count('c') + s.count('g')) / len(s)
+def self_match(probe: str, min_match = 4):
+    length = len(probe)
+    probe_re = reverse_complement(probe)
+    match_pairs = 0
+    for i in range(0,length-min_match+1):
+        tem = probe[i:min_match+i]
+        for j in range(0,length-min_match+1):
+            tem_re = probe_re[j:min_match+j]
+            if tem == tem_re and i + j + min_match - 2 != length:
+                match_pairs = match_pairs + 1
+    return match_pairs

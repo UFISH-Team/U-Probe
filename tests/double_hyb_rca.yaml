@@ -22,8 +22,6 @@ encoding:
   gene2:
     barcode1: A-488
     barcode2: A-594
-  geneX:
-    barocde1: ATTTCCGGTTT
 
 extracts:
   target_region:
@@ -85,7 +83,7 @@ attributes:
 
 filters:
   tm:
-    condition: tm1 <= 45 & tm1 >= 35 & tm2 <= 45 & tm2 >= 35, …
+    condition: tm1 <= 45 & tm1 >= 35 & tm2 <= 45 & tm2 >= 35 & tm3 <= 45 & tm3 >= 35
   fold_score_circle:
     condition: circle_fold_score <= 80
 
