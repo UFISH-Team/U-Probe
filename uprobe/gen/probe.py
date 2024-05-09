@@ -77,6 +77,8 @@ def construct_probes(config, target_seqs):
     barcode1 = 'AAACCCTTGGCC'
     barcode2 = 'GGGGAAAATTTC'
     for i, target_region in enumerate(target_seqs):
+        #barcode1 = config['probes']['circle_probe']['parts']['part2']['parts']['barcode1']
+        #barcode2 = config['probes']['circle_probe']['parts']['part2']['parts']['barcode2']
         len1 = config['probes']['circle_probe']['parts']['part1']['length']
         len3 = config['probes']['circle_probe']['parts']['part3']['length']
         target_part1 = target_region[:len1]
