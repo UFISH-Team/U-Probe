@@ -6,8 +6,6 @@ channels:
   - anaconda
   - defaults
 
-channel_priority: strict
-
 dependencies:
   - python=3.9
   - pysam
