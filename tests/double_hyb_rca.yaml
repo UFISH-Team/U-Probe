@@ -7,6 +7,8 @@ targets:
   - gene1
   - gene2:
     - sequence: xxxxxxxxxx
+  - gene3
+  - gene4
 
 barcode_set:
   A-488: xxxxxxxxxA1
@@ -84,7 +86,7 @@ attributes:
 filters:
   tm:
     condition: tm1 <= 45 & tm1 >= 35 & tm2 <= 45 & tm2 >= 35, …
-    fold_score_circle:
+  fold_score_circle:
     condition: circle_fold_score <= 80
 
 sort:
