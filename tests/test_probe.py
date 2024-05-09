@@ -19,7 +19,9 @@ def test_constrct_probes():
     target_seqs = fake_target_seqs()
     probes = construct_probes(config, target_seqs)
     assert isinstance(probes, pd.DataFrame)
-    circle_probe = 'GGCAGGCCTTCATAAACCCTTGGCCAGGGGAAAATTTCGGCCTTCATAACC'
-    print(probes['circle_probe'])
-    #assert (probes['circle_probe']) == circle_probe
-    #assert (probes['amp_probe']) == 'CTTCATAACCGGCTGAAATTTTCCCC'
+    #circle_probe = 'GGCAGGCCTTCATAAACCCTTGGCCAGGGGAAAATTTCGGCCTTCATAACC'
+    #print(probes['circle_probe'])
+    #assert (probes['circle_probe']).to_string() == circle_probe
+    print(probes['amp_probe'])
+    #assert (probes['amp_probe']).to_string() == 'CTTCATAACCGGCTGAAATTTTCCCC'
+    

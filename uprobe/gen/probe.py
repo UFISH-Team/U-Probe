@@ -17,7 +17,7 @@ def circle_part2(
         barcode1: str = '',
         barcode2: str = ''
         )-> str:
-    if barcode2:
+    if barcode2 is not None:
         part2 = barcode1 + "A" + barcode2
     else:
         part2 = barcode1
