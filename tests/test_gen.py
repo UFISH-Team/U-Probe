@@ -1,7 +1,14 @@
-from uprobe.gen.fun import exon_cut
+from uprobe.gen.fun import get_exon_seq
+from pathlib import Path
 
-def test_exon_cut():
-    targetseqs = ['SRY', 'RPS4Y1']
-    data = exon_cut(targetseqs, './Y.fasta', './Y.gtf')
-    data.to_csv('exon_cut.csv', index=False)
-    assert data.shape[0] == 41
+HERE = Path(__file__).parent
+
+fa = HERE / "data" / "hg38" / "hg38.fa"
+gtf = HERE / "data" / "hg38" / "hg38.gtf"
+genes = ['HSFY3P', 'ZFY']
+
+def test_get_exon_seq():
+
+    get_exon_seq(genes, fa, gtf)
+    
+    

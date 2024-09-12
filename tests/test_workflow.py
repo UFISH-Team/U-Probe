@@ -3,7 +3,6 @@ from uprobe.workflow import (
     parse_yaml, check_protocol_yaml, check_genome_yaml,
     construct_workflow
 )
-
 HERE = Path(__file__).parent
 
 

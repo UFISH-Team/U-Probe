@@ -1,4 +1,4 @@
-from uprobe.sorts._sorts import sort_n_trans
+from uprobe.post_process.sorts import sort_n_trans
 import pandas as pd
 
 

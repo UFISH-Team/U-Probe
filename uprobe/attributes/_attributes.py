@@ -119,10 +119,12 @@ def cal_gc_content(seq: str):
 def cal_target_fold_score(seq: str):
     return -RNA.fold_compound(seq).mfe()[1]
 
-def cal_target_blocks(seq: str, offset: int, whole_fold: t.Tuple[str, int, int]):
+def cal_target_blocks(seq: str, offset: float):
+    whole_fold = RNA.fold_compound(seq).mfe()
     target_fold = whole_fold[0][offset:offset+len(seq)]
     target_blocks = len(target_fold) - target_fold.count('.')  # smaller is better
     return target_blocks
 
 def cal_self_match(seq: str):
     return self_match(seq)
+

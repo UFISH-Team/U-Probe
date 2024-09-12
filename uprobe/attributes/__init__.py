@@ -5,7 +5,7 @@ from ._attributes import (
     count_n_bowtie2_aligned_genes,
     cal_temp, cal_gc_content,
     cal_target_fold_score,
-    cal_self_match
+    cal_self_match, cal_target_blocks
 )
 
 
@@ -14,42 +14,66 @@ def add_attributes(
         protocol: dict,
         genome: dict,
         workdir: Path
-        ) -> pd.DataFrame:
+) -> pd.DataFrame:
     attributes: dict = protocol['attributes']
-    # random str
-    task_id = secrets.token_hex(6)
-    attr: dict
+    task_id = secrets.token_hex(6)  # 生成随机字符串
+
     for attr_name, attr in attributes.items():
-        target = attr['target']
-        target_seqs = df_probes[target]
-        seqnames = df_probes['id']
-        recname2seq = dict(zip(seqnames, target_seqs))
-        attr_type: str = attr['type']
-        if attr_type == "n_mapped_genes":
-            # TODO
+        target = attr.get('target')
+        if target is None:
+            print(f"Warning: 'target' key is missing in attribute '{attr_name}'")
             continue
-            if attr['aligner'] == "bowtie2":
-                assert genome['bowtie2_index'] is not None
-                vals = count_n_bowtie2_aligned_genes(
-                    str(workdir), recname2seq, task_id,
-                    genome['bowtie2_index'],
-                    attr.get("threads", 10),
+        
+        # 检查 target 是否在 DataFrame 中
+        if target not in df_probes.columns:
+            print(f"Warning: '{target}' not found in DataFrame columns.")
+            continue
+        
+        attr_type: str = attr.get('type', '').lower()  # 确保小写处理
+
+        if attr_type == "n_mapped_genes":
+            if attr.get('aligner') == "bowtie2":
+                assert 'bowtie2' in genome['align_index'] 
+                fasta_path = Path(genome['fasta'])
+                index_prefix =fasta_path.parent / "genome_bowtie2_index"/ fasta_path.stem
+                tmp_path = Path(f"{workdir}/tmp")
+                tmp_path.mkdir(exist_ok=True, parents=True)
+                vals = df_probes.apply(
+                    lambda row: count_n_bowtie2_aligned_genes(
+                        str(tmp_path), {row['gene_id']: row[target]}, task_id,
+                        str(index_prefix),
+                        attr.get("threads", 10), 
+                    ), axis=1
                 )
             else:
                 raise NotImplementedError(
                     f"Aligner {attr['aligner']} is not implemented."
                 )
-        elif attr_type.lower() == "annealing_temperature":
-            vals = [cal_temp(seq) for seq in target_seqs]
-        elif attr_type.lower() == "gc_content":
-            vals = [cal_gc_content(seq) for seq in target_seqs]
-        elif attr_type.lower() == "fold_score":
-            vals = [cal_target_fold_score(seq) for seq in target_seqs]
-        elif attr_type.lower() == "self_match":
-            vals = [cal_self_match(seq) for seq in target_seqs]
+        
+        elif attr_type == "annealing_temperature":
+            vals = df_probes[target].apply(cal_temp)
+        
+        elif attr_type == "gc_content":
+            vals = df_probes[target].apply(cal_gc_content)
+        
+        elif attr_type == "fold_score":
+            vals = df_probes[target].apply(cal_target_fold_score)
+        
+        elif attr_type == "self_match":
+            vals = df_probes[target].apply(cal_self_match)
+
+        elif attr_type == "blocks":
+            if 'start' not in df_probes.columns:
+                print(f"Warning: 'start' column not found for attribute '{attr_name}'")
+                continue
+            vals = df_probes.apply(lambda row: cal_target_blocks(row[target], row['start']), axis=1)
+        
         else:
             raise NotImplementedError(
                 f"Attribute type {attr_type} is not implemented."
             )
+
+        # 将计算结果添加到 DataFrame 中
         df_probes[attr_name] = vals
+
     return df_probes

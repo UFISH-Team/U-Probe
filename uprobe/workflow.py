@@ -7,10 +7,10 @@ import pandas as pd
 
 from .utils import get_logger
 from .attributes import add_attributes
-from .tools.aligner import build_genome
-from .gen import generate_target_seqs
+from .tools import  build_genome
+from .gen.fun import generate_target_seqs
 from .gen.probe import construct_probes
-from .post_process import post_process
+from .post_process import process
 
 
 def parse_yaml(path: Path) -> dict:
@@ -26,25 +26,6 @@ def check_protocol_yaml(res: dict):
 
 def check_genome_yaml(res: dict):
     pass
-
-
-#def generate_target_seqs(
-#        target_genes: T.List[str],
-#        fasta_path: str,
-#        gtf_path: str,
-#        length: int = 40,
-#        overlap: int = 20,
-#        ):
-#    return pd.DataFrame({
-#        "id": ["target1", "target2", "target3"],
-#        "gene": ["gene1", "gene2", "gene3"],
-#        "target_region": [
-#            "ATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTT",
-#            "GTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTTGTGAGGGCCTGCCGGTT",
-#            "CTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTTCTGAAGGCCGGCCGGTT",
-#        ]
-#    })
-
 
 def construct_workflow(
         protocol_yaml: Path,
@@ -63,7 +44,6 @@ def construct_workflow(
     assert fasta_path.exists(), f"Genome fasta file not found: {fasta_path}"
     gtf_path = Path(genome['gtf'])
     assert gtf_path.exists(), f"Genome gtf file not found: {gtf_path}"
-    log.info(f"Building genome {genome_name}")
     genome = build_genome(genome)
 
     def workflow():
@@ -73,15 +53,15 @@ def construct_workflow(
             protocol["targets"],
             genome['fasta'],
             genome['gtf'],
-            overlap=20,
-            length=40,
+            overlap=10,
+            min_length=40,
             )
         seqs = df_targets["target_region"].to_list()
         probe_df = construct_probes(protocol, seqs)
         assert probe_df.shape[0] == df_targets.shape[0]
         df = pd.concat([df_targets, probe_df], axis=1)
         df = add_attributes(df, protocol, genome, workdir)
-        df = post_process(df, protocol, genome)
+        df = process(df, protocol)
         print(df)
         df.to_csv(output_csv, index=False)
 
@@ -94,7 +74,7 @@ if __name__ == "__main__":
             protocol_yaml: str,
             genomes_yaml: str,
             output_csv: str,
-            workdir: str = "."):
+            workdir: str = "/home/qzhang/U-Probe/tests"):
         workflow = construct_workflow(
             Path(protocol_yaml),
             Path(genomes_yaml),

@@ -1,10 +1,10 @@
 hg38:
   description: "Human genome build 38"
   species: Homo sapiens
-  fasta: "tests/data/test.fa"
-  gtf: "tests/data/test.gtf"
-  genome_index:
-    - bowtie2
-  transcripts_index:
+  fasta: "tests/data/hg38/hg38.fa"
+  gtf: "tests/data/hg38/hg38.gtf"
+  out: "tests/data/hg38"
+  align_index:
+    - blast
     - bowtie2
   jellyfish: false
