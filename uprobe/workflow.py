@@ -5,14 +5,14 @@ import yaml
 
 import pandas as pd
 
-from .utils import get_logger
-from .gen.geneldict import generate_gene_dict
-from .attributes import add_attributes
-from .tools import  build_genome
-from .gen.fun import generate_target_seqs
-from .gen.probe import construct_probes
-from .process import post_process
-from .utils import get_logger
+from uprobe.utils import get_logger
+from uprobe.gen.geneldict import generate_gene_dict
+from uprobe.attributes import add_attributes
+from uprobe.tools import  build_genome
+from uprobe.gen.fun import generate_target_seqs
+from uprobe.gen.probe import construct_probes
+from uprobe.process import post_process
+from uprobe.utils import get_logger
 
 log = get_logger(__name__)
 
@@ -81,6 +81,8 @@ def construct_workflow(
 
         assert probe_df.shape[0] == df_targets.shape[0], "mismatch in number of targets and probes."
         
+        print(f"probe: {probe_df.columns}")
+        print(f"df: {df_targets.columns}")
         log.info("merging target sequences with probe data.")
         df = pd.merge(df_targets, probe_df, on='target_region', how='inner')
         

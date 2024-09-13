@@ -8,3 +8,14 @@ hg38:
     - blast
     - bowtie2
   jellyfish: false
+
+oryza:
+  description: "Oryza sativa"
+  species: Oryza sativa
+  fasta: "/home/qzhang/genomes/oryza/oryza.fna"
+  gtf: "/home/qzhang/genomes/oryza/oryza.gtf"
+  out: "/home/qzhang/genomes/oryza"
+  align_index:
+    - bowtie2
+    - blast
+  jellyfish: false

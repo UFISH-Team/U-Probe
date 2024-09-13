@@ -14,3 +14,11 @@ Run tests:
 ```
 $ pytest -s tests/
 ```
+
+## Test
+
+Run workflow
+
+```
+python /uprobe/workflow.py /tests/data/double_hyb_rca.yaml tests/data/genomes.yaml out_probes.csv
+```

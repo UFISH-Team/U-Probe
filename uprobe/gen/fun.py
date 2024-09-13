@@ -3,7 +3,6 @@ import os
 import typing as t
 from pyfaidx import Fasta
 from typing import List
-from .geneldict import generate_gene_dict
 
 from ..utils import get_logger, reverse_complement
 
@@ -58,7 +57,7 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
         df_exons = df_exons[df_exons.length > min_length]
         if df_exons.shape[0] == 0:
             raise ValueError(f"Gene {gene} can't found any exon records.")
-        df_exons['transcript_name'] = df_exons['info'].str.extract(r'transcript_name\s+"([^"]+)"')[0]
+        df_exons['transcript_name'] = df_exons['info'].str.extract(r'transcript_id\s+"([^"]+)"')[0]
         exon_cnts = df_exons.groupby(by=['chr', 'start', 'end', 'length', 'strand', 'transcript_name'], as_index=False).count()
         gene2exons[gene] = []
         for idx, row in exon_cnts.iterrows():

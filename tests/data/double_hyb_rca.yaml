@@ -1,11 +1,13 @@
-name: RCA Double Hybridization
+name: RCA Double Hybridization - 240913
 description: Protocol for designing probe for hybridization RCA experiment with double barcodes
 
-genome: hg38
+genome: oryza
 
 targets:
-  - HSFY3P
-  - ZFY
+  - LOC107281753
+  - LOC4326462
+  - LOC107279812
+  - LOC4326459
 
 barcode_set:
   A-488: AAACCCTTGGCC
@@ -13,12 +15,19 @@ barcode_set:
   B-488: GGTCTATTCGGG
 
 encoding:
-  HSFY3P: 
+  LOC107281753: 
     barcode1: A-488
     barcode2: A-488
-  ZFY:
+  LOC4326462:
     barcode1: A-488
     barcode2: A-594
+  LOC107279812:
+    barcode1: A-488
+    barcode2: A-594
+  LOC4326459:
+    barcode1: B-488
+    barcode2: B-488
+  
 
 extracts:
   target_region:
@@ -65,7 +74,7 @@ attributes:
     target: target_region
     type: n_mapped_genes
     aligner: bowtie2
-    similarity_threshold_ratio: 0.75
+    similarity_threshold_ratio: 0.9
   target_gc_content:
     target: target_region
     type: gc_content  
