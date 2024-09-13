@@ -86,8 +86,6 @@ def count_n_bowtie2_aligned_genes(
             fq_path, index_prefix,
             sam_path, threads=threads,
             log_file=f"{outdir}/{name}.bowtie2.log")
-    else:
-        log.info("{} exists".format(sam_path))
     n_mapped_genes = {}
     for rec_name, seq, alns in read_sam_align_blocks(sam_path):
         n_genes = len(set([chr_.split("_")[0] for chr_, s, e in alns]))
@@ -108,7 +106,7 @@ def self_match(probe: str, min_match = 4):
 
 
 def cal_temp(seq: str): # Tm
-    return primer3.calcTm(seq)
+    return primer3.calc_tm(seq)
 
 def cal_fold(seq: str): # MFE
     return -RNA.fold_compound(seq).mfe()[1]

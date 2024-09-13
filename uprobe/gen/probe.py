@@ -1,6 +1,7 @@
 import pandas as pd
 from uprobe.utils import reverse_complement
 
+
 # target_region: the target mRNA region of the probe
 # target_part1: the 5' part of the target_region
 # target_part2: the middle part of the target_region
@@ -72,26 +73,28 @@ def amp_probe(target_region: str,
     part2 = amp_part2(target_region, target_part1, target_part2, barcode1, barcode2)
     return part1 + part2
 
-def construct_probes(config, barcode1, barcode2, target_seqs):
+def construct_probes(config, target_seqs,
+                     barcodes
+                     ): #contain barcpdes
     probes = [] 
-    
+
     len_part1 = config['extracts']['target_region']['parts']['part1']['length']
     len_part3 = config['extracts']['target_region']['parts']['part3']['length']
     
-    for target_region in target_seqs:
-        # 获取各个部分的序列
+    
+    for i, target_region in enumerate(target_seqs):
+        barcode1, barcode2 = barcodes[i]  # 
+        
         target_part1 = target_region[:len_part1]
         target_part3 = target_region[-len_part3:]
         
-        # 生成 circle_probe 序列
         circle_probe_seq = circle_probe(target_part1, target_part1, barcode1, barcode2)
         
-        # 生成 amp_probe 序列
         target_part2 = target_region[len_part1:len_part1 + len_part3]
         amp_probe_seq = amp_probe(target_region, target_part1, target_part2, target_part3, barcode1, barcode2)
         
-        # 组装探针信息
         probe = {
+            'target_region': target_region,
             'circle_probe': circle_probe_seq,
             'circle_probe:part1': circle_part1(target_part1),
             'circle_probe:part2': circle_part2(barcode1, barcode2),

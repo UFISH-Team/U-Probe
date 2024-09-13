@@ -12,7 +12,8 @@ def filter_n_mapped_genes(df: pd.DataFrame, n_mapped_genes: int) -> pd.DataFrame
     Returns:
     - Filtered DataFrame.
     """
-    return df[df["n_mapped_genes"] <= n_mapped_genes]
+    df['n_mapped_genes'] = df['n_mapped_genes'].apply(lambda x: list(x.values())[0])
+    return df[df["n_mapped_genes"].values <= n_mapped_genes]
 
 def filter_tm(df: pd.DataFrame, min_tm: int = 35, max_tm: int = 45) -> pd.DataFrame:
     """
@@ -27,7 +28,9 @@ def filter_tm(df: pd.DataFrame, min_tm: int = 35, max_tm: int = 45) -> pd.DataFr
     - Filtered DataFrame.
     """
     return df[
-        (df["tm"].between(min_tm, max_tm)) 
+        (df["tm1"].between(min_tm, max_tm)) &
+        df['tm2'].between(min_tm, max_tm) &
+        df['tm3'].between(min_tm, max_tm)
     ]
 
 def filter_target_fold_score(df: pd.DataFrame, threshold: int = 50) -> pd.DataFrame:
@@ -54,7 +57,7 @@ def filter_gc_content(df: pd.DataFrame, ratio: float = 0.3) -> pd.DataFrame:
     Returns:
     - Filtered DataFrame.
     """
-    return df[df["gc_content"] >= ratio]
+    return df[df["target_gc_content"] >= ratio]
 
 def filter_circle_fold_score(res_df: pd.DataFrame, circle_fold_thresh: int = 80) -> pd.DataFrame:
     """

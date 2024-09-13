@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 from pathlib import Path
 from uprobe.workflow import parse_yaml
-from uprobe.post_process import process
+from uprobe.process import process
 
 HERE = Path(__file__).parent
 path = HERE / "data" / "double_hyb_rca.yaml"

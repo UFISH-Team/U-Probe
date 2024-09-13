@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from uprobe.post_process.filters import (
+from uprobe.process.filters import (
     filter_gc_content,
     filter_n_mapped_genes,
     filter_target_fold_score,

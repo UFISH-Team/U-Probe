@@ -13,10 +13,10 @@ barcode_set:
   B-488: GGTCTATTCGGG
 
 encoding:
-  gene1:
+  HSFY3P: 
     barcode1: A-488
     barcode2: A-488
-  gene2:
+  ZFY:
     barcode1: A-488
     barcode2: A-594
 
@@ -66,11 +66,9 @@ attributes:
     type: n_mapped_genes
     aligner: bowtie2
     similarity_threshold_ratio: 0.75
-
   target_gc_content:
     target: target_region
     type: gc_content  
-
   tm1:
     target: circle_probe:part1
     type: annealing_temperature
@@ -95,31 +93,31 @@ attributes:
   amp_self_match:
     target: amp_probe
     type: self_match
-  blocks:
+  target_blocks:
     target: target_region
     type: blocks
 
 post_process:
   filters:
-    n_mapped_genes: 4
+    n_mapped_genes: 10
     tm:
       min: 35
-      max: 45
-    target_fold_score: 50
-    gc_content: 0.5
+      max: 70
+    target_fold_score: 30
+    gc_content: 0.2
     circle_AT:
     
   sorts:
     is_ascending: 
+      - n_trans
+      - target_gc_content
+    is_descending:
       - n_mapped_genes
       - target_fold_score
       - circle_fold_score
       - circle_self_match
       - amp_fold_score
-      - self_match_amp
+      - amp_self_match
       - target_blocks
-      - target_fold_score
-    is_descending:
-      - n_trans
   remove_overlap:
-    location_interval: 5
+    location_interval: 0

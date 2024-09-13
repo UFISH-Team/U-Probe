@@ -6,12 +6,15 @@ import yaml
 import pandas as pd
 
 from .utils import get_logger
+from .gen.geneldict import generate_gene_dict
 from .attributes import add_attributes
 from .tools import  build_genome
 from .gen.fun import generate_target_seqs
 from .gen.probe import construct_probes
-from .post_process import process
+from .process import post_process
+from .utils import get_logger
 
+log = get_logger(__name__)
 
 def parse_yaml(path: Path) -> dict:
     content = path.read_text(encoding="utf-8")
@@ -24,46 +27,78 @@ def check_protocol_yaml(res: dict):
     assert "name" in res, "name key not found"
 
 
-def check_genome_yaml(res: dict):
-    pass
-
 def construct_workflow(
         protocol_yaml: Path,
         genomes_yaml: Path,
         output_csv: Path,
         workdir: Path = Path("."),
         ) -> T.Callable:
-    log = get_logger("workflow")
+    
+    log.info("parsing protocol yaml.")
     protocol = parse_yaml(protocol_yaml)
     check_protocol_yaml(protocol)
+    
+    log.info("parsing genomes yaml.")
     genomes = parse_yaml(genomes_yaml)
-    check_genome_yaml(genomes)
+
     genome_name = protocol['genome']
     genome = genomes[genome_name]
+
     fasta_path = Path(genome['fasta'])
-    assert fasta_path.exists(), f"Genome fasta file not found: {fasta_path}"
+    assert fasta_path.exists(), f"genome fasta file not found: {fasta_path}"
+    log.info(f"found genome fasta file: {fasta_path}")
+
     gtf_path = Path(genome['gtf'])
     assert gtf_path.exists(), f"Genome gtf file not found: {gtf_path}"
+    log.info(f"found genome gtf file: {gtf_path}")
+
+    log.info("building genome.")
     genome = build_genome(genome)
 
     def workflow():
         os.chdir(workdir)
-        log.info(protocol['name'])
+        log.info(f"changed working directory to: {workdir}")
+        log.info(f"running workflow: {protocol['name']}")
+        
+        log.info("generating target sequences.")
         df_targets = generate_target_seqs(
             protocol["targets"],
             genome['fasta'],
             genome['gtf'],
             overlap=10,
             min_length=40,
-            )
-        seqs = df_targets["target_region"].to_list()
-        probe_df = construct_probes(protocol, seqs)
-        assert probe_df.shape[0] == df_targets.shape[0]
-        df = pd.concat([df_targets, probe_df], axis=1)
+        )
+        
+        log.info("generating gene barcode dictionary.")
+        barcode_dict = generate_gene_dict(protocol)
+        df_targets['barcodes'] = df_targets['gene'].map(barcode_dict)
+
+        seqs = df_targets['target_region'].to_list()
+        barcodes = df_targets['barcodes'].tolist()
+
+        log.info("constructing probes.")
+        probe_df = construct_probes(protocol, seqs, barcodes)
+
+        assert probe_df.shape[0] == df_targets.shape[0], "mismatch in number of targets and probes."
+        
+        log.info("merging target sequences with probe data.")
+        df = pd.merge(df_targets, probe_df, on='target_region', how='inner')
+        
+        log.info("adding attributes to the DataFrame.")
         df = add_attributes(df, protocol, genome, workdir)
-        df = process(df, protocol)
-        print(df)
-        df.to_csv(output_csv, index=False)
+        
+        log.info("post-processing the DataFrame.")
+        df = post_process(df, protocol)
+
+        if df.shape[0] == 0:
+            log.warning("dataFrame is empty, no results.")
+        else:
+            log.info("dropping unnecessary columns from the dataFrame.")
+            df = df.drop(columns=['circle_probe:part1', 'circle_probe:part2', 'circle_probe:part3',
+                                  'amp_probe:part1', 'amp_probe:part2'])
+
+            log.info(f"saving results to csv: {output_csv}")
+            df.to_csv(output_csv, index=False)
 
     return workflow
 

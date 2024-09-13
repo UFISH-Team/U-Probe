@@ -3,6 +3,7 @@ import os
 import typing as t
 from pyfaidx import Fasta
 from typing import List
+from .geneldict import generate_gene_dict
 
 from ..utils import get_logger, reverse_complement
 
@@ -200,29 +201,36 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
             f.write(f"{seq}\n")
 
 
-def generate_target_seqs(target_genes, fasta_path, gtf_path, min_length=40, overlap=1):
+def generate_target_seqs(target_genes, 
+                         fasta_path, 
+                         gtf_path, 
+                         min_length=40, 
+                         overlap=30
+                         ):
     exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
     data_list = []  # 收集数据的列表
 
     for gene_name, exon_list in exon_info.items():
-        for i, exon_data in enumerate(exon_list, start=1):
+        n = 1
+        for j, exon_data in enumerate(exon_list, start=1):
             name, trans_name, seq, n_trans = exon_data
             chr_name = name.split('_')[0]  # 解析染色体名称
-
             # 生成子序列
-            for i in range(0, len(seq), min_length-overlap):
+            for i in range(0, len(seq) - min_length + 1,  min_length-overlap):
                 tem = seq[i:min_length+i]
                 tem = seq[i:i + min_length]
                 if len(tem) == min_length:  # 确保片段长度符合要求
                     start = i + 1  # 人类可读的位置应该从1开始
                     end = i + min_length
-                    gene_id = f"{gene_name}.{i}"
+                    gene_id = f"{gene_name}_{n}"
+                    n += 1
                     
                     # 将数据添加到列表中
-                    data_list.append([gene_id, chr_name, trans_name, start, end, tem, n_trans])
+                    data_list.append([gene_id, gene_name, chr_name, trans_name, start, end, tem, n_trans])
 
     # 创建 DataFrame
-    data = pd.DataFrame(data_list, columns=['gene_id', 'chr_name', 'transcript_name','start', 'end', 'target_region', 'n_trans'])
+    data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'chr_name', 'transcript_name','start', 
+                                            'end', 'target_region', 'n_trans'])
     return data
 
 

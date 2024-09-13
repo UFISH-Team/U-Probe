@@ -6,7 +6,7 @@
   "description": "hg38",
   "number-of-letters": 6613719,
   "number-of-sequences": 1,
-  "last-updated": "2024-09-12T19:20:00",
+  "last-updated": "2024-09-13T15:42:00",
   "number-of-volumes": 1,
   "bytes-total": 1702957,
   "bytes-to-cache": 1653683,

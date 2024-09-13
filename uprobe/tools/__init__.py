@@ -4,7 +4,6 @@ from .aligner import (
 )
 from ..gen.fun import extract_trans_seqs
 from ..utils import get_logger
-import os
 
 log = get_logger(__name__)
 
@@ -26,9 +25,9 @@ def build_transcripts_index(gtf: Path, fasta: Path, outdir: Path, threads: int) 
     
     # 检查 Bowtie2 索引是否存在
     if index_flag.exists():
-        log.info("Bowtie2 index found in the output directory.")
+        log.info("bowtie2 index found in the output directory.")
     else:
-        log.info("No Bowtie2 index found, building it now.")
+        log.info("no bowtie2 index found, building it now.")
         build_bowtie2_index(trans_fasta_path, str(index_prefix), threads)
     
     return str(index_prefix)
@@ -40,14 +39,14 @@ def build_genome(genome: dict) -> dict:
     prefix = fasta_path.stem
 
     for aligner in aligner_index:
-        log.info(f"Building {aligner} index for {prefix}")
+        log.info(f"building {aligner} index for {prefix}")
         # 创建新的文件夹用于存放索引
         index_dir = fasta_path.parent / f"genome_{aligner}_index"/ prefix
         index_dir.parent.mkdir(parents=True, exist_ok=True)
         
         if aligner == "bowtie2":
             if (index_dir.parent / f"{prefix}.1.bt2").exists():
-                log.info(f"Index {index_dir.parent} already exists.")
+                log.info(f"index {index_dir.parent} already exists.")
                 continue
             build_bowtie2_index(fasta_path, str(index_dir))
         
@@ -59,21 +58,19 @@ def build_genome(genome: dict) -> dict:
         
         elif aligner == "mmseqs":
             if (index_dir.parent / f"{prefix}.mmseqs").exists():
-                log.info(f"Index {index_dir.parent} already exists.")
+                log.info(f"index {index_dir.parent} already exists.")
                 continue
             build_mmseqs_index(fasta_path, str(index_dir))
 
         else:
-            raise NotImplementedError(f"Aligner {aligner} is not implemented.")
+            raise NotImplementedError(f"aligner {aligner} is not implemented.")
 
-        log.info(f"Building {aligner} index for {prefix} transcript")
+        log.info(f"building {aligner} index for {prefix} transcript")
 
         # 创建新的文件夹用于存放索引
         tran_index_dir = fasta_path.parent / f"transcript-index"
         tran_index_dir.mkdir(parents=True, exist_ok=True)
 
         build_transcripts_index(genome['gtf'], fasta_path, tran_index_dir, 10)
-
-            
 
     return genome
