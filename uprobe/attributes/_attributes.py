@@ -62,7 +62,6 @@ def bowtie2_align_se_sen(
                 log.error(f.read())
     return sam_path
 
-
 def write_fastq(outdir, gene, recname2seq: t.Mapping[str, str]):
     fq = f'{outdir}/{gene}.fq'
     with open(fq, 'w') as f:
@@ -104,14 +103,13 @@ def self_match(probe: str, min_match = 4):
                 match_pairs = match_pairs + 1
     return match_pairs
 
-
 def cal_temp(seq: str): # Tm
     return primer3.calc_tm(seq)
 
-def cal_fold(seq: str): # MFE
+def cal_fold(seq: str): # RNA fold
     return -RNA.fold_compound(seq).mfe()[1]
 
-def cal_gc_content(seq: str):
+def cal_gc_content(seq: str): #target gc content
     return (seq.count('G') + seq.count('C')) / len(seq)
 
 def cal_target_fold_score(seq: str):

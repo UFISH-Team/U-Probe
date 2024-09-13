@@ -42,7 +42,7 @@ def circle_probe(
     return part1 + part2 + part3
 
 
-# amp probe: part1+part2
+# amp probe: part1 + part2
 # 5'->3'
 def amp_part1(
         target_part3: str
@@ -75,18 +75,18 @@ def amp_probe(target_region: str,
 
 def construct_probes(config, target_seqs,
                      barcodes
-                     ): #contain barcpdes
+                     ): #contain barcodes
+    """Construct rca probes"""
     probes = [] 
-
+    
     len_part1 = config['extracts']['target_region']['parts']['part1']['length']
     len_part2 = config['extracts']['target_region']['parts']['part2']['length']
     len_part3 = config['extracts']['target_region']['parts']['part3']['length']
     
-
     for i, target_region in enumerate(target_seqs):
 
         barcode1, barcode2 = barcodes[i]  # 
-        
+
         target_part1 = target_region[:len_part1]
         target_part2 = target_region[len_part1:len_part1 + len_part2]
         target_part3 = target_region[-len_part3:]

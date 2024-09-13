@@ -2,7 +2,6 @@ import pandas as pd
 import os
 import typing as t
 from pyfaidx import Fasta
-from typing import List
 
 from ..utils import get_logger, reverse_complement
 
@@ -50,7 +49,6 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
         df_gene = df_gtf[df_gtf.gene_name == gene]
         if df_gene.shape[0] <= 0:
             raise ValueError(f"Gene {gene} not exists in GTF file.")
-
         df_exons = df_gene[df_gene.type == 'CDS'].copy()
         if df_exons.shape[0] == 0:
             df_exons = df_gene[df_gene.type == 'exon'].copy()
@@ -58,24 +56,30 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
         if df_exons.shape[0] == 0:
             raise ValueError(f"Gene {gene} can't found any exon records.")
         df_exons['transcript_name'] = df_exons['info'].str.extract(r'transcript_id\s+"([^"]+)"')[0]
-        exon_cnts = df_exons.groupby(by=['chr', 'start', 'end', 'length', 'strand', 'transcript_name'], as_index=False).count()
+        exon_cnts = df_exons.groupby(
+            by=['chr', 'start', 'end', 'length', 'strand'],
+            as_index=False
+        ).agg(
+            count=('transcript_name', 'count'),  
+            transcript_name=('transcript_name', lambda x: list(set(x))) 
+        )
         gene2exons[gene] = []
         for idx, row in exon_cnts.iterrows():
             chr_, start, end, strand, trans_name = str(row['chr']), row['start'], row['end'], row['strand'], row['transcript_name']
-            name = '_'.join([chr_, str(start), str(end), strand])
-            n_trans = row['type']
+            exon_name = '_'.join([chr_, str(start), str(end), strand])
+            n_trans = row['count']
             chr_ = chr_.replace('chr', '')
             seq = fa[chr_][start:end].seq.upper()
             if strand == '-':
                 seq = reverse_complement(seq)
-            exon = (name, trans_name, seq, n_trans)
+            exon = (exon_name, trans_name, seq, n_trans)
             gene2exons[gene].append(exon)
     return gene2exons
 
 def get_exon_seq(genes, fa, gtf):
     fa = Fasta(fa)
     genelist = pd.DataFrame(genes, columns=['geneID'])
-    df_gtf = read_gtf(gtf, extract_fields=['gene_name', "transcript_name"], get_length=True)
+    df_gtf = read_gtf(gtf, extract_fields=['gene_name', "transcript_id"], get_length=True)
     gene2exons = extract_exons_rca(df_gtf, fa, genelist)
     return gene2exons
 
@@ -86,7 +90,6 @@ def change_chrom_name(chrom):
         return 'chr'+chrom
         #return chrom
     
-# 假设 Exon 和 Utr 定义如下
 Exon = t.Tuple[str, str, str, int]  # (type, name, seq, n_trans)
 Utr = t.Tuple[str, str, str, int]  # (type, name, seq, n_trans)
 
@@ -95,23 +98,17 @@ def extract_gene_features(df_gtf: pd.DataFrame, fa: Fasta,
                           ) -> t.Mapping[str, t.List[t.Tuple[str, str]]]:
     """Extract all exons and UTRs of each gene"""
     gene_features = {}
-
     for item in genelist.iterrows():
         gene = item[1]['geneID']
         df_gene = df_gtf[df_gtf.gene_name == gene]
-        
         if df_gene.shape[0] <= 0:
             raise ValueError(f"Gene {gene} not exists in GTF file.")
-
-        # 提取外显子（CDS和exon）
+        # extract CDS/exon
         df_exons = df_gene[df_gene.type.isin(['CDS', 'exon'])].copy()
         df_exons = df_exons[df_exons.length > min_length]
-        
         if df_exons.shape[0] == 0:
             raise ValueError(f"Gene {gene} can't find any exon records.")
-
         gene_features[gene] = []
-        
         for idx, row in df_exons.iterrows():
             chr_, start, end, strand = str(row['chr']), row['start'], row['end'], row['strand']
             name = f"{gene}_{start}_{end}"
@@ -120,11 +117,9 @@ def extract_gene_features(df_gtf: pd.DataFrame, fa: Fasta,
             if strand == '-':
                 seq = reverse_complement(seq)
             gene_features[gene].append(("exon", name, seq, n_trans))
-
-        # 提取UTR
+        # extract utr
         df_utrs = df_gene[df_gene.type == 'UTR'].copy()
         df_utrs = df_utrs[df_utrs.length > min_length]
-
         if df_utrs.shape[0] > 0:
             for idx, row in df_utrs.iterrows():
                 chr_, start, end, strand = str(row['chr']), row['start'], row['end'], row['strand']
@@ -132,26 +127,20 @@ def extract_gene_features(df_gtf: pd.DataFrame, fa: Fasta,
                 n_trans = 1
                 seq = fa[chr_][start:end].seq.upper()
                 if strand == '-':
-                    seq = reverse_complement(seq)
-                
+                    seq = reverse_complement(seq) 
                 if idx == 0:
                     utr_type = "5'UTR" if strand == '+' else "3'UTR"
                 elif idx == df_utrs.shape[0] - 1:
                     utr_type = "3'UTR" if strand == '+' else "5'UTR"
                 else:
                     utr_type = "unknown_UTR"
-                
                 gene_features[gene].append((utr_type, name, seq, n_trans))
-
     return gene_features
-
 
 def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
     """Extract transcript's sequences.
     """
-    #import pdb; pdb.set_trace()
-    log.info(f"Extract transcript sequences from: {gtf_path}, {fa_path}")
-
+    log.info(f"extract transcript sequences from: {gtf_path}, {fa_path}")
     fa = Fasta(str(fa_path))
     exons_df = read_gtf(gtf_path, filter_by_type='exon', extract_fields=["gene_id", "transcript_id"])
     #exons_df = remove_small_chromosomes_df(exons_df)
@@ -192,45 +181,33 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
                 seq_lst.append(seq)
         seq = "".join(seq_lst)
         seq_dict[key_] = seq
-
-    log.info(f"Save results to {output_fa_path}")
+    log.info(f"save results to {output_fa_path}")
     with open(output_fa_path, 'w') as f:
         for (gene_id, tran_id), seq in seq_dict.items():
             f.write(f">{gene_id}_{tran_id}\n")
             f.write(f"{seq}\n")
 
-
 def generate_target_seqs(target_genes, 
                          fasta_path, 
                          gtf_path, 
-                         min_length=40, 
-                         overlap=30
+                         min_length: int = 40, 
+                         overlap: int = 20
                          ):
     exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
-    data_list = []  # 收集数据的列表
-
+    data_list = [] 
     for gene_name, exon_list in exon_info.items():
         n = 1
         for j, exon_data in enumerate(exon_list, start=1):
-            name, trans_name, seq, n_trans = exon_data
-            chr_name = name.split('_')[0]  # 解析染色体名称
-            # 生成子序列
-            for i in range(0, len(seq) - min_length + 1,  min_length-overlap):
-                tem = seq[i:min_length+i]
+            exon_name, trans_name, seq, n_trans = exon_data
+            # extract target region seqs
+            for i in range(0, len(seq) - min_length + 1,  min_length - overlap):
                 tem = seq[i:i + min_length]
-                if len(tem) == min_length:  # 确保片段长度符合要求
-                    start = i + 1  # 人类可读的位置应该从1开始
+                if len(tem) == min_length: 
+                    start = i + 1  
                     end = i + min_length
                     gene_id = f"{gene_name}_{n}"
                     n += 1
-                    
-                    # 将数据添加到列表中
-                    data_list.append([gene_id, gene_name, chr_name, trans_name, start, end, tem, n_trans])
-
-    # 创建 DataFrame
-    data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'chr_name', 'transcript_name','start', 
+                    data_list.append([gene_id, gene_name, exon_name, trans_name, start, end, tem, n_trans])
+    data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'exon_name', 'transcript_name','start', 
                                             'end', 'target_region', 'n_trans'])
     return data
-
-
-

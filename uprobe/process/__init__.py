@@ -1,3 +1,4 @@
+import pandas as pd 
 from .filters import (
     filter_gc_content,
     filter_n_mapped_genes,
@@ -6,9 +7,9 @@ from .filters import (
     filter_circle_AT
 )
 
-import pandas as pd 
 
-def filter_table(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
+def filter_table(df: pd.DataFrame, filters: dict
+                 ) -> pd.DataFrame:
     """
     Filter the table by the specified columns in the protocol.
     
@@ -22,24 +23,20 @@ def filter_table(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     if 'n_mapped_genes' in filters:
         n_mapped_genes: int = filters['n_mapped_genes']
         df = filter_n_mapped_genes(df, n_mapped_genes)
-
     if 'tm' in filters:
         min_tm = filters['tm'].get('min', 35)
         max_tm = filters['tm'].get('max', 45)
         df = filter_tm(df, min_tm, max_tm)
-
     if 'target_fold_score' in filters:
         df = filter_target_fold_score(df, filters['target_fold_score'])
-
     if 'gc_content' in filters:
         df = filter_gc_content(df, filters['gc_content'])
-
     if 'circle_AT' in filters:
         df = filter_circle_AT(df)
-
     return df
 
-def sort_table(df: pd.DataFrame, keys: list, ascending: list) -> pd.DataFrame:
+def sort_table(df: pd.DataFrame, keys: list, ascending: list
+               ) -> pd.DataFrame:
     """
     Sort the table by the specified columns in the protocol.
     
@@ -53,11 +50,12 @@ def sort_table(df: pd.DataFrame, keys: list, ascending: list) -> pd.DataFrame:
     """
     return df.sort_values(by=keys, ascending=ascending)
 
-def remove_overlap(df: pd.DataFrame, location_interval: int) -> pd.DataFrame:
+def remove_overlap(df: pd.DataFrame, location_interval: int
+                   ) -> pd.DataFrame:
     """
     Remove overlapping entries based on a specified location interval,
     considering each transcript separately.
-    
+
     Parameters:
         df (pd.DataFrame): The DataFrame to process.
         location_interval (int): The interval for determining overlaps.
@@ -65,17 +63,17 @@ def remove_overlap(df: pd.DataFrame, location_interval: int) -> pd.DataFrame:
     Returns:
         pd.DataFrame: The DataFrame with overlapping entries removed.
     """
+    df['transcript_name'] = df['transcript_name'].apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
+
     df = df.sort_values(by=['transcript_name', 'start'])
     non_overlapping = []
-
-    for transcript, group in df.groupby('transcript_name'):
+    for _, group in df.groupby('transcript_name'):
         current_end = None
-        for index, row in group.iterrows():
+        for _, row in group.iterrows():
             if current_end is None or row['start'] > current_end + location_interval:
                 non_overlapping.append(row)
                 current_end = row['end']
-
-    return pd.DataFrame(non_overlapping)
+    return pd.DataFrame(non_overlapping).reset_index(drop=True)
 
 def post_process(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     """
@@ -89,23 +87,17 @@ def post_process(df: pd.DataFrame, config: dict) -> pd.DataFrame:
         pd.DataFrame: The post-processed DataFrame.
     """
     processes = config.get('post_process', {})
-
     if 'filters' in processes:
         filters = processes['filters']
         df = filter_table(df, filters)
-
     if 'sorts' in processes:
         sorts = processes['sorts']
         pos_fields = sorts.get('is_ascending', [])
         neg_fields = sorts.get('is_descending', [])
-
         sort_keys = pos_fields + neg_fields
         is_ascending = [True] * len(pos_fields) + [False] * len(neg_fields)
-
         df = sort_table(df, sort_keys, is_ascending)
-
     if "remove_overlap" in processes:
         location_interval = processes['remove_overlap'].get('location_interval', 0)
         df = remove_overlap(df, location_interval)
-
     return df

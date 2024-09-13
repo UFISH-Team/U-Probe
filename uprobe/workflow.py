@@ -1,9 +1,9 @@
 import os
 import typing as T
 from pathlib import Path
-import yaml
-
 import pandas as pd
+
+import yaml
 
 from uprobe.utils import get_logger
 from uprobe.gen.geneldict import generate_gene_dict
@@ -21,11 +21,9 @@ def parse_yaml(path: Path) -> dict:
     res = yaml.load(content, Loader=yaml.FullLoader)
     return res
 
-
 def check_protocol_yaml(res: dict):
     assert "genome" in res, "genome key not found"
     assert "name" in res, "name key not found"
-
 
 def construct_workflow(
         protocol_yaml: Path,
@@ -65,8 +63,8 @@ def construct_workflow(
             protocol["targets"],
             genome['fasta'],
             genome['gtf'],
-            overlap=10,
-            min_length=40,
+            overlap=protocol['extracts']['target_region']['overlap'],
+            min_length=protocol['extracts']['target_region']['min_length'],
         )
         
         log.info("generating gene barcode dictionary.")
@@ -112,7 +110,7 @@ if __name__ == "__main__":
             protocol_yaml: str,
             genomes_yaml: str,
             output_csv: str,
-            workdir: str = "/home/qzhang/U-Probe/tests"):
+            workdir: str = "/tests"):
         workflow = construct_workflow(
             Path(protocol_yaml),
             Path(genomes_yaml),

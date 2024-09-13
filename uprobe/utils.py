@@ -3,7 +3,6 @@ import logging
 import os
 from os.path import exists
 
-
 def get_logger(name):
     log = logging.getLogger(name)
     handler = logging.StreamHandler(sys.stderr)
@@ -13,7 +12,6 @@ def get_logger(name):
     log.addHandler(handler)
     log.setLevel(logging.DEBUG)
     return log
-
 
 def get_base_map():
     base_map = [b'\0' for i in range(256)]
@@ -35,7 +33,6 @@ def reverse_complement(seq):
     res = seq[::-1]
     res = res.translate(BASEMAP)
     return res
-
 
 def get_tmp_dir(basename):
     i = 0

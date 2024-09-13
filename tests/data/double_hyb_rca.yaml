@@ -33,6 +33,7 @@ extracts:
   target_region:
     source: targets
     min_length: 40
+    overlap: 35
     template: "{part1}{part2}N{part3}"
     parts:
       part1: 
@@ -74,7 +75,7 @@ attributes:
     target: target_region
     type: n_mapped_genes
     aligner: bowtie2
-    similarity_threshold_ratio: 0.9
+    similarity_threshold_ratio: 0.75
   target_gc_content:
     target: target_region
     type: gc_content  
@@ -128,5 +129,5 @@ post_process:
       - amp_fold_score
       - amp_self_match
       - target_blocks
-  remove_overlap:
+  remove_overlap:  
     location_interval: 10
