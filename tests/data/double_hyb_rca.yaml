@@ -129,4 +129,4 @@ post_process:
       - amp_self_match
       - target_blocks
   remove_overlap:
-    location_interval: 0
+    location_interval: 10

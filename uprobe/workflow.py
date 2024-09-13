@@ -81,8 +81,9 @@ def construct_workflow(
 
         assert probe_df.shape[0] == df_targets.shape[0], "mismatch in number of targets and probes."
         
-        print(f"probe: {probe_df.columns}")
-        print(f"df: {df_targets.columns}")
+        print(f"probe columns: {probe_df.columns}")
+        print(f"df columns: {df_targets.columns}")
+
         log.info("merging target sequences with probe data.")
         df = pd.merge(df_targets, probe_df, on='target_region', how='inner')
         

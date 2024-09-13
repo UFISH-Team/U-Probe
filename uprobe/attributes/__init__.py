@@ -51,17 +51,17 @@ def add_attributes(
                 )
         
         elif attr_type == "annealing_temperature":
-            vals = df_probes[target].apply(cal_temp)
+            vals = df_probes[target].apply(cal_temp).round(2)
         
 
         elif attr_type == "gc_content":
-            vals = df_probes[target].apply(cal_gc_content)
+            vals = df_probes[target].apply(cal_gc_content).round(2)
         
         elif attr_type == "fold_score":
-            vals = df_probes[target].apply(cal_target_fold_score)
+            vals = df_probes[target].apply(cal_target_fold_score).round(2)
         
         elif attr_type == "self_match":
-            vals = df_probes[target].apply(cal_self_match)
+            vals = df_probes[target].apply(cal_self_match).round(2)
 
         elif attr_type == "blocks":
             if 'start' not in df_probes.columns:
