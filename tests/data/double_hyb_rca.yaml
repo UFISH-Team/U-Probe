@@ -80,13 +80,13 @@ attributes:
     target: target_region
     type: gc_content  
   tm1:
-    target: circle_probe:part1
+    target: target_region:part1
     type: annealing_temperature
   tm2:
-    target: circle_probe:part2
+    target: target_region:part2
     type: annealing_temperature
   tm3:
-    target: circle_probe:part3
+    target: target_region:part3
     type: annealing_temperature
   target_fold_score:
     target: target_region
@@ -112,7 +112,7 @@ post_process:
     n_mapped_genes: 10
     tm:
       min: 35
-      max: 70
+      max: 45
     target_fold_score: 30
     gc_content: 0.2
     circle_AT:

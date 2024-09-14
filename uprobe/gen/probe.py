@@ -98,6 +98,9 @@ def construct_probes(config, target_seqs,
         
         probe = {
             'target_region': target_region,
+            'target_region:part1': target_part1,
+            'target_region:part2': target_part2,
+            'target_region:part3': target_part3,
             'circle_probe': circle_probe_seq,
             'circle_probe:part1': circle_part1(target_part1),
             'circle_probe:part2': circle_part2(barcode1, barcode2),
