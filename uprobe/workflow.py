@@ -110,7 +110,7 @@ if __name__ == "__main__":
             protocol_yaml: str,
             genomes_yaml: str,
             output_csv: str,
-            workdir: str = "/tests"):
+            workdir: str = "U-Probe/tests"):
         workflow = construct_workflow(
             Path(protocol_yaml),
             Path(genomes_yaml),
