@@ -8,7 +8,6 @@ from ._attributes import (
     cal_self_match, cal_target_blocks
 )
 
-
 def add_attributes(
         df_probes: pd.DataFrame,
         protocol: dict,

@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess as subp
 
-from ..utils import get_logger
+from uprobe.utils import get_logger
 
 log = get_logger(__name__)
 

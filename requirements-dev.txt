@@ -7,3 +7,5 @@ pytest
 pytest-cov
 pytest-asyncio
 flake8
+pyqt5 < 5.13
+pyqtwebengine < 5.13

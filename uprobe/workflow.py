@@ -5,14 +5,13 @@ import pandas as pd
 
 import yaml
 
-from uprobe.utils import get_logger
-from uprobe.gen.geneldict import generate_gene_dict
-from uprobe.attributes import add_attributes
-from uprobe.tools import  build_genome
-from uprobe.gen.fun import generate_target_seqs
-from uprobe.gen.probe import construct_probes
-from uprobe.process import post_process
-from uprobe.utils import get_logger
+from utils import get_logger
+from gen.geneldict import generate_gene_dict
+from attributes import add_attributes
+from tools import  build_genome
+from gen.fun import generate_target_seqs
+from gen.probe import construct_probes
+from process import post_process
 
 log = get_logger(__name__)
 
@@ -110,7 +109,7 @@ if __name__ == "__main__":
             protocol_yaml: str,
             genomes_yaml: str,
             output_csv: str,
-            workdir: str = "/home/qzhang/U-Probe/tests"): 
+            workdir: str = "tests"): 
         workflow = construct_workflow(
             Path(protocol_yaml),
             Path(genomes_yaml),

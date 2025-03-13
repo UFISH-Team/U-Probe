@@ -1,6 +1,11 @@
 import argparse
 from pathlib import Path
 from .workflow import construct_workflow
+import sys
+import os
+
+project_root = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(project_root)
 
 def main():
     parser = argparse.ArgumentParser(description="Run the workflow for double hybrid RCA.")

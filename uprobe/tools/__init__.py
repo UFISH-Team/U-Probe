@@ -2,8 +2,8 @@ from pathlib import Path
 from .aligner import (
     build_bowtie2_index, build_blast_db, build_mmseqs_index
 )
-from ..gen.fun import extract_trans_seqs
-from ..utils import get_logger
+from uprobe.gen.fun import extract_trans_seqs
+from uprobe.utils import get_logger
 
 log = get_logger(__name__)
 

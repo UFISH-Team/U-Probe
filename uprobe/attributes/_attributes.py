@@ -3,7 +3,7 @@ import typing as t
 import primer3
 import RNA
 import subprocess as subp
-from ..utils import get_logger, reverse_complement
+from uprobe.utils import get_logger, reverse_complement
 
 log = get_logger(__name__)
 

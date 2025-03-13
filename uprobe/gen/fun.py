@@ -3,7 +3,7 @@ import os
 import typing as t
 from pyfaidx import Fasta
 
-from ..utils import get_logger, reverse_complement
+from uprobe.utils import get_logger, reverse_complement
 
 log = get_logger(__name__)
 
