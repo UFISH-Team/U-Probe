@@ -10,7 +10,7 @@ from gen.geneldict import generate_gene_dict
 from attributes import add_attributes
 from tools import  build_genome
 from gen.fun import generate_target_seqs
-from gen.probe import construct_probes
+from uprobe.gen.probe_rca import construct_probes
 from process import post_process
 
 log = get_logger(__name__)

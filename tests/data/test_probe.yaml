@@ -1,0 +1,45 @@
+name: test_probe_config
+description: 测试探针设计配置
+
+probes:
+  # 基础序列探针
+  base_seq:
+    source: "external"
+    sequence: "ATCGATCG"
+    process:
+      - type: "reverse_complement"
+
+  # 目标序列探针
+  target_seq:
+    source: "target"
+    sequence: "GCTAGCTA"
+
+  # 表达式探针，引用base_seq
+  expr_probe:
+    expr: "base_seq"
+
+  # 模板探针，组合多个部分
+  template_probe:
+    type: "template"
+    template: "{part1}{part2}{part3}"
+    parts:
+      part1:
+        source: "external"
+        sequence: "AAAA"
+      part2:
+        expr: "base_seq"
+      part3:
+        source: "external"
+        sequence: "TTTT"
+
+  # 复杂组合探针
+  complex_probe:
+    type: "template"
+    template: "{seq1}{seq2}{seq3}"
+    parts:
+      seq1:
+        expr: "target_seq"
+      seq2:
+        expr: "expr_probe"
+      seq3:
+        expr: "template_probe"
