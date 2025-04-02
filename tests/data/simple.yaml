@@ -1,3 +1,4 @@
+
 name: simple
 description: A simple protocol for test
 
@@ -25,31 +26,15 @@ extracts:
     overlap: length / 2
 
 probes:
-  # Component definition
-  component_1:
-    source: "target"  # or "external"
-    process:
-      - type: "process_type_1"
-        params: {}
-      - type: "process_type_2"
-        params: {}
-
-  component_2:
-    source: "external"
-    sequence: "ACGT..."
-    process:
-      - type: "process_type_3"
-        params: {}
-
-  # Final probe assembly
-  final_probe:
-    type: "template"
-    template: "{component_1}{component_2}"
+  probe1:
+    template: "{part1}AAA{part2}"
     parts:
       part1:
-        expr: "component_1"
+        length: 13
+        source: target_region[0:length]
       part2:
-        expr: "component_2"
+        length: 13
+        source: target_region[-length:]
 
 attributes:
   n_mapped_genes:
@@ -72,4 +57,3 @@ post_process:
   - sort:
     - tm1
   - remove_overlap
-
