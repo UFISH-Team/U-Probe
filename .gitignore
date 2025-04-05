@@ -180,5 +180,6 @@ uprobe.egg-info
 .pytest_cache
 
 # tests
+tmp/
 tests/data/test/
 
