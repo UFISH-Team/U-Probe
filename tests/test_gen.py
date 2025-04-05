@@ -1,8 +1,6 @@
-from uprobe.gen.geneldict import generate_gene_dict
+from uprobe.gen.genebars import generate_gene_dict
 from pathlib import Path
 from uprobe.workflow import parse_yaml
-
-HERE = Path(__file__).parent
 
 HERE = Path(__file__).parent
 

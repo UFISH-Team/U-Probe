@@ -7,19 +7,11 @@ from .filters import (
     filter_circle_AT
 )
 
-
 def filter_table(df: pd.DataFrame, filters: dict
                  ) -> pd.DataFrame:
-    """
-    Filter the table by the specified columns in the protocol.
     
-    Parameters:
-        df (pd.DataFrame): The DataFrame to filter.
-        filters (dict): A dictionary of filter criteria.
+    "Filter the table by the specified columns in the protocol."
 
-    Returns:
-        pd.DataFrame: The filtered DataFrame.
-    """
     if 'n_mapped_genes' in filters:
         n_mapped_genes: int = filters['n_mapped_genes']
         df = filter_n_mapped_genes(df, n_mapped_genes)
@@ -40,29 +32,13 @@ def sort_table(df: pd.DataFrame, keys: list, ascending: list
     """
     Sort the table by the specified columns in the protocol.
     
-    Parameters:
-        df (pd.DataFrame): The DataFrame to sort.
-        keys (list): List of column names to sort by.
-        ascending (list): List of booleans indicating sort order for each key.
-
-    Returns:
-        pd.DataFrame: The sorted DataFrame.
     """
     return df.sort_values(by=keys, ascending=ascending)
 
 def remove_overlap(df: pd.DataFrame, location_interval: int
                    ) -> pd.DataFrame:
-    """
-    Remove overlapping entries based on a specified location interval,
-    considering each transcript separately.
+    "Remove overlapping entries based on a specified location interval, considering each transcript separately."
 
-    Parameters:
-        df (pd.DataFrame): The DataFrame to process.
-        location_interval (int): The interval for determining overlaps.
-
-    Returns:
-        pd.DataFrame: The DataFrame with overlapping entries removed.
-    """
     df['transcript_name'] = df['transcript_name'].apply(lambda x: ', '.join(x) if isinstance(x, list) else x)
 
     df = df.sort_values(by=['transcript_name', 'start'])
@@ -78,13 +54,6 @@ def remove_overlap(df: pd.DataFrame, location_interval: int
 def post_process(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     """
     Post-process the data frame according to the protocol.
-    
-    Parameters:
-        df (pd.DataFrame): The DataFrame to process.
-        config (dict): Configuration dictionary containing processing instructions.
-
-    Returns:
-        pd.DataFrame: The post-processed DataFrame.
     """
     processes = config.get('post_process', {})
     if 'filters' in processes:

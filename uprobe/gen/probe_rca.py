@@ -79,9 +79,9 @@ def construct_probes(config, target_seqs,
     """Construct rca probes"""
     probes = [] 
     
-    len_part1 = config['extracts']['target_region']['parts']['part1']['length']
-    len_part2 = config['extracts']['target_region']['parts']['part2']['length']
-    len_part3 = config['extracts']['target_region']['parts']['part3']['length']
+    len_part1 = config['probes']['circle_probe']['parts']['part1']['length']
+    len_part2 = len(barcodes[0][0])*2+1
+    len_part3 = config['probes']['circle_probe']['parts']['part3']['length']
     
     for i, target_region in enumerate(target_seqs):
 

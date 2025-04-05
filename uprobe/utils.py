@@ -53,3 +53,14 @@ def self_match(probe: str, min_match = 4):
             if tem == tem_re and i + j + min_match - 2 != length:
                 match_pairs = match_pairs + 1
     return match_pairs
+
+def gene_barcode(config: dict) -> dict:
+    """Generates a dictionary of gene names to anchor barcodes"""
+    gene_barcode_dict = {}
+    for target in config['targets']:
+        if target in config['encoding']:
+            barcodes = config['encoding'][target]
+            anchor1 = config['barcode_set'][barcodes['barcode1']]
+            anchor2 = config['barcode_set'][barcodes['barcode2']]
+            gene_barcode_dict[target] = (anchor1, anchor2) 
+    return gene_barcode_dict

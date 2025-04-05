@@ -1,4 +1,3 @@
-
 from pathlib import Path
 import typing as T
 from ..utils import reverse_complement
@@ -28,7 +27,7 @@ class DAG():
         for node in self.nodes:
             if isinstance(node, ExprProbe):
                 node.parse_expr()
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
 
     def get_downstream_nodes(self, node: "Node") -> T.List["Node"]:
         downstream = []
@@ -140,7 +139,7 @@ class TemplateProbe(Probe):
         for part in self.parts:
             if part.name == item:
                 return part
-        raise ValueError(f"Part {item} not found")
+
 
 def construct_probes(workdir: Path, config, target_seqs_path: Path):
     dag = DAG()

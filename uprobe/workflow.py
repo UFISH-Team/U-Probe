@@ -5,12 +5,11 @@ import pandas as pd
 
 import yaml
 
-from uprobe.utils import get_logger
-from uprobe.gen.geneldict import generate_gene_dict
+from uprobe.utils import get_logger, gene_barcode
 from uprobe.attributes import add_attributes
 from uprobe.tools import  build_genome
 from uprobe.gen.fun import generate_target_seqs
-from uprobe.gen.probe_rca import construct_probes
+from uprobe.gen.probe import construct_probes
 from uprobe.process import post_process
 
 log = get_logger(__name__)
@@ -62,12 +61,12 @@ def construct_workflow(
             protocol["targets"],
             genome['fasta'],
             genome['gtf'],
-            overlap=protocol['extracts']['target_region']['overlap'],
-            min_length=protocol['extracts']['target_region']['min_length'],
+            overlap = protocol['extracts']['target_region']['overlap'],
+            min_length=protocol['extracts']['target_region']['length'],
         )
         
         log.info("generating gene barcode dictionary.")
-        barcode_dict = generate_gene_dict(protocol)
+        barcode_dict = gene_barcode(protocol)
         df_targets['barcodes'] = df_targets['gene'].map(barcode_dict)
 
         seqs = df_targets['target_region'].to_list()

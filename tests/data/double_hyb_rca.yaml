@@ -5,53 +5,52 @@ genome: hg38
 
 targets:
   - SRY
+  - ENSG00000139618
 
 barcode_set:
-  A-488: xxxxxxxxxA1
-  A-594: xxxxxxxxxA2
-  B-488: xxxxxxxxxB2
+  A-488: AAAATTTTTTTTAAGCA
+  B-488: ATTTCGTACGTGTCATA
+  A-594: GGTTTTTTTTTTTTTTT
 
 encoding:
-  gene1:
+  SRY: 
     barcode1: A-488
-    barcode2: A-488
-  gene2:
+    barcode2: B-488
+  ENSG00000139618:
     barcode1: A-488
     barcode2: A-594
 
 extracts:
-  target_region:
+  target_region: 
     source: targets
     length: 60
-    overlap: length / 2
+    overlap: 30
 
 probes:
-  probe1:
-    template: "{part1}{part2}N{part3}{part4}"
+  circle_probe:
+    template: "{part1}{part2}{part3}"
     parts:
       part1:
         length: 13
         expr: rc(target_region[0:length])
       part2:
-        length: encoding[target_region.gene_id]['barcode1'].length
-        expr: encoding[target_region.gene_id]['barcode1']
+        template: "{barcode1}N{barcode2}"
+        parts:
+          barcode1:
+            expr: encoding[target_region.gene_id]['barcode1']
+          barcode2:
+            expr: encoding[target_region.gene_id]['barcode2']
       part3:
-        length: encoding[target_region.gene_id]['barcode2'].length
-        expr: encoding[target_region.gene_id]['barcode2']
-      part4:
         length: 13
-        expr: rc(target_region[part1.length+1:part1.length+length])
+        expr: rc(target_region[part1.length:part1.length+length])
 
-  probe2:
+  amp_probe:
     template: "{part1}N{part2}"
     parts:
       part1:
-        expr: rc(probe1.part1)
+        expr: rc(circle_probe.part2.barcode2)
       part2:
-        length: 13
-        start: probe1.part1.length*2+1
-        end: probe1.part1.length*2 + length
-        expr: rc(target_region[start:end])
+        expr: rc(target_region[-self.length:])
 
 attributes:
   n_mapped_genes:
