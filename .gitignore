@@ -178,3 +178,7 @@ uprobe.egg-info
 .git
 .github
 .pytest_cache
+
+# tests
+tests/data/test/
+
