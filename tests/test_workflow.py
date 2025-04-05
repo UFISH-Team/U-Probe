@@ -11,7 +11,7 @@ def test_parse_yaml():
     res = parse_yaml(path)
     check_protocol_yaml(res)
     assert res["name"] == "RCA Double Hybridization"
-    assert res['genome'] == "hg38"
+    assert res['genome'] == "test"
     path = HERE / "data" / "genomes.yaml"
     res = parse_yaml(path)
 
@@ -28,5 +28,6 @@ def test_workflow():
     workflow = construct_workflow(
         protocol_yaml, genomes_yaml,
         HERE / "output_probe.csv",
-        ".")
+        Path("."),
+        HERE / "raw_results.csv")
     workflow()

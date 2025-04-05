@@ -1,3 +1,15 @@
+
+test:
+  description: "Test genome"
+  species: Test
+  fasta: "tests/data/test/test.fa"
+  gtf: "tests/data/test/test.gtf"
+  out: "tests/data/test"
+  align_index:
+    - blast
+    - bowtie2
+  jellyfish: false
+
 hg38:
   description: "Human genome build 38"
   species: Homo sapiens

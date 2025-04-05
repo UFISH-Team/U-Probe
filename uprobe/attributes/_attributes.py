@@ -3,7 +3,7 @@ import typing as t
 import primer3
 import RNA
 import subprocess as subp
-from uprobe.utils import get_logger, reverse_complement
+from uprobe.utils import get_logger, reverse_complement, write_fastq
 
 log = get_logger(__name__)
 
@@ -61,16 +61,6 @@ def bowtie2_align_se_sen(
             with open(log_file) as f:
                 log.error(f.read())
     return sam_path
-
-def write_fastq(outdir, gene, recname2seq: t.Mapping[str, str]):
-    fq = f'{outdir}/{gene}.fq'
-    with open(fq, 'w') as f:
-        for recname, seq in recname2seq.items():
-            f.write(f"@{recname}\n")
-            f.write(seq+"\n")
-            f.write("+\n")
-            f.write("~"*len(seq)+"\n")
-    return fq
 
 def count_n_bowtie2_aligned_genes(
         outdir: str,

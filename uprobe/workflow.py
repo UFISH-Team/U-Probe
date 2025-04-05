@@ -9,7 +9,7 @@ from uprobe.utils import get_logger, gene_barcode
 from uprobe.attributes import add_attributes
 from uprobe.tools import  build_genome
 from uprobe.gen.fun import generate_target_seqs
-from uprobe.gen.probe import construct_probes
+from uprobe.gen.probe_rca import construct_probes
 from uprobe.process import post_process
 
 log = get_logger(__name__)
@@ -28,6 +28,7 @@ def construct_workflow(
         genomes_yaml: Path,
         output_csv: Path,
         workdir: Path = Path("."),
+        raw_results_csv: T.Optional[Path] = None,
         ) -> T.Callable:
     
     log.info("parsing protocol yaml.")
@@ -77,26 +78,27 @@ def construct_workflow(
 
         assert probe_df.shape[0] == df_targets.shape[0], "mismatch in number of targets and probes."
         
-        print(f"probe columns: {probe_df.columns}")
-        print(f"df columns: {df_targets.columns}")
+        #print(f"probe columns: {probe_df.columns}")
+        #print(f"df columns: {df_targets.columns}")
 
-        log.info("merging target sequences with probe data.")
         df = pd.merge(df_targets, probe_df, on='target_region', how='inner')
-        
-        log.info("adding attributes to the DataFrame.")
         df = add_attributes(df, protocol, genome, workdir)
+
+        if raw_results_csv:
+            log.info(f"saving raw results to csv: {raw_results_csv}")
+            df.to_csv(raw_results_csv, index=False)
         
-        log.info("post-processing the DataFrame.")
+        log.info("post-processing the results.")
         df = post_process(df, protocol)
 
         if df.shape[0] == 0:
-            log.warning("dataFrame is empty, no results.")
+            log.warning("df is empty, no results.")
         else:
-            log.info("dropping unnecessary columns from the dataFrame.")
-            df = df.drop(columns=['circle_probe:part1', 'circle_probe:part2', 'circle_probe:part3',
-                                  'amp_probe:part1', 'amp_probe:part2'])
+            # Drop all columns containing 'part' in their names
+            part_columns = [col for col in df.columns if 'part' in col]
+            df = df.drop(columns=part_columns)
 
-            log.info(f"saving results to csv: {output_csv}")
+            log.info(f"saving post-processed results to csv: {output_csv}")
             df.to_csv(output_csv, index=False)
 
     return workflow

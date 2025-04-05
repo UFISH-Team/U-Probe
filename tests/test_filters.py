@@ -8,16 +8,15 @@ from uprobe.process.filters import (
     filter_circle_AT
 )
 
-# 使用 pytest.fixture 定义样本数据
 @pytest.fixture
 def sample_df():
     data = {
-        'n_mapped_genes': [2, 5, 3, 1],
+        'n_mapped_genes': [{'g42236': 2}, {'g42179': 5}, {'g42180': 3}, {'g42181': 1}],
         'tm1': [36, 44, 50, 30],
         'tm2': [37, 42, 33, 40],
         'tm3': [39, 46, 32, 38],
         'target_fold_score': [70, 20, 75, 60],
-        'gc_content': [0.4, 0.2, 0.5, 0.3],
+        'target_gc_content': [0.4, 0.2, 0.5, 0.3],
         'circle_fold_score': [90, 75, 85, 70],
         'circle_probe': ['ATCGTA', 'GCTA', 'CGTA', 'AGTC']
     }
@@ -37,7 +36,7 @@ def test_filter_gc_content(sample_df):
 
 def test_filter_target_fold_score(sample_df):
     result = filter_target_fold_score(sample_df, 60)
-    assert result.shape[0] == 2  # 只有两行满足条件
+    assert result.shape[0] == 2  
 
 def test_filter_circle_AT(sample_df):
     result = filter_circle_AT(sample_df)

@@ -2,7 +2,7 @@ import sys
 import logging
 import os
 from os.path import exists
-
+import typing as t
 def get_logger(name):
     log = logging.getLogger(name)
     handler = logging.StreamHandler(sys.stderr)
@@ -54,13 +54,28 @@ def self_match(probe: str, min_match = 4):
                 match_pairs = match_pairs + 1
     return match_pairs
 
+def write_fastq(outdir, gene, recname2seq: t.Mapping[str, str]):
+    fq = f'{outdir}/{gene}.fq'
+    with open(fq, 'w') as f:
+        for recname, seq in recname2seq.items():
+            f.write(f"@{recname}\n")
+            f.write(seq+"\n")
+            f.write("+\n")
+            f.write("~"*len(seq)+"\n")
+    return fq
+
 def gene_barcode(config: dict) -> dict:
-    """Generates a dictionary of gene names to anchor barcodes"""
+    """
+    Generates a dictionary of gene names to anchor barcodes
+    """
     gene_barcode_dict = {}
     for target in config['targets']:
         if target in config['encoding']:
             barcodes = config['encoding'][target]
-            anchor1 = config['barcode_set'][barcodes['barcode1']]
-            anchor2 = config['barcode_set'][barcodes['barcode2']]
-            gene_barcode_dict[target] = (anchor1, anchor2) 
+            # Get all barcodes for this target
+            barcode_values = []
+            for barcode_key in barcodes:
+                barcode_value = config['barcode_set'][barcodes[barcode_key]]
+                barcode_values.append(barcode_value)
+            gene_barcode_dict[target] = tuple(barcode_values)
     return gene_barcode_dict

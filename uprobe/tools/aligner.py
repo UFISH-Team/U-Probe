@@ -28,7 +28,7 @@ def build_blast_db(fasta_path: Path,
         "-title", title,
         "-parse_seqids",
         "-out", str(db_prefix),
-        "-logfile", f"{str(db_prefix.parent)}/make_nt.log",
+        "-logfile", f"{str(Path(db_prefix).parent)}/make_nt.log",
     ]
     cmd = " ".join(cmd)
     log.info(f"Call cmd: {cmd}")
