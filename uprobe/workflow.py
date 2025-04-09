@@ -110,12 +110,14 @@ if __name__ == "__main__":
             protocol_yaml: str,
             genomes_yaml: str,
             output_csv: str,
-            workdir: str = "tests"): 
+            workdir: str = ".",
+            raw_results_csv: str = None): 
         workflow = construct_workflow(
             Path(protocol_yaml),
             Path(genomes_yaml),
             Path(output_csv),
-            Path(workdir)
+            Path(workdir),
+            Path(raw_results_csv) if raw_results_csv else None
         )
         workflow()
     fire.Fire(main)

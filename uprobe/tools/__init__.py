@@ -45,7 +45,7 @@ def build_genome(genome: dict
             build_bowtie2_index(fasta_path, str(index_dir))     
         elif aligner == "blast":
             if (index_dir.parent / f"{prefix}.ndb").exists():
-                log.info(f"Index {index_dir.parent} already exists.")
+                log.info(f"index {index_dir.parent} already exists.")
                 continue
             build_blast_db(fasta_path, str(index_dir), title=prefix)
         elif aligner == "mmseqs":
