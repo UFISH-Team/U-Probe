@@ -2,9 +2,9 @@
 test:
   description: "Test genome"
   species: Test
-  fasta: "/home/qzhang/genomes/test/test.fa"
-  gtf: "/home/qzhang/genomes/test/test.gtf"
-  out: "/home/qzhang/genomes/test"
+  fasta: "/home/qzhang/testdata/genomes/test/test.fa"
+  gtf: "/home/qzhang/testdata/genomes/test/test.gtf"
+  out: "/home/qzhang/testdata/genomes/test"
   align_index:
     - blast
     - bowtie2
