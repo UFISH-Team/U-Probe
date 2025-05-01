@@ -20,23 +20,29 @@ def parse_yaml(path: Path) -> dict:
     return res
 
 def check_protocol_yaml(res: dict):
+    print(res)
     assert "genome" in res, "genome key not found"
     assert "name" in res, "name key not found"
 
 def construct_workflow(
-        protocol_yaml: Path,
-        genomes_yaml: Path,
+        protocol_yaml: T.Union[Path, dict],
+        genomes_yaml: T.Union[Path, dict],
         output_csv: Path,
         workdir: Path = Path("."),
         raw_results_csv: T.Optional[Path] = None,
         ) -> T.Callable:
+    if isinstance(protocol_yaml, dict):
+        protocol = protocol_yaml
+    else:
+        log.info("parsing protocol yaml.")
+        protocol = parse_yaml(protocol_yaml)
+        check_protocol_yaml(protocol)
     
-    log.info("parsing protocol yaml.")
-    protocol = parse_yaml(protocol_yaml)
-    check_protocol_yaml(protocol)
-    
-    log.info("parsing genomes yaml.")
-    genomes = parse_yaml(genomes_yaml)
+    if isinstance(genomes_yaml, dict):
+        genomes = genomes_yaml
+    else:
+        log.info("parsing genomes yaml.")
+        genomes = parse_yaml(genomes_yaml)
 
     genome_name = protocol['genome']
     genome = genomes[genome_name]
@@ -85,8 +91,8 @@ def construct_workflow(
         df = add_attributes(df, protocol, genome, workdir)
 
         if raw_results_csv:
-            log.info(f"saving raw results to csv: {raw_results_csv}")
-            df.to_csv(raw_results_csv, index=False)
+            log.info(f"saving raw results to csv: {workdir}/{raw_results_csv}")
+            df.to_csv(workdir / raw_results_csv, index=False)
         
         log.info("post-processing the results.")
         df = post_process(df, protocol)
@@ -98,8 +104,8 @@ def construct_workflow(
             part_columns = [col for col in df.columns if 'part' in col]
             df = df.drop(columns=part_columns)
 
-            log.info(f"saving post-processed results to csv: {output_csv}")
-            df.to_csv(output_csv, index=False)
+            log.info(f"saving post-processed results to csv: {workdir}/{output_csv}")
+            df.to_csv(workdir / output_csv, index=False)
 
     return workflow
 
@@ -107,15 +113,17 @@ def construct_workflow(
 if __name__ == "__main__":
     import fire
     def main(
-            protocol_yaml: str,
-            genomes_yaml: str,
+            protocol_yaml: T.Union[Path, str, dict],
+            genomes_yaml: T.Union[Path, str, dict],
             output_csv: str,
-            workdir: str = "tests"): 
+            workdir: str = "tests",
+            raw_results_csv: T.Optional[str] = None): 
         workflow = construct_workflow(
             Path(protocol_yaml),
             Path(genomes_yaml),
             Path(output_csv),
-            Path(workdir)
+            Path(workdir),
+            Path(raw_results_csv) if raw_results_csv else None
         )
         workflow()
     fire.Fire(main)

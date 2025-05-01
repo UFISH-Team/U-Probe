@@ -1,0 +1,25 @@
+probes:
+  probe_1:
+    template: "{part1}{part2}"
+    parts:
+      part1:
+        length: 11
+        expr: "rc(target_region[0:11])"
+      part2:
+        length: 15
+        expr: "target_region[0:15]"
+  probe_2:
+    template: "{part1}"
+    parts:
+      part1:
+        length: 26
+        expr: "probe_1[0:10]"
+  probe_3:
+    template: "{part1}{part2}"
+    parts:
+      part1:
+        length: 12
+        expr: "encoding[gene_id]['BC2']"
+      part2:
+        length: 12
+        expr: "encoding[gene_id]['BC3']"

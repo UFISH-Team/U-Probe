@@ -32,17 +32,17 @@ probes:
     parts:
       part1:
         length: 13
-        expr: rc(target_region[0:length])
+        expr: rc(target_region[0:13])
       part2:
         template: "{barcode1}N{barcode2}"
         parts:
           barcode1:
-            expr: encoding[target_region.gene_id]['barcode1']
+            expr: encoding[gene_id]['barcode1']
           barcode2:
-            expr: encoding[target_region.gene_id]['barcode2']
+            expr: encoding[gene_id]['barcode2']
       part3:
         length: 13
-        expr: rc(target_region[part1.length:part1.length+length])
+        expr: rc(target_region[13:26])
 
   amp_probe:
     template: "{part1}N{part2}"
@@ -50,7 +50,7 @@ probes:
       part1:
         expr: rc(circle_probe.part2.barcode2)
       part2:
-        expr: rc(target_region[-self.length:])
+        expr: rc(target_region[-13:])
 
 attributes:
   n_mapped_genes:

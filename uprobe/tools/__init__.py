@@ -36,28 +36,36 @@ def build_genome(genome: dict
     prefix = fasta_path.stem
     for aligner in aligner_index:
         log.info(f"building {aligner} index for {prefix}")
-        index_dir = fasta_path.parent / f"genome_{aligner}_index"/ prefix
-        index_dir.parent.mkdir(parents=True, exist_ok=True)
-        if aligner == "bowtie2":
-            if (index_dir.parent / f"{prefix}.1.bt2").exists():
-                log.info(f"index {index_dir.parent} already exists.")
-                continue
-            build_bowtie2_index(fasta_path, str(index_dir))     
-        elif aligner == "blast":
-            if (index_dir.parent / f"{prefix}.ndb").exists():
-                log.info(f"Index {index_dir.parent} already exists.")
-                continue
-            build_blast_db(fasta_path, str(index_dir), title=prefix)
-        elif aligner == "mmseqs":
-            if (index_dir.parent / f"{prefix}.db").exists():
-                log.info(f"index {index_dir.parent} already exists.")
-                continue
-            build_mmseqs_index(fasta_path, str(index_dir))
+        index_dir = fasta_path.parent / f"{aligner}_genome"/ prefix
+        if index_dir.parent.exists():
+            log.info(f"index {index_dir.parent} already exists.")
         else:
-            raise NotImplementedError(f"aligner {aligner} is not implemented.")
+            log.info(f"index {index_dir.parent} does not exist, building it now.")
+            index_dir.parent.mkdir(parents=True, exist_ok=True)
+            if aligner == "bowtie2":
+                if (index_dir.parent / f"{prefix}.1.bt2").exists():
+                    log.info(f"index {index_dir.parent} already exists.")
+                else:
+                    build_bowtie2_index(fasta_path, str(index_dir))     
+            if aligner == "blast":
+                if (index_dir.parent / f"{prefix}.ndb").exists():
+                    log.info(f"index {index_dir.parent} already exists.")
+                else:          
+                    build_blast_db(fasta_path, str(index_dir), title=prefix)
+            if aligner == "mmseqs":
+                if (index_dir.parent / f"{prefix}.db").exists():
+                    log.info(f"index {index_dir.parent} already exists.")
+                else:
+                    build_mmseqs_index(fasta_path, str(index_dir))
+            else:
+                raise NotImplementedError(f"aligner {aligner} is not implemented.")
         log.info(f"building {aligner} index for {prefix} transcript")
-        tran_index_dir = fasta_path.parent / f"transcript-index"
-        tran_index_dir.mkdir(parents=True, exist_ok=True)
+        tran_index_dir = fasta_path.parent / f"blast_transcript"
+        if tran_index_dir.exists():
+            log.info(f"transcript index {tran_index_dir} already exists.")
+        else:
+            log.info(f"transcript index {tran_index_dir} does not exist, building it now.")
+            tran_index_dir.mkdir(parents=True, exist_ok=True)
         build_transcripts_index(gtf=genome['gtf'], 
                                 fasta=fasta_path, 
                                 outdir=tran_index_dir, 

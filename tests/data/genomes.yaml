@@ -2,11 +2,10 @@
 test:
   description: "Test genome"
   species: Test
-  fasta: "tests/data/test/test.fa"
-  gtf: "tests/data/test/test.gtf"
-  out: "tests/data/test"
+  fasta: "D:/repos/testdata/genomes/test/test.fa"
+  gtf: "D:/repos/testdata/genomes/test/test.gtf"
+  out: "D:/repos/testdata/genomes/test"
   align_index:
-    - blast
     - bowtie2
   jellyfish: false
 

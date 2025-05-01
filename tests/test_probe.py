@@ -1,10 +1,12 @@
 import pytest
 from pathlib import Path
+from uprobe.utils import reverse_complement
 
-# 假设 construct_probes 已从你实际的代码模块中导入
-from uprobe.gen.probe import construct_probes  # 请替换成实际模块路径
+
+from uprobe.gen.probe import construct_probes 
 from uprobe.workflow import parse_yaml, check_protocol_yaml
 from uprobe.gen.probe import DAG
+from uprobe.gen.probe import ExprProbe, TemplateProbe
 
 HERE = Path(__file__).parent
 
@@ -31,68 +33,94 @@ def test_constrct_probes():
 
 def test_probe_dependencies():
     config = parse_yaml(HERE / "data" / "double_hyb_rca.yaml")
-    check_protocol_yaml(config)
-    workdir = HERE / "data" / "workdir"
+    workdir = HERE / "data" / "probe_rca"
+    import shutil
+    if workdir.exists():
+        shutil.rmtree(workdir)
     workdir.mkdir(parents=True, exist_ok=True)
     
     dag = DAG()
-    dag.from_config(config, workdir)
+    dag.from_config(config, workdir) 
     
-    # Test circle_probe dependencies
+    print("dag.nodes names:",[node.name for node in dag.nodes])
     circle_probe = dag.get_node_by_name("circle_probe")
-    assert circle_probe is not None
+    assert isinstance(circle_probe, TemplateProbe) 
+    assert circle_probe.template == "{part1}{part2}{part3}"
     assert len(circle_probe.deps) == 3 
-    print("circle_probe.deps:",circle_probe.deps)      # part1, part2, part3
-    assert any(dep.name == "circle_probe.part1" for dep in circle_probe.deps)
-    assert any(dep.name == "circle_probe.part2" for dep in circle_probe.deps)
-    assert any(dep.name == "circle_probe.part3" for dep in circle_probe.deps)
+    print("circle_probe.deps names:",[dep.name for dep in circle_probe.deps])     
     
-    # Test part2 dependencies
-    part2 = dag.get_node_by_name("circle_probe.part2")
-    assert part2 is not None
-    assert len(part2.deps) == 2 
-    print("part2.deps:",part2.deps)      # barcode1, barcode2
-    assert any(dep.name == "circle_probe.part2.barcode1" for dep in part2.deps)
-    assert any(dep.name == "circle_probe.part2.barcode2" for dep in part2.deps)
-    
-    # Test amp_probe dependencies
-    amp_probe = dag.get_node_by_name("amp_probe")
-    assert amp_probe is not None
-    assert len(amp_probe.deps) == 2 
-    print("amp_probe.deps:",amp_probe.deps)      # part1, part2
-    assert any(dep.name == "amp_probe.part1" for dep in amp_probe.deps)
-    assert any(dep.name == "amp_probe.part2" for dep in amp_probe.deps)
-    
-    # Test external dependencies
-    barcode1 = dag.get_node_by_name("circle_probe.part2.barcode1")
-    assert barcode1 is not None
-    assert len(barcode1.deps) == 0
-    assert len(barcode1.external_deps) == 2
-    print("barcode1.external_deps:",barcode1.external_deps)  # target_region.gene_id and encoding
-    assert "target_region.gene_id" in barcode1.external_deps
-    assert "encoding" in barcode1.external_deps
-    
-    barcode2 = dag.get_node_by_name("circle_probe.part2.barcode2")
-    assert barcode2 is not None
-    assert len(barcode2.deps) == 0
-    assert len(barcode2.external_deps) == 2
-    print("barcode2.external_deps:",barcode2.external_deps)  # target_region.gene_id and encoding
-    assert "target_region.gene_id" in barcode2.external_deps
-    assert "encoding" in barcode2.external_deps
-    
-    # Test part1 external dependencies
     part1 = dag.get_node_by_name("circle_probe.part1")
-    assert part1 is not None
-    assert len(part1.deps) == 0
-    print("part1.external_deps:",part1.external_deps)
-    assert len(part1.external_deps) == 2  # target_region
-    assert "target_region" in part1.external_deps
+    assert isinstance(part1, ExprProbe)
+    print("part1.expr:",part1.expr)
+    assert part1.expr == "rc(target_region[0:13])"
+    assert len(part1.deps) == 0 
     
-    # Test part3 external dependencies
-    part3 = dag.get_node_by_name("circle_probe.part3")
-    assert part3 is not None
-    assert len(part3.deps) == 0
-    print("part3.external_deps:",part3.external_deps)
-    assert len(part3.external_deps) == 3  # target_region
-    assert "target_region" in part3.external_deps
+    part2 = dag.get_node_by_name("circle_probe.part2")
+    assert isinstance(part2, TemplateProbe)
+    assert part2.template == "{barcode1}N{barcode2}"
+    assert len(part2.deps) == 2
+    print("part2.deps names:",[dep.name for dep in part2.deps])   
 
+    part3 = dag.get_node_by_name("circle_probe.part3")
+    assert isinstance(part3, ExprProbe) 
+    assert part3.expr == "rc(target_region[13:26])" 
+    assert len(part3.deps) == 0
+
+    barcode1 = dag.get_node_by_name("circle_probe.part2.barcode1")
+    assert isinstance(barcode1, ExprProbe)
+    assert barcode1.expr == "encoding[gene_id]['barcode1']"
+    assert len(barcode1.deps) == 0
+
+    assert "encoding" in barcode1.external_deps
+    assert "gene_id" in barcode1.external_deps
+
+    barcode2 = dag.get_node_by_name("circle_probe.part2.barcode2")
+    assert isinstance(barcode2, ExprProbe)
+    assert barcode2.expr == "encoding[gene_id]['barcode2']"
+    assert len(barcode2.deps) == 0
+    assert "encoding" in barcode2.external_deps
+    assert "gene_id" in barcode2.external_deps
+
+    amp_probe = dag.get_node_by_name("amp_probe")
+    assert isinstance(amp_probe, TemplateProbe)
+    assert amp_probe.template == "{part1}N{part2}"
+    assert len(amp_probe.deps) == 2 
+
+    amp_part1 = dag.get_node_by_name("amp_probe.part1")
+    assert isinstance(amp_part1, ExprProbe)
+    assert amp_part1.expr == "rc(circle_probe.part2.barcode2)" 
+    assert len(amp_part1.deps) == 1
+    assert amp_part1.deps[0].name == "circle_probe.part2.barcode2"
+
+    amp_part2 = dag.get_node_by_name("amp_probe.part2")
+    assert isinstance(amp_part2, ExprProbe)
+    assert amp_part2.expr == "rc(target_region[-13:])" 
+    assert len(amp_part2.deps) == 0 
+
+    target_region="ATGAAGGCCTGCCGGTTATGAAGGCCTGCCGGTTATGAAG"
+    gene_id="gene1" 
+    encoding_dict = {
+        "gene1": {
+            "barcode1": "AAAATTTTTTTTAAGCA",
+            "barcode2": "ATTTATTGCGATTTGGC"
+        },
+        "g42115": {
+             "barcode1": "AAAATTTTTTTTAAGCA",
+             "barcode2": "GGTTTTTTTTTTTTTTT"
+        }
+    }
+    context = {
+        "target_region": target_region,
+        "gene_id": gene_id,
+        "encoding": encoding_dict,
+    }
+
+    dag.run(context=context)
+
+    assert circle_probe.done
+    assert amp_probe.done
+    assert part1.done
+    assert part2.done
+    assert part3.done
+    assert barcode1.done
+    assert barcode2.done
