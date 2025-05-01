@@ -10,9 +10,9 @@ sys.path.append(project_root)
 
 def main():
     parser = argparse.ArgumentParser(description="Run the workflow for double hybrid RCA.")
-    parser.add_argument("--genomes_yaml", type=T.Union[Path, str, dict], required=True,
+    parser.add_argument("--genomes_yaml", type=Path, required=True,
                         help="Path to the genomes YAML file.")
-    parser.add_argument("--protocol_yaml", type=T.Union[Path, str, dict], required=True,
+    parser.add_argument("--protocol_yaml", type=Path, required=True,
                         help="Path to the protocol YAML file.")
     parser.add_argument("--output_csv", type=Path, required=True,
                         help="Path to the output CSV file.")

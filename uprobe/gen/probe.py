@@ -1,7 +1,8 @@
 from pathlib import Path
 import typing as T
-from ..utils import reverse_complement
+from ..utils import reverse_complement 
 from .utils import parse_expression
+from collections import deque
 
 
 def read_lines(path: Path, comment: str = '#'):
@@ -45,9 +46,29 @@ class DAG():
     def get_all_0_deps(self) -> T.List["Node"]:
         return [probe for probe in self.nodes if len(probe.deps) == 0]
 
-    def run(self):
-        """Run the DAG, build all probes."""
-        pass
+    def run(self, context: dict):
+        """Run the DAG for a given context, building nodes in dependency order."""     
+        for node in self.nodes:
+            node.done = False
+        queue = deque(self.get_all_0_deps())     
+        built_count = 0
+        while queue:
+            node = queue.popleft()           
+            all_deps_done = all(dep.done for dep in node.deps)           
+            if not node.done and all_deps_done: 
+                print(f"Building node: {node.name}")
+                try:
+                    node.build(context)
+                    built_count += 1
+                except Exception as e:
+                    print(f"Error building node {node.name}: {e}")
+                    continue 
+                for down_node in self.get_downstream_nodes(node):
+                    if not down_node.done and all(dep.done for dep in down_node.deps):
+                         if down_node not in queue:
+                            print(f"  Adding downstream node to queue: {down_node.name}")
+                            queue.append(down_node)        
+        print(f"DAG run completed. Built {built_count} nodes.")
 
 
 class Node:
@@ -60,10 +81,8 @@ class Node:
         self.done = False
         self.output_file = workdir / f"{name}.out"
 
-    def build(self):
-        for dep in self.deps:
-            assert dep.done, f"Dependency {dep.name} not done"
-
+    def build(self, context: dict):
+        pass 
 
 class Probe(Node):
     pass
@@ -86,7 +105,45 @@ class ExprProbe(Probe):
                 self.external_deps.append(dep)
             else:
                 self.deps.append(node)
-
+    
+    def build(self, context: dict):
+        eval_globals = {"rc": reverse_complement} 
+        eval_locals = context.copy()
+        dep_name_map = {}
+        print(f"  Loading dependencies for {self.name}: {[dep.name for dep in self.deps]}")
+        for dep in self.deps:
+            if not dep.done:
+                raise RuntimeError(f"Dependency {dep.name} was not built before {self.name}")
+            try:
+                dep_value = dep.output_file.read_text().strip() 
+                safe_dep_name = dep.name.replace('.', '_') 
+                dep_name_map[dep.name] = safe_dep_name
+                eval_locals[safe_dep_name] = dep_value 
+                print(f"    Loaded {dep.name} as {safe_dep_name} = '{dep_value[:20]}...'")
+            except FileNotFoundError:
+                 raise RuntimeError(f"Output file for dependency {dep.name} not found")
+            except Exception as e:
+                 raise RuntimeError(f"Error reading output file for dependency {dep.name}: {e}")
+        modified_expr = self.expr
+        for original_name in sorted(dep_name_map.keys(), key=len, reverse=True):
+            safe_name = dep_name_map[original_name]
+            modified_expr = modified_expr.replace(original_name, safe_name)
+        if modified_expr != self.expr:
+             print(f"  Original expression: {self.expr}")
+             print(f"  Modified expression for eval: {modified_expr}")
+        print(f"  Evaluating expression for {self.name}: {modified_expr}")
+        try:
+            with open(self.output_file, 'w') as f:
+                result = eval(modified_expr, eval_globals, eval_locals)
+                f.write(str(result))
+            self.done = True
+            print(f"  Successfully built {self.name}")
+        except Exception as e:
+            print(f"  Error evaluating {self.name}: {e}")
+            print(f"    Expression evaluated: {modified_expr}")
+            print(f"    Evaluation context (locals): {{k: (v[:50] + '...' if isinstance(v, str) and len(v) > 50 else v) for k, v in eval_locals.items()}}") # Log context safely
+            self.done = False
+            raise
 
 class TemplateProbe(Probe):
     def __init__(self, dag: DAG, workdir: Path, name: str, config: dict):
@@ -114,26 +171,34 @@ class TemplateProbe(Probe):
             self.dag.nodes.append(part)
         self.deps = self.parts
 
-    def build(self):
-        super().build()
+    def build(self, context: dict):
+        print(f"  Formatting template for {self.name}: {self.template}")
+        if not all(part.done for part in self.parts):
+             missing_deps = [p.name for p in self.parts if not p.done]
+             raise RuntimeError(f"Cannot build {self.name}, missing dependencies: {missing_deps}")
         readers = {
-            part.name: read_lines(part.output_file)
+            part.name.split('.')[-1]: read_lines(part.output_file)
             for part in self.parts
         }
-        with open(self.output_file, 'w') as f:
-            while True:
-                name2seq = {}
-                for name, reader in readers.items():
+        try:
+            with open(self.output_file, 'w') as f:
+                while True:
+                    name2seq = {}
                     try:
-                        seq_ = next(reader)
+                        for name, reader in readers.items():
+                            seq_ = next(reader)
+                            name2seq[name] = seq_
                     except StopIteration:
-                        break
-                    name2seq[name] = seq_
-                else:
+                        break 
+                    
                     seq = self.template.format(**name2seq)
                     f.write(seq + "\n")
-                    continue
-                break
+            self.done = True
+            print(f"  Successfully built {self.name}")
+        except Exception as e:
+            print(f"  Error formatting template {self.name}: {e}")
+            self.done = False
+            raise
 
     def __getitem__(self, item: str):
         for part in self.parts:
@@ -141,7 +206,8 @@ class TemplateProbe(Probe):
                 return part
 
 
-def construct_probes(workdir: Path, config, target_seqs_path: Path):
+def construct_probes(workdir: Path, config, context: dict):
+
     dag = DAG()
     dag.from_config(config, workdir)
-    dag.run()
+    dag.run(context) 
