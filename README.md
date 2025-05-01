@@ -3,13 +3,13 @@ Universal oligo probe design software
 
 ## Installation and Usage
 
-### 1. Clone
+##### Clone
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
 cd uprobe
 ```
 
-### 2.  Install Dependencies
+##### Install Dependencies
 using pip:
 ```
 pip install -r requirements.txt
