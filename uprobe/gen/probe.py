@@ -141,7 +141,7 @@ class ExprProbe(Probe):
         except Exception as e:
             print(f"  Error evaluating {self.name}: {e}")
             print(f"    Expression evaluated: {modified_expr}")
-            print(f"    Evaluation context (locals): {{k: (v[:50] + '...' if isinstance(v, str) and len(v) > 50 else v) for k, v in eval_locals.items()}}") # Log context safely
+            print(f"    Evaluation context (locals): {{k: (v[:50] + '...' if isinstance(v, str) and len(v) > 50 else v) for k, v in eval_locals.items()}}") 
             self.done = False
             raise
 

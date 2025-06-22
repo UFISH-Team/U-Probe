@@ -9,7 +9,7 @@ from uprobe.utils import get_logger, gene_barcode
 from uprobe.attributes import add_attributes
 from uprobe.tools import  build_genome
 from uprobe.gen.fun import generate_target_seqs
-from uprobe.gen.probe_rca import construct_probes
+from uprobe.gen.probe import construct_probes
 from uprobe.process import post_process
 
 log = get_logger(__name__)
