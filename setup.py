@@ -63,7 +63,7 @@ def get_install_requires():
 
 
 packages_for_dev = get_requirements_from_file("requirements-dev.txt")
-packages_for_docs = get_requirements_from_file("docs/requirements.txt")
+packages_for_docs = get_requirements_from_file("requirements-doc.txt")
 requires_dev = packages_for_dev + packages_for_docs
 
 
