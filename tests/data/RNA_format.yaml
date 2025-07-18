@@ -1,0 +1,102 @@
+name: RNAprobe
+
+description: Protocol for designing probe type Probe_4345 from species hg19
+
+genome: hg19
+
+samples:
+  - aaaaa
+  - bbbbb
+
+encoding:
+  aaaaa:
+    BC1: GGAGACTGATTACACG
+  bbbbb:
+    BC1: TAGGCATGAACGTCGA
+
+extracts:
+  target_region:
+    source: exon
+    length: 50
+    overlap: 20
+    
+probes:
+  probe_1:
+    template: "{part1}{part2}{part3}"
+    parts:
+      part1:
+        length: 12
+        expr: target_region[0:12]
+      part2:
+        length: 12
+        expr: encoding[gene_id]['BC1']
+      part3:
+        length: 11
+        expr: target_region[0:11]
+
+attributes:
+  probe_1:
+    parts:
+      part1:
+        label: target: 1-12
+        attributes:
+          foldScore:
+            name: foldScore
+            max: 40
+      part2:
+        label: barcode: BC1
+        attributes:
+          gcContent:
+            name: gcContent
+            min: 40
+            max: 60
+          tm:
+            name: tm
+            min: 60
+            max: 75
+      part3:
+        label: target: 1-11
+        attributes:
+          selfMatch:
+            name: selfMatch
+            max: 4
+          mappedGenes:
+            name: mappedGenes
+            max: 5
+            aligner: BLAST
+          specific:
+            name: specific
+            threshold: 80
+            aligner: BLAST
+    attributes:
+      gcContent:
+        name: gcContent
+        min: 40
+        max: 60
+      foldScore:
+        name: foldScore
+        max: 40
+      tm:
+        name: tm
+        min: 60
+        max: 75
+      selfMatch:
+        name: selfMatch
+        max: 4
+      mappedGenes:
+        name: mappedGenes
+        max: 5
+        aligner: BLAST
+      specific:
+        name: specific
+        threshold: 80
+        aligner: BLAST
+
+post_process:
+  sorts:
+    is_descending:
+      probe.0.foldScore
+    is_ascending:
+      part.0.1.gcContent
+  remove_overlap: 
+    location_interval: 20

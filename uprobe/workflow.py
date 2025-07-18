@@ -58,13 +58,16 @@ def construct_workflow(
     log.info("building genome.")
     genome = build_genome(genome)
 
+    workdir.mkdir(parents=True, exist_ok=True)
+    os.chdir(workdir)
+
     def workflow():
-        os.chdir(workdir)
-        log.info(f"changed working directory to: {workdir}")
+        log.info(f"changed working directory to: {os.getcwd()}")
         log.info(f"running workflow: {protocol['name']}")
         
         log.info("generating target sequences.")
         df_targets = generate_target_seqs(
+            protocol['extracts']['target_region']['source'],
             protocol["targets"],
             genome['fasta'],
             genome['gtf'],
@@ -72,22 +75,12 @@ def construct_workflow(
             min_length=protocol['extracts']['target_region']['length'],
         )
         
-        log.info("generating gene barcode dictionary.")
-        barcode_dict = gene_barcode(protocol)
-        df_targets['barcodes'] = df_targets['gene'].map(barcode_dict)
-
-        seqs = df_targets['target_region'].to_list()
-        barcodes = df_targets['barcodes'].tolist()
-
         log.info("constructing probes.")
-        probe_df = construct_probes(protocol, seqs, barcodes)
+        probe_df = construct_probes(workdir, protocol, df_targets)
 
         assert probe_df.shape[0] == df_targets.shape[0], "mismatch in number of targets and probes."
         
-        #print(f"probe columns: {probe_df.columns}")
-        #print(f"df columns: {df_targets.columns}")
-
-        df = pd.merge(df_targets, probe_df, on='target_region', how='inner')
+        df = pd.concat([df_targets, probe_df], axis=1)
         df = add_attributes(df, protocol, genome, workdir)
 
         if raw_results_csv:

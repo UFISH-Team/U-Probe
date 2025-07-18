@@ -6,19 +6,14 @@ genome: test
 targets:
   - Cryl1
   - g42115
-
-barcode_set:
-  A-488: AAAATTTTTTTTAAGCA
-  B-488: ATTTATTGCGATTTGGC
-  A-594: GGTTTTTTTTTTTTTTT
-
+  
 encoding:
   Cryl1: 
-    barcode1: A-488
-    barcode2: B-488
+    barcode1: AAAATTTTTTTTAAGCA
+    barcode2: ATTTATTGCGATTTGGC
   g42115:
-    barcode1: A-488
-    barcode2: A-594
+    barcode1: AAAATTTTTTTTAAGCA
+    barcode2: GGTTTTTTTTTTTTTTT
 
 extracts:
   target_region: 
@@ -32,25 +27,25 @@ probes:
     parts:
       part1:
         length: 13
-        expr: rc(target_region[0:13])
+        expr: "rc(target_region[0:13])"
       part2:
         template: "{barcode1}N{barcode2}"
         parts:
           barcode1:
-            expr: encoding[gene_id]['barcode1']
+            expr: "encoding[gene]['barcode1']"
           barcode2:
-            expr: encoding[gene_id]['barcode2']
+            expr: "encoding[gene]['barcode2']"
       part3:
         length: 13
-        expr: rc(target_region[13:26])
+        expr: "rc(target_region[13:26])"
 
   amp_probe:
     template: "{part1}N{part2}"
     parts:
       part1:
-        expr: rc(circle_probe.part2.barcode2)
+        expr: "rc(circle_probe.part2.barcode2)"
       part2:
-        expr: rc(target_region[-13:])
+        expr: "rc(target_region[-13:])"
 
 attributes:
   n_mapped_genes:

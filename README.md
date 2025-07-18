@@ -34,5 +34,9 @@ $ pytest -s tests/
 Run workflow
 
 ```
-python ./uprobe/workflow.py ./tests/data/double_hyb_rca.yaml ./tests/data/genomes.yaml ./out_probes.csv
+python -m uprobe \
+    --genomes_yaml tests/data/genomes.yaml \
+    --protocol_yaml tests/data/double_hyb_rca.yaml \
+    --output_csv results/output.csv \
+    --workdir results
 ```

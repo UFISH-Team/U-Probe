@@ -3,6 +3,7 @@ import logging
 import os
 from os.path import exists
 import typing as t
+from pyfaidx import Fasta
 
 def get_logger(name):
     log = logging.getLogger(name)
@@ -80,3 +81,10 @@ def gene_barcode(config: dict) -> dict:
                 barcode_values.append(barcode_value)
             gene_barcode_dict[target] = tuple(barcode_values)
     return gene_barcode_dict
+
+def Fa_seq_read(fasta_file):
+   fa = Fasta(fasta_file)
+   for key in fa.keys():
+       name = key
+       seq = fa[key][:].seq
+       yield name, seq

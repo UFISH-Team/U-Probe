@@ -1,0 +1,101 @@
+name: DNAprobe
+
+description: Protocol for designing probe type Probe_9379 from species hg19
+
+genome: hg19
+
+extracts:
+  target_region:
+    source: genome
+    length: 50
+    overlap: 20
+
+samples:
+  - pool7-ASPSCR1;chr17:79837392-80267392;6000;2e-5
+  - pool7-RBI1;chr17:79837392-80267392;6000;2e-5
+  - pool7-RARA;chr17:38092814-38578814;6000;1e-4
+  # ... 更多池信息
+
+encoding:
+  pool7-ASPSCR1:
+    barcode1: XXXXXXXXXXXXXXXX
+  pool7-RBI1:
+    barcode1: YYYYYYYYYYYYYYYY
+  # ... 更多池的条形码
+
+probes:
+  probe_1:
+    template: "{part1}{part2}"
+    parts:
+      part1:
+        length: 11
+        expr: target_region[0:11]
+      part2:
+        length: 10
+        expr: encoding[gene_id]['BC4']
+
+attributes:
+  probe_1:
+    parts:
+      part1:
+        label: target: 1-11
+        attributes:
+          tm:
+            name: tm
+            min: 60
+            max: 75
+          specific:
+            name: specific
+            threshold: 80
+            aligner: BLAST
+      part2:
+        label: barcode: BC4
+        attributes:
+          gcContent:
+            name: gcContent
+            min: 40
+            max: 60
+          foldScore:
+            name: foldScore
+            max: 40
+          selfMatch:
+            name: selfMatch
+            max: 4
+          mappedGenes:
+            name: mappedGenes
+            max: 5
+            aligner: BLAST
+    attributes:
+      gcContent:
+        name: gcContent
+        min: 40
+        max: 60
+      foldScore:
+        name: foldScore
+        max: 40
+      tm:
+        name: tm
+        min: 60
+        max: 75
+      selfMatch:
+        name: selfMatch
+        max: 4
+      mappedGenes:
+        name: mappedGenes
+        max: 5
+        aligner: BLAST
+      specific:
+        name: specific
+        threshold: 80
+        aligner: BLAST
+
+post_process:
+  sorts:
+    is_descending:
+      - probe.0.foldScore
+      - target.gcContent
+    is_ascending:
+      - part.0.1.gcContent
+      - probe.1.tm
+  remove_overlap:
+    location_interval: 20

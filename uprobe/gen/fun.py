@@ -186,28 +186,64 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
         for (gene_id, tran_id), seq in seq_dict.items():
             f.write(f">{gene_id}_{tran_id}\n")
             f.write(f"{seq}\n")
+import typing as t
 
-def generate_target_seqs(target_genes, 
+def Slide_through(seq: str,
+                  sub_len: int,
+                  overlap: int) -> t.Iterable[t.Tuple[str, int, int]]:
+    """Slide through a sequence, generate it's subsequences.
+    """
+    assert sub_len > 0, "sub-sequence length must large than zero."
+    assert overlap >= 0, 'overlap length must large or equal to zero.'
+    assert overlap < sub_len, 'overlap length must less than sub-seq length.'
+    step = sub_len - overlap
+    tlen = len(seq)
+    sub_start = 0
+    while sub_start + sub_len <= tlen:
+        sub_end = sub_start + sub_len
+        sub_seq = seq[sub_start:sub_end]
+        yield sub_seq, sub_start, sub_end
+        sub_start += step
+
+def Slide_through_fasta(path: str,
+                        slen: int,
+                        overlap: int) -> t.Iterable[t.Tuple[str, str, int, int]]:
+    """Slide through all sequences in fasta file.
+    """
+    from uprobe.utils import Fa_seq_read
+    for name, seq in Fa_seq_read(path):
+        for sub_seq, sub_start, sub_end in Slide_through(seq, slen, overlap):
+            yield sub_seq, name, sub_start, sub_end
+
+def generate_target_seqs(
+                        source,
+                        target_genes, 
                          fasta_path, 
                          gtf_path, 
                          min_length: int = 40, 
                          overlap: int = 20
                          ):
-    exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
-    data_list = [] 
-    for gene_name, exon_list in exon_info.items():
-        n = 1
-        for j, exon_data in enumerate(exon_list, start=1):
-            exon_name, trans_name, seq, n_trans = exon_data
-            # extract target region seqs
-            for i in range(0, len(seq) - min_length + 1,  min_length - overlap):
-                tem = seq[i:i + min_length]
-                if len(tem) == min_length: 
-                    start = i + 1  
-                    end = i + min_length
-                    gene_id = f"{gene_name}_{n}"
-                    n += 1
-                    data_list.append([gene_id, gene_name, exon_name, trans_name, start, end, tem, n_trans])
-    data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'exon_name', 'transcript_name','start', 
-                                            'end', 'target_region', 'n_trans'])
-    return data
+    if source == 'exon':
+        exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
+        data_list = [] 
+        for gene_name, exon_list in exon_info.items():
+            n = 1
+            for j, exon_data in enumerate(exon_list, start=1):
+                exon_name, trans_name, seq, n_trans = exon_data
+                # extract target region seqs
+                for i in range(0, len(seq) - min_length + 1,  min_length - overlap):
+                    tem = seq[i:i + min_length]
+                    if len(tem) == min_length: 
+                        start = i + 1  
+                        end = i + min_length
+                        gene_id = f"{gene_name}_{n}"
+                        n += 1
+                        data_list.append([gene_id, gene_name, exon_name, trans_name, start, end, tem, n_trans])
+        data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'exon_name', 'transcript_name','start', 
+                                                'end', 'target_region', 'n_trans'])
+        return data
+    else:
+        gen = Slide_through_fasta(fasta_path, min_length, overlap)
+
+        return gen
+

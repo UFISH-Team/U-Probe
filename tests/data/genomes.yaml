@@ -2,31 +2,22 @@
 test:
   description: "Test genome"
   species: Test
-  fasta: "D:/repos/testdata/genomes/test/test.fa"
-  gtf: "D:/repos/testdata/genomes/test/test.gtf"
-  out: "D:/repos/testdata/genomes/test"
+  fasta: "/home/qzhang/testdata/genomes/test/test.fa"
+  gtf: "/home/qzhang/testdata/genomes/test/test.gtf"
+  out: "/home/qzhang/testdata/genomes/test"
   align_index:
     - bowtie2
+    - blast
   jellyfish: false
 
-hg38:
-  description: "Human genome build 38"
+hg19:
+  description: "Human genome build 19"
   species: Homo sapiens
-  fasta: "tests/data/hg38/hg38.fa"
-  gtf: "tests/data/hg38/hg38.gtf"
-  out: "tests/data/hg38"
+  fasta: "/home/qzhang/testdata/genomes/hg19/hg19.fa"
+  gtf: "/home/qzhang/testdata/genomes/hg19/hg19.gtf"
+  out: "/home/qzhang/testdata/genomes/hg19"
   align_index:
     - blast
     - bowtie2
   jellyfish: false
 
-oryza:
-  description: "Oryza sativa"
-  species: Oryza sativa
-  fasta: "/home/qzhang/genomes/oryza/oryza.fna"
-  gtf: "/home/qzhang/genomes/oryza/oryza.gtf"
-  out: "/home/qzhang/genomes/oryza"
-  align_index:
-    - bowtie2
-    - blast
-  jellyfish: false

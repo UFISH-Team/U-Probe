@@ -1,5 +1,6 @@
 from pathlib import Path
 import typing as T
+import pandas as pd
 from ..utils import reverse_complement 
 from .utils import parse_expression
 from collections import deque
@@ -157,7 +158,7 @@ class TemplateProbe(Probe):
     def resolve_parts(self) -> None:
         self.parts.clear()
         for part_name, part_config in self.config['parts'].items():
-            part: Node
+            part: Probe
             new_name = f"{self.name}.{part_name}"
             if 'template' in part_config:
                 part = TemplateProbe(
@@ -206,8 +207,34 @@ class TemplateProbe(Probe):
                 return part
 
 
-def construct_probes(workdir: Path, config, context: dict):
+def construct_probes(workdir: Path, config: dict, targets_df: pd.DataFrame) -> pd.DataFrame:
+    probes_dir = workdir / "probes"
+    probes_dir.mkdir(parents=True, exist_ok=True)
 
     dag = DAG()
-    dag.from_config(config, workdir)
-    dag.run(context) 
+    dag.from_config(config, probes_dir)
+
+    base_context = {
+        "encoding": config.get("encoding", {}),
+        "barcode_set": config.get("barcode_set", {})
+    }
+
+    all_probes_list = []
+    for _, row in targets_df.iterrows():
+        target_context = base_context.copy()
+        target_context.update(row.to_dict())
+
+        dag.run(target_context)
+        
+        probes_for_target = {}
+        for node in dag.nodes:
+            output_file = probes_dir / f"{node.name}.out"
+            # Use ':' separator for column names to match attribute config
+            col_name = node.name.replace('.', ':')
+            if output_file.exists():
+                probes_for_target[col_name] = output_file.read_text().strip()
+            else:
+                probes_for_target[col_name] = None
+        all_probes_list.append(probes_for_target)
+
+    return pd.DataFrame(all_probes_list)

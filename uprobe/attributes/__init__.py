@@ -30,12 +30,12 @@ def add_attributes(
             if attr.get('aligner') == "bowtie2":
                 assert 'bowtie2' in genome['align_index'] 
                 fasta_path = Path(genome['fasta'])
-                index_prefix =fasta_path.parent / "genome_bowtie2_index"/ fasta_path.stem
-                tmp_path = Path(f"{workdir}/tmp")
-                tmp_path.mkdir(exist_ok=True, parents=True)
+                index_prefix = fasta_path.parent / 'bowtie2_genome' / fasta_path.stem
+                outdir = workdir / "tmp"
+                outdir.mkdir(exist_ok=True, parents=True)
                 vals = df_probes.apply(
                     lambda row: count_n_bowtie2_aligned_genes(
-                        str(tmp_path), {f"{row['exon_name']}_{row['start']}": row[target]}, task_id,
+                        str(outdir), {f"{row['exon_name']}_{row['start']}": row[target]}, task_id,
                         str(index_prefix),
                         attr.get("threads", 10), 
                     ), axis=1
