@@ -1,4 +1,3 @@
-
 test:
   description: "Test genome"
   species: Test
@@ -20,4 +19,3 @@ hg19:
     - blast
     - bowtie2
   jellyfish: false
-

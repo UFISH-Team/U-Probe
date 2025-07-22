@@ -32,6 +32,13 @@ def get_base_map():
 
 BASEMAP = get_base_map()
 def reverse_complement(seq):
+    # Handle pandas Series by converting to string
+    if hasattr(seq, 'iloc') and hasattr(seq, 'values'):  # Check if it's a pandas Series
+        seq = str(seq.iloc[0]) if len(seq) > 0 else str(seq.values[0])
+    elif hasattr(seq, '__iter__') and not isinstance(seq, str):
+        # Handle other iterable types that might be passed
+        seq = str(seq)
+    
     res = seq[::-1]
     res = res.translate(BASEMAP)
     return res
@@ -88,3 +95,4 @@ def Fa_seq_read(fasta_file):
        name = key
        seq = fa[key][:].seq
        yield name, seq
+

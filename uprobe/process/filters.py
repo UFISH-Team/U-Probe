@@ -33,4 +33,3 @@ def filter_circle_fold_score(res_df: pd.DataFrame,
 def filter_circle_AT(res_df: pd.DataFrame
                      ) -> pd.DataFrame:
     return res_df[res_df['circle_probe'].str.match("^[AT].*[AT]$")]
-

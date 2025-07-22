@@ -1,8 +1,5 @@
 """
 Barcode generation module using seqwalk for orthogonal DNA sequence design.
-
-This module provides various strategies for generating orthogonal barcodes
-with different constraints and requirements.
 """
 
 import typing as T

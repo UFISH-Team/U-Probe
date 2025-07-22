@@ -17,7 +17,7 @@ encoding:
 
 extracts:
   target_region: 
-    source: targets
+    source: exon
     length: 40
     overlap: 20
 
@@ -32,9 +32,9 @@ probes:
         template: "{barcode1}N{barcode2}"
         parts:
           barcode1:
-            expr: "encoding[gene]['barcode1']"
+            expr: "encoding[gene_id]['barcode1']"
           barcode2:
-            expr: "encoding[gene]['barcode2']"
+            expr: "encoding[gene_id]['barcode2']"
       part3:
         length: 13
         expr: "rc(target_region[13:26])"
@@ -48,6 +48,9 @@ probes:
         expr: "rc(target_region[-13:])"
 
 attributes:
+  fold_score:
+    target: circle_probe:part1
+    type: fold_score
   n_mapped_genes:
     target: target_region
     type: n_mapped_genes
@@ -74,9 +77,13 @@ attributes:
 
 post_process:
   filters:
-    tm:
-      condition: tm1 <= 45 & tm1 >= 35 & tm2 <= 45 & tm2 >= 35 & tm3 <= 45 & tm3 >= 35
-    fold_score_circle:
+    tm1:
+      condition: tm1 >= 35 & tm1 <= 45 
+    tm2:
+      condition: tm2 <= 45 & tm2 >= 35 
+    tm3:
+      condition: tm3 <= 45 & tm3 >= 35
+    circle_fold_score:
       condition: circle_fold_score <= 80
     n_mapped_genes:
       condition: n_mapped_genes <= 4

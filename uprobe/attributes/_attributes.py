@@ -103,7 +103,24 @@ def cal_gc_content(seq: str): #target gc content
     return (seq.count('G') + seq.count('C')) / len(seq)
 
 def cal_target_fold_score(seq: str):
-    return -RNA.fold_compound(seq).mfe()[1]
+    if not seq or seq is None:
+        return float('nan')
+    
+    # Replace any invalid characters with A (ViennaRNA only accepts AUGC)
+    # Convert T to U for RNA folding
+    clean_seq = seq.upper().replace('T', 'U')
+    # Replace any other invalid characters with A
+    valid_chars = set('AUGC')
+    clean_seq = ''.join(c if c in valid_chars else 'A' for c in clean_seq)
+    
+    if not clean_seq:
+        return float('nan')
+    
+    try:
+        return -RNA.fold_compound(clean_seq).mfe()[1]
+    except Exception as e:
+        print(f"Warning: RNA folding failed for sequence '{seq[:20]}...': {e}")
+        return float('nan')
 
 def cal_target_blocks(seq: str, offset: float):
     whole_fold = RNA.fold_compound(seq).mfe()

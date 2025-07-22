@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import yaml
 
-# Add the parent directory to the path so we can import uprobe modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from uprobe.gen.barcodes import generate_barcodes_from_config
