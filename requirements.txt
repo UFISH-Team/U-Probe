@@ -5,3 +5,4 @@ primer3-py
 pathos
 pyfaidx==0.5.9.5
 fire
+seqwalk

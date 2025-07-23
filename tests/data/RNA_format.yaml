@@ -1,0 +1,107 @@
+name: RNAprobe
+description: Protocol for designing probe type Probe_4345 from species hg19
+
+genome: hg19
+
+targets:
+  - GAPDH
+  - TP53
+
+encoding:
+  GAPDH:
+    BC1: GGAGACTGATTACACG
+  TP53:
+    BC1: TAGGCATGAACGTCGA
+
+extracts:
+  target_region:
+    source: exon
+    length: 50
+    overlap: 20
+    
+probes:
+  probe_1:
+    template: "{part1}{part2}{part3}"
+    parts:
+      part1:
+        length: 12
+        expr: target_region[0:12]
+      part2:
+        length: 12
+        expr: encoding[gene_id]['BC1']
+      part3:
+        length: 11
+        expr: target_region[0:11]
+
+attributes:
+  # 目标区域质量评估
+  target_gc_content:
+    target: target_region
+    type: gc_content
+  target_mapped_genes:
+    target: target_region
+    type: n_mapped_genes
+    aligner: bowtie2
+    similarity_threshold_ratio: 0.75
+    
+  # 探针各部分属性
+  probe1_part1_foldScore:
+    target: probe_1:part1
+    type: fold_score
+  probe1_part2_gcContent:
+    target: probe_1:part2
+    type: gc_content
+  probe1_part2_tm:
+    target: probe_1:part2
+    type: annealing_temperature
+  probe1_part3_selfMatch:
+    target: probe_1:part3
+    type: self_match
+  probe1_part3_mappedGenes:
+    target: probe_1:part3
+    type: n_mapped_genes
+    aligner: bowtie2
+    similarity_threshold_ratio: 0.8
+    
+  # 完整探针属性
+  probe1_foldScore:
+    target: probe_1
+    type: fold_score
+  probe1_gcContent:
+    target: probe_1
+    type: gc_content
+  probe1_tm:
+    target: probe_1
+    type: annealing_temperature
+
+post_process:
+  filters:
+    # 基础质量过滤
+    target_quality:
+      condition: target_gc_content >= 40 & target_gc_content <= 90 & target_mapped_genes <= 5
+      
+    # 探针部分质量过滤  
+    part1_quality:
+      condition: probe1_part1_foldScore <= 90
+    part2_quality:
+      condition: probe1_part2_gcContent >= 40 & probe1_part2_gcContent >= 60 & probe1_part2_tm >= 35 & probe1_part2_tm <= 75
+    part3_quality:
+      condition: probe1_part3_selfMatch <= 4 & probe1_part3_mappedGenes <= 5
+      
+    # 整体探针质量
+    probe_overall:
+      condition: probe1_foldScore <= 90 & probe1_gcContent <= 90 & probe1_gcContent >= 60
+      
+  sorts:
+    is_ascending:
+      - probe1_part1_foldScore
+      - probe1_foldScore
+      - probe1_part3_selfMatch
+      - probe1_part3_mappedGenes
+    is_descending:
+      - probe1_part2_gcContent
+      - probe1_part2_tm
+      - probe1_tm
+      
+  remove_overlap:
+    location_interval: 0

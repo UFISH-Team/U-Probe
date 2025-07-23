@@ -68,7 +68,7 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
             chr_, start, end, strand, trans_name = str(row['chr']), row['start'], row['end'], row['strand'], row['transcript_name']
             exon_name = '_'.join([chr_, str(start), str(end), strand])
             n_trans = row['count']
-            chr_ = chr_.replace('chr', '')
+            #chr_ = chr_.replace('chr', '')
             seq = fa[chr_][start:end].seq.upper()
             if strand == '-':
                 seq = reverse_complement(seq)
@@ -109,10 +109,18 @@ def extract_gene_features(df_gtf: pd.DataFrame, fa: Fasta,
         if df_exons.shape[0] == 0:
             raise ValueError(f"Gene {gene} can't find any exon records.")
         gene_features[gene] = []
+        df_exons['transcript_name'] = df_exons['info'].str.extract(r'transcript_id\s+"([^"]+)"')[0]
+        df_exons = df_exons.groupby(
+            by=['chr', 'start', 'end', 'length', 'strand'],
+            as_index=False
+        ).agg(
+            count=('transcript_name', 'count'),  
+            transcript_name=('transcript_name', lambda x: list(set(x))) 
+        )
         for idx, row in df_exons.iterrows():
             chr_, start, end, strand = str(row['chr']), row['start'], row['end'], row['strand']
             name = f"{gene}_{start}_{end}"
-            n_trans = row['type']
+            n_trans = row['count']
             seq = fa[chr_][start:end].seq.upper()
             if strand == '-':
                 seq = reverse_complement(seq)
@@ -187,27 +195,63 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
             f.write(f">{gene_id}_{tran_id}\n")
             f.write(f"{seq}\n")
 
-def generate_target_seqs(target_genes, 
+def generate_target_seqs(
+                        source,
+                        target_genes, 
                          fasta_path, 
                          gtf_path, 
                          min_length: int = 40, 
                          overlap: int = 20
                          ):
-    exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
-    data_list = [] 
-    for gene_name, exon_list in exon_info.items():
-        n = 1
-        for j, exon_data in enumerate(exon_list, start=1):
-            exon_name, trans_name, seq, n_trans = exon_data
-            # extract target region seqs
-            for i in range(0, len(seq) - min_length + 1,  min_length - overlap):
-                tem = seq[i:i + min_length]
-                if len(tem) == min_length: 
-                    start = i + 1  
-                    end = i + min_length
-                    gene_id = f"{gene_name}_{n}"
-                    n += 1
-                    data_list.append([gene_id, gene_name, exon_name, trans_name, start, end, tem, n_trans])
-    data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'exon_name', 'transcript_name','start', 
-                                            'end', 'target_region', 'n_trans'])
-    return data
+    if source == 'exon' or source == 'CDS':
+        exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
+        data_list = [] 
+        for gene_name, exon_list in exon_info.items():
+            n = 1
+            for j, exon_data in enumerate(exon_list, start=1):
+                exon_name, trans_name, seq, n_trans = exon_data
+                # extract target region seqs
+                for i in range(0, len(seq) - min_length + 1,  min_length - overlap):
+                    tem = seq[i:i + min_length]
+                    if len(tem) == min_length: 
+                        start = i + 1  
+                        end = i + min_length
+                        gene_id = f"{gene_name}_{n}"
+                        n += 1
+                        data_list.append([gene_id, gene_name, exon_name, trans_name, start, end, tem, n_trans])
+        data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'exon_name', 'transcript_name','start', 
+                                                'end', 'target_region', 'n_trans'])
+        return data
+
+    elif source == 'UTR':
+        utr_info = extract_gene_features(target_genes, fasta_path, gtf_path)
+        data_list = []
+        for gene_name, utr_list in utr_info.items():
+            n = 1
+            for j, utr_data in enumerate(utr_list, start=1):
+                utr_name, trans_name, seq, n_trans = utr_data
+                data_list.append([gene_id, gene_name, utr_name, trans_name, start, end, tem, n_trans])
+        data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'utr_name', 'transcript_name','start', 
+                                                'end', 'target_region', 'n_trans'])
+        return data
+
+def validate_targets(targets, gtf_path):
+    """validate targets in gtf file"""
+    log.info(f"validating targets in gtf file: {targets}")
+    df_gtf = read_gtf(gtf_path)
+    genome_genes = set(df_gtf['gene_name'].unique())
+    valid_targets = []
+    invalid_targets = []
+    for target in targets:
+        if target in genome_genes:
+            valid_targets.append(target)
+        else:
+            invalid_targets.append(target)
+    if invalid_targets:
+        log.warning(f"invalid targets: {invalid_targets}")
+        log.warning(f"valid targets: {list(genome_genes)[:20]}...")
+        return False, valid_targets, invalid_targets
+    else:
+        log.info(f"valid targets: {valid_targets}")
+        return True, valid_targets, invalid_targets
+

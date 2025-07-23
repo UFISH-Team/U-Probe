@@ -46,7 +46,7 @@ def test_probe_dependencies():
 
 def test_construct_probes():
     config = parse_yaml(HERE / "data" / "probes.yaml")
-    workdir = HERE / "data" / "probe_custom_test"
+    workdir = HERE / "data" / "probe_custom"
     workdir.mkdir(parents=True, exist_ok=True)
     construct_probes(workdir, config, context)
 

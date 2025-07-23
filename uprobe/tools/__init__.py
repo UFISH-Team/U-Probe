@@ -25,7 +25,7 @@ def build_transcripts_index(gtf: Path,
         log.info("bowtie2 index found in the output directory.")
     else:
         log.info("no bowtie2 index found, building it now.")
-        build_bowtie2_index(trans_fasta_path, str(index_prefix), threads)
+        build_bowtie2_index(trans_fasta_path, index_prefix, threads)
     return str(index_prefix)
 
 def build_genome(genome: dict
@@ -46,13 +46,13 @@ def build_genome(genome: dict
                 if (index_dir.parent / f"{prefix}.1.bt2").exists():
                     log.info(f"index {index_dir.parent} already exists.")
                 else:
-                    build_bowtie2_index(fasta_path, str(index_dir))     
-            if aligner == "blast":
+                    build_bowtie2_index(fasta_path, index_dir)
+            elif aligner == "blast":
                 if (index_dir.parent / f"{prefix}.ndb").exists():
                     log.info(f"index {index_dir.parent} already exists.")
                 else:          
-                    build_blast_db(fasta_path, str(index_dir), title=prefix)
-            if aligner == "mmseqs":
+                    build_blast_db(fasta_path, index_dir, title=prefix)
+            elif aligner == "mmseqs":
                 if (index_dir.parent / f"{prefix}.db").exists():
                     log.info(f"index {index_dir.parent} already exists.")
                 else:
@@ -66,7 +66,7 @@ def build_genome(genome: dict
         else:
             log.info(f"transcript index {tran_index_dir} does not exist, building it now.")
             tran_index_dir.mkdir(parents=True, exist_ok=True)
-        build_transcripts_index(gtf=genome['gtf'], 
+        build_transcripts_index(gtf=Path(genome['gtf']), 
                                 fasta=fasta_path, 
                                 outdir=tran_index_dir, 
                                 threads=10)

@@ -16,7 +16,7 @@ def main():
                         help="Path to the protocol YAML file.")
     parser.add_argument("--output_csv", type=Path, required=True,
                         help="Path to the output CSV file.")
-    parser.add_argument("--raw_results_csv", type=Path, default=None,
+    parser.add_argument("--raw_csv", type=Path, default=None,
                         help="Path to the raw results CSV file.")
     parser.add_argument("--workdir", type=Path, default=Path("."),
                         help="Working directory (default: current directory).")
@@ -28,7 +28,7 @@ def main():
         args.genomes_yaml,
         args.output_csv,
         args.workdir,
-        args.raw_results_csv
+        args.raw_csv
     )
 
     workflow()
