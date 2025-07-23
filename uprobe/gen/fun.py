@@ -68,6 +68,10 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
             chr_, start, end, strand, trans_name = str(row['chr']), row['start'], row['end'], row['strand'], row['transcript_name']
             exon_name = '_'.join([chr_, str(start), str(end), strand])
             n_trans = row['count']
+            if "chr" not in chr_:
+                chr_ = f"chr{chr_}"
+            else:
+                chr_ = chr_.replace('chr', '')
             #chr_ = chr_.replace('chr', '')
             seq = fa[chr_][start:end].seq.upper()
             if strand == '-':
