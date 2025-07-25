@@ -1,7 +1,7 @@
 # U-Probe: Universal Probe Design Tool
 
 <div align="center">
-  <img src="./assets/3.png" alt="uprobe logo">
+  <img src="./assets/3.png" alt="uprobe logo", width="710px", height="210px">
 </div>
 <br>
 
