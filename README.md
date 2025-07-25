@@ -9,7 +9,7 @@ git clone https://github.com/UFISH-Team/U-Probe.git
 cd uprobe
 ```
 
-Using conda install env:
+Using conda install environment:
 
 ```
 conda env create -f environments.yaml
@@ -21,7 +21,7 @@ Using pip:
 ```
 pip install -r requirements.txt
 ```
-If using pip, user need to install Bowtie2, Blast and MMseqs2.
+If using pip, user needs to install Bowtie2, Blast and MMseqs2.
 
 ## Development
 
