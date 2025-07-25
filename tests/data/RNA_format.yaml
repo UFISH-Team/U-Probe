@@ -1,5 +1,4 @@
 name: RNAprobe
-
 description: Protocol for designing probe type Probe_4345 from species Arabidopsis thaliana
 
 genome: hg38
@@ -60,11 +59,11 @@ attributes:
   target_gcContent:
     target: target_region
     type: gc_content
-  #target_mappedGenes:
-  #  target: target_region
-  #  type: n_mapped_genes
-  #  aligner: bowtie2
-  #  similarity_threshold_ratio: 0.75
+  target_mappedGenes:
+    target: target_region
+    type: n_mapped_genes
+    aligner: bowtie2
+    min_mapq: 30
     
   # probe attributes
   probe1_part1_foldScore:
@@ -79,11 +78,11 @@ attributes:
   probe1_part3_selfMatch:
     target: probe_1:part3
     type: self_match
-  #probe1_part3_mappedGenes:
-  #  target: probe_1:part3
-  #  type: n_mapped_genes
-  #  aligner: bowtie2
-  #  similarity_threshold_ratio: 0.8
+  probe1_part3_mappedGenes:
+    target: probe_1:part3
+    type: n_mapped_genes
+    aligner: bowtie2
+    min_mapq: 30
     
   # probe attributes
   probe1_foldScore:
@@ -101,9 +100,8 @@ post_process:
     # target region
     target_gcContent:
       condition: target_gcContent >= 0.4 & target_gcContent <= 0.8
-    #target_mappedGenes:
-    #  type: n_mapped_genes
-    #  condition: target_mappedGenes <= 5
+    target_mappedGenes:
+      condition: target_mappedGenes <= 5
       
     # probe part  
     probe1_part1_foldScore:
@@ -114,9 +112,8 @@ post_process:
       condition: probe1_part2_tm >= 35 & probe1_part2_tm <= 75
     probe1_part3_selfMatch:
       condition: probe1_part3_selfMatch <= 6
-    #probe1_part3_mappedGenes:
-    #  type: n_mapped_genes
-    #  condition: probe1_part3_mappedGenes <= 5
+    probe1_part3_mappedGenes:
+      condition: probe1_part3_mappedGenes <= 5
 
     # probe overall
     probe1_foldScore:
