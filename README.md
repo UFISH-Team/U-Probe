@@ -1,4 +1,7 @@
+<div align="center">
 # U-Probe: Universal Probe Design Tool
+</div>
+<br>
 
 <div align="center">
   <img src="./assets/3.png" alt="uprobe logo">
