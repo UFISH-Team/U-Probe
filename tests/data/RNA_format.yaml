@@ -1,25 +1,26 @@
 name: RNAprobe
+
 description: Protocol for designing probe type Probe_4345 from species Arabidopsis thaliana
 
-genome: hg38
+genome: test
 
 targets:
-  - TRNT
-  - CYTB
-  - BRCA1 
-  - TP53 
+  - LOC102653793
+  - LOC413089
+  - g28306 
+  - LOC410975_g9553 
 
 encoding:
-  TRNT:
+  LOC102653793:
     BC1: GGAGACTGATTACACG
     BC2: GGAGACGGACTTTACA
-  CYTB:
+  LOC413089:
     BC1: TAGGCATGAACGTCGA
     BC2: GGACGGAGATTACACT
-  BRCA1:
+  g28306:
     BC1: GGAGATTACACGGACT
     BC2: GGACTGATAGTACACG
-  TP53:
+  LOC410975_g9553:
     BC1: TAGGACGTCATGACGA
     BC2: GGAACGGAGATTACCT
 

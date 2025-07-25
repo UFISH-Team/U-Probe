@@ -11,13 +11,13 @@ class DAG():
     def __init__(self) -> None:
         self.nodes: T.List[Node] = []
 
-    def from_config(self, config: dict, workdir: Path):
+    def from_config(self, config: dict):
         assert 'probes' in config, "probes key not found"
         assert isinstance(config['probes'], dict), "probes should be a dict"
         for probe_name, probe_config in config['probes'].items():
             assert 'template' in probe_config or 'expr' in probe_config, \
                 "template or expr key not found"
-            probe = TemplateProbe(self, workdir, probe_name, probe_config)
+            probe = TemplateProbe(self, probe_name, probe_config)
             self.nodes.append(probe)
         for node in self.nodes:
             if isinstance(node, ExprProbe):
@@ -63,9 +63,8 @@ class DAG():
 
 
 class Node:
-    def __init__(self, dag: DAG, workdir: Path, name: str, config: dict):
+    def __init__(self, dag: DAG, name: str, config: dict):
         self.dag = dag
-        self.workdir = workdir
         self.name = name
         self.config = config
         self.deps: T.List[Probe] = []
@@ -80,8 +79,8 @@ class Probe(Node):
 
 
 class ExprProbe(Probe):
-    def __init__(self, dag: DAG, workdir: Path, name: str, config: dict):
-        super().__init__(dag, workdir, name, config)
+    def __init__(self, dag: DAG, name: str, config: dict):
+        super().__init__(dag, name, config)
         assert 'expr' in config, "expr key not found"
         self.expr = config['expr']
         self.external_deps: T.List[str] = []
@@ -150,8 +149,8 @@ class ExprProbe(Probe):
             raise
 
 class TemplateProbe(Probe):
-    def __init__(self, dag: DAG, workdir: Path, name: str, config: dict):
-        super().__init__(dag, workdir, name, config)
+    def __init__(self, dag: DAG, name: str, config: dict):
+        super().__init__(dag, name, config)
         assert 'template' in config, "template key not found"
         assert 'parts' in config, "parts key not found"
         self.parts: T.List[Probe] = []
@@ -165,10 +164,10 @@ class TemplateProbe(Probe):
             new_name = f"{self.name}.{part_name}"
             if 'template' in part_config:
                 part = TemplateProbe(
-                    self.dag, self.workdir, new_name, part_config)
+                    self.dag, new_name, part_config)
             elif 'expr' in part_config:
                 part = ExprProbe(
-                    self.dag, self.workdir, new_name, part_config)
+                    self.dag, new_name, part_config)
             else:
                 raise ValueError(f"invalid part config: {part_config}")
             self.parts.append(part)
@@ -203,14 +202,14 @@ class TemplateProbe(Probe):
                 return part
 
 
-def construct_probes(workdir: Path, config, contexts):
+def construct_probes(config, contexts):
     """
     Construct probes for each target context in memory.
     """
     if not isinstance(contexts, list):
         context = contexts
         dag = DAG()
-        dag.from_config(config, workdir)
+        dag.from_config(config)
         dag.run(context)
         return pd.DataFrame()  # Return empty DataFrame for single context
     
@@ -218,7 +217,7 @@ def construct_probes(workdir: Path, config, contexts):
     for context in contexts:
         try:
             dag = DAG()
-            dag.from_config(config, workdir)
+            dag.from_config(config)
             dag.run(context)
             probe_data = {}
             for node in dag.nodes:
@@ -230,7 +229,7 @@ def construct_probes(workdir: Path, config, contexts):
             
             probe_results.append(probe_data)
         except Exception as e:
-            log.error(f"error processing target {idx}: {e}")
+            log.error(f"error processing target {context}: {e}")
             probe_data = {}
             if 'dag' in locals():
                 probe_data = {node.name: None for node in dag.nodes}

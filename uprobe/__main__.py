@@ -18,8 +18,6 @@ def main():
                         help="Path to the output directory.")
     parser.add_argument("--raw_csv", type=bool, default=False,
                         help="Path to the raw results CSV file.")
-    parser.add_argument("--workdir", type=Path, default=Path("."),
-                        help="Working directory (default: current directory).")
     parser.add_argument("--continue_on_invalid", action='store_true',
                         help="Continue with valid targets if some are invalid.")
 
@@ -30,7 +28,6 @@ def main():
             protocol_config=args.protocol_yaml,
             genomes_config=args.genomes_yaml,
             output_dir=args.output_dir,
-            workdir=args.workdir,
             raw_csv=args.raw_csv,
             continue_on_invalid_targets=args.continue_on_invalid
         )

@@ -52,7 +52,6 @@ def run_workflow(
     protocol_config: T.Union[Path, dict],
     genomes_config: T.Union[Path, dict],
     output_dir: Path,
-    workdir: Path = Path("."),
     raw_csv: bool = False,
     continue_on_invalid_targets: bool = False,
 ) -> pd.DataFrame:
@@ -63,7 +62,6 @@ def run_workflow(
         protocol_config: Path to the protocol YAML file or a dictionary.
         genomes_config: Path to the genomes YAML file or a dictionary.
         output_dir: Directory to save the output CSV files.
-        workdir: Working directory for intermediate files.
         raw_csv: If True, saves the unprocessed probe data to a CSV file.
         continue_on_invalid_targets: If True, continue with valid targets even if some are invalid.
 
@@ -78,7 +76,6 @@ def run_workflow(
 
     # Ensure output and work directories exist
     output_dir.mkdir(parents=True, exist_ok=True)
-    workdir.mkdir(parents=True, exist_ok=True)
 
     # --- 1. Parse Configurations ---
     log.info("Parsing configurations...")
@@ -152,7 +149,7 @@ def run_workflow(
     ]
 
     log.info("Constructing probes...")
-    probe_df = construct_probes(workdir, protocol, contexts)
+    probe_df = construct_probes(protocol, contexts)
     if probe_df.empty:
         log.error("No probes were constructed. Check probe construction parameters.")
         return pd.DataFrame()
@@ -166,8 +163,9 @@ def run_workflow(
     df_final = add_attributes(df_combined, protocol, genome)
 
     time_str = time.strftime("%Y%m%d_%H%M%S")
+    name = protocol.get("name", "probes")
     if raw_csv:
-        raw_path = output_dir / f"probes_{time_str}_raw.csv"
+        raw_path = output_dir / f"{name}_{time_str}_raw.csv"
         log.info(f"Saving raw results to {raw_path}")
         df_final.to_csv(raw_path, index=False)
 
@@ -177,7 +175,7 @@ def run_workflow(
     if df_processed.empty:
         log.warning("No probes remaining after post-processing filters.")
     else:
-        output_path = output_dir / f"probes_{time_str}_processed.csv"
+        output_path = output_dir / f"{name}_{time_str}.csv"
         log.info(f"Saving {df_processed.shape[0]} processed probes to {output_path}")
         df_processed.to_csv(output_path, index=False)
     

@@ -1,6 +1,7 @@
 # U-Probe: Universal Probe Design Tool
 
-U-Probe is a powerful and flexible Python-based tool for designing custom DNA probes for various molecular biology applications, such as *in situ* hybridization and targeted sequencing. It provides a comprehensive workflow from target gene selection to final probe generation, with a focus on automation, customization, and ease of use.
+- U-Probe is a powerful and flexible Python-based tool for designing custom DNA or RNA probes for various molecular biology applications, such as *in situ* hybridization and targeted sequencing. 
+- It provides a comprehensive workflow from target gene selection to final probe generation, with a focus on automation, customization, and ease of use.
 
 ## Features
 
@@ -13,19 +14,25 @@ U-Probe is a powerful and flexible Python-based tool for designing custom DNA pr
 ## Installation
 
 To get started with U-Probe, clone the repository and install the required dependencies.
+Using pip:
 
 ```bash
-git clone https://your-repo-url/u-probe.git
+git clone https://github.com/UFISH-Team/U-Probe.git
 cd u-probe
 pip install -r requirements.txt
-# Or, if using poetry
-poetry install
 ```
-*(Note: A `requirements.txt` file should be created or the `pyproject.toml` file should be configured for dependency management.)*
+Using conda:
+```bash
+git clone https://github.com/UFISH-Team/U-Probe.git
+cd u-probe
+conda env create -n environments.yaml
+```
+
+*(Note: A `requirements.txt` file should be created.)*
 
 ## Quick Start (CLI)
 
-The easiest way to run the probe design workflow is through the command-line interface. You will need two main configuration files: `genomes.yaml` (defining the paths to your genome files) and `protocol.yaml` (defining the target genes and probe design parameters).
+You will need two main configuration files: `genomes.yaml` (defining the paths to your genome files) and `protocol.yaml` (defining the target genes and probe design parameters).
 
 1.  **Prepare your configuration files:**
     *   `genomes.yaml`:
@@ -52,12 +59,12 @@ The easiest way to run the probe design workflow is through the command-line int
         --protocol_yaml /path/to/your/protocol.yaml \
         --output_dir ./results \
         --workdir ./temp_work
+        --raw_csv True
     ```
     This command will generate the final probe set as a CSV file in the `./results` directory.
+    If parameter `--raw_csv` is `True`, will generate raw results without filtering and sorting.
 
-## Programmatic Usage (Python API)
-
-U-Probe provides a clean API for more advanced use cases and integration into custom scripts.
+## Programmatic Usage (API)
 
 ### Core Functions
 
@@ -118,4 +125,4 @@ This file defines all parameters for a specific probe design run.
 - `encoding`: Mapping of genes to barcodes or other identifiers.
 - `filters`: Criteria for post-processing and filtering probes (e.g., GC content, Tm).
 
-For more detailed examples and advanced configurations, please refer to the `examples/` directory.
+For more detailed examples and advanced configurations, please refer to the `tests/data` directory.
