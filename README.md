@@ -37,10 +37,10 @@ Running workflow command:
 
 ```
 $ python -m uprobe \
-$     --genomes_yaml tests/data/genomes.yaml \
-$     --protocol_yaml tests/data/RNA_format.yaml \
-$     --output_csv output_results.csv \
-$     --workdir work_path 
-$     --raw_csv True
+      --genomes_yaml tests/data/genomes.yaml \
+      --protocol_yaml tests/data/RNA_format.yaml \
+      --output_csv output_results.csv \
+      --workdir work_path 
+      --raw_csv True
 
 ```
