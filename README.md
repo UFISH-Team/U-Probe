@@ -43,7 +43,7 @@ conda deactivate
 
 You will need two main configuration files: `genomes.yaml` (defining the paths to your genome files) and `protocol.yaml` (defining the target genes and probe design parameters).
 
-1. ** Prepare configuration files:**
+**🛠️ Prepare files:**
 
     *   `genomes.yaml`:
         ```yaml
@@ -63,7 +63,8 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
         ```
         More detailed configurations refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
-2. ** Run the workflow:**
+**🔬 Run the workflow:**
+
     ```bash
     python -m uprobe \
         --genomes_yaml /path/to/your/genomes.yaml \
