@@ -93,7 +93,11 @@ def self_match(probe: str, min_match = 4):
                 match_pairs = match_pairs + 1
     return match_pairs
 
+def preprocess_seq(seq):
+    return seq.replace('N', 'A')
+
 def cal_temp(seq: str): # Tm
+    seq = preprocess_seq(seq)
     return primer3.calc_tm(seq)
 
 def cal_fold(seq: str): # RNA fold
