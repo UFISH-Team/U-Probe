@@ -1,0 +1,11 @@
+barcode_generation:
+  pcr_barcodes: # can be named as you want
+    strategy: "max_orthogonality"  # max_orthogonality, max_size
+    num_barcodes: 5
+    length: 8
+    alphabet: "ACGT"
+    rc_free: true
+    gc_limits: [2, 6]
+    prevent_patterns: ["AAAA", "TTTT", "CCCC", "GGGG"]
+    save_file: "pcr_barcodes.txt" # can be named as you want
+    analyze_quality: true # if true, the quality of the barcodes will be analyzed
