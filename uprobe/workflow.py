@@ -133,11 +133,11 @@ def construct_workflow(
             df = pd.concat([df_targets, probe_df], axis=1)
             log.info("--------------------------------")
             log.info("** adding attributes to probes:")
-            df = add_attributes(df, protocol, genome, workdir)
+            df = add_attributes(df, protocol, genome)
             
             time_str = time.strftime("%Y%m%d_%H%M%S")
             if raw_csv:
-                raw_path = f"raw_{output_csv.stem}_{time_str}.csv"
+                raw_path = f"{output_csv.stem}_{time_str}_raw.csv"
                 log.info(f"saving raw results to csv: {raw_path}")
                 df.to_csv(raw_path, index=False)
             
@@ -163,7 +163,7 @@ def construct_workflow(
             import traceback
             log.error(traceback.format_exc())
             log.info("--------------------------------")
-            log.info("** workflow completed with error")
+            log.error("** workflow completed with error")
     return workflow
 
 
