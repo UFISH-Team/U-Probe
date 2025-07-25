@@ -62,6 +62,7 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
         More detailed configurations refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
 **🔬 Run the workflow:**
+
     ```bash
     python -m uprobe \
         --genomes_yaml /path/to/your/genomes.yaml \
@@ -70,6 +71,7 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
         --workdir ./temp_work
         --raw_csv True
     ```
+    
     This command will generate the final probe set as a CSV file in the `./results` directory.
     If parameter `--raw_csv` is `True`, will generate raw results without filtering and sorting.
 
@@ -81,9 +83,10 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
 - `uprobe.api.build_genome_index()`: Use this to pre-build genome indices.
 - `uprobe.api.get_gene_barcodes()`: A utility to extract gene-to-barcode mappings from your protocol.
 
-### Example: Running the Workflow in Python
+### Example: 
 
 ```python
+# Running the Workflow in Python
 from pathlib import Path
 from uprobe.api import run_workflow
 import yaml
