@@ -1,12 +1,5 @@
 import pandas as pd 
 import re
-from .filters import (
-    filter_gc_content,
-    filter_n_mapped_genes,
-    filter_target_fold_score,
-    filter_tm,
-    filter_circle_AT
-)
 
 def parse_condition(condition: str) -> list:
     """Parse a condition string into list of (column, operator, value) tuples
@@ -16,14 +9,18 @@ def parse_condition(condition: str) -> list:
     
     result = []
     # Match patterns like "column <= 80" or "column >= 35"
-    pattern = r'(\w+)\s*([<>=]+)\s*(\d+)'
+    pattern = r'(\w+)\s*([<>=]+)\s*(\d+(?:\.\d+)?)'
     
     for cond in conditions:
         match = re.match(pattern, cond)
         if not match:
             raise ValueError(f"Invalid condition format: {cond}")
         column, operator, value = match.groups()
-        result.append((column, operator, float(value)))
+        try:
+            value = int(value)
+        except ValueError:
+            value = float(value)
+        result.append((column, operator, value))
     
     return result
 
@@ -33,34 +30,21 @@ def apply_condition(df: pd.DataFrame,
     """Apply multiple conditions to a DataFrame
     """
     for column, operator, value in conditions:
-        if column == 'n_mapped_genes':
-            # Special handling for n_mapped_genes which contains dictionaries
-            if operator == '<=':
-                df = df[df[column].apply(lambda x: max(x.values()) <= value)]
-            elif operator == '>=':
-                df = df[df[column].apply(lambda x: min(x.values()) >= value)]
-            elif operator == '<':
-                df = df[df[column].apply(lambda x: max(x.values()) < value)]
-            elif operator == '>':
-                df = df[df[column].apply(lambda x: min(x.values()) > value)]
-            elif operator == '==':
-                df = df[df[column].apply(lambda x: any(v == value for v in x.values()))]
-            else:
-                raise ValueError(f"Unsupported operator: {operator}")
+        if column not in df.columns:
+            continue
+        # Normal numeric comparison for other columns
+        if operator == '<=':
+            df = df[df[column] <= value]
+        elif operator == '>=':
+            df = df[df[column] >= value]
+        elif operator == '<':
+            df = df[df[column] < value]
+        elif operator == '>':
+            df = df[df[column] > value]
+        elif operator == '==':
+            df = df[df[column] == value]
         else:
-            # Normal numeric comparison for other columns
-            if operator == '<=':
-                df = df[df[column] <= value]
-            elif operator == '>=':
-                df = df[df[column] >= value]
-            elif operator == '<':
-                df = df[df[column] < value]
-            elif operator == '>':
-                df = df[df[column] > value]
-            elif operator == '==':
-                df = df[df[column] == value]
-            else:
-                raise ValueError(f"Unsupported operator: {operator}")
+            raise ValueError(f"Unsupported operator: {operator}")
     return df
 
 def filter_table(df: pd.DataFrame,
@@ -79,18 +63,6 @@ def filter_table(df: pd.DataFrame,
                 for cond in condition:
                     conditions = parse_condition(cond)
                     df = apply_condition(df, conditions)
-        elif filter_name == 'n_mapped_genes':
-            df = filter_n_mapped_genes(df, filter_config)
-        elif filter_name == 'tm':
-            min_tm = filter_config.get('min', 35)
-            max_tm = filter_config.get('max', 45)
-            df = filter_tm(df, min_tm, max_tm)
-        elif filter_name == 'target_fold_score':
-            df = filter_target_fold_score(df, filter_config)
-        elif filter_name == 'gc_content':
-            df = filter_gc_content(df, filter_config)
-        elif filter_name == 'circle_AT':
-            df = filter_circle_AT(df)
     return df
 
 def sort_table(df: pd.DataFrame, 
@@ -101,7 +73,13 @@ def sort_table(df: pd.DataFrame,
     Sort the table by the specified columns in the protocol.
     
     """
-    return df.sort_values(by=keys, ascending=ascending)
+    valid_keys = [key for key in keys if key in df.columns]
+    valid_ascending = ascending[:len(valid_keys)]
+    
+    if not valid_keys:
+        return df
+        
+    return df.sort_values(by=valid_keys, ascending=valid_ascending)
 
 def remove_overlap(df: pd.DataFrame, 
                    location_interval: int
@@ -109,6 +87,9 @@ def remove_overlap(df: pd.DataFrame,
     """
     Remove overlapping entries based on a specified location interval, considering each transcript separately.
     """
+    if 'transcript_name' not in df.columns:
+        return df
+        
     df['transcript_name'] = df['transcript_name'].apply(lambda x: 
                                                         ', '.join(x) if isinstance(x, list) else x)
 
