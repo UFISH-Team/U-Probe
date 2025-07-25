@@ -11,7 +11,11 @@ Aln = t.Tuple[str, int, int]  # chr, start, end
 Block = t.Tuple[str, str, t.List[Aln]]  # query_name, query_seq, alignments
 
 def read_sam_align_blocks(
-        sam_path: str
+        sam_path: str,
+        min_mapq: int = 30  # MAPQ 是通过比对得分和输入序列的错配情况计算的，值越高表示比对质量越好
+                            # MAPQ > 30: 比对质量相对可靠（唯一比对或高匹配度）。
+                            # MAPQ > 20: 允许某些中质量比对。
+                            # MAPQ = 0: 通常会被完全过滤掉，因为这些序列可能无法唯一比对
         ) -> t.Iterable[Block]:
     import pysam
     def yield_cond(old, rec, block, end=False):
@@ -24,12 +28,15 @@ def read_sam_align_blocks(
         old = None
         rec = None
         for rec in sam.fetch():
+            if rec.mapping_quality < min_mapq:
+                continue
             aln = rec.reference_name, rec.reference_start, rec.reference_end
             if yield_cond(old, rec, alns):
                 yield old.query_name, old.query_sequence, alns
                 alns = []
             if aln[0] is not None:
                 alns.append(aln)
+            #print(aln)
             old = rec
         if (rec is not None) and yield_cond(old, rec, alns, end=True):
             yield old.query_name, old.query_sequence, alns
@@ -42,16 +49,16 @@ def bowtie2_align_se_sen(
         log_file: t.Optional[str] = 'bowtie2.log',
         header: bool = True,
         ) -> str:
-    cmd = ["bowtie2", "-x", index, "-U", fq_path]
+    cmd = ["bowtie2", "-x", str(index), "-U", str(fq_path)]
     if not header:
         cmd.append("--no-hd")
     cmd += ["-t", "-k", "100", "--very-sensitive-local"]
     cmd += ["-p", str(threads)]
-    cmd += ["-S", sam_path]
+    cmd += ["-S", str(sam_path)]
     cmd_str = " ".join(cmd)
     if log_file:
         cmd_str += f" > {log_file} 2>&1"
-    log.info(f"Call cmd: {cmd}")
+    log.info(f"Call cmd: {cmd_str}")
     try:
         subp.check_call(cmd_str, shell=True)
     except subp.CalledProcessError as e:
@@ -67,7 +74,8 @@ def count_n_bowtie2_aligned_genes(
         recname2seq: t.Mapping[str, str],
         name: str,
         index_prefix: str,
-        threads: int):
+        min_mapq: int = 30,
+        threads: int = 10):
     fq_path = write_fastq(outdir, name, recname2seq)
     sam_path = f"{outdir}/{name}.sam"
     if not os.path.exists(sam_path):
@@ -76,8 +84,9 @@ def count_n_bowtie2_aligned_genes(
             sam_path, threads=threads,
             log_file=f"{outdir}/{name}.bowtie2.log")
     n_mapped_genes = {}
-    for rec_name, seq, alns in read_sam_align_blocks(sam_path):
-        n_genes = len(set([chr_.split("_")[0] for chr_, s, e in alns]))
+    for rec_name, seq, alns in read_sam_align_blocks(sam_path, min_mapq=min_mapq):
+
+        n_genes = len(set(["_".join(chr_.split("_")[-4:]) for chr_, s, e in alns]))
         n_mapped_genes[rec_name] = n_genes
     return n_mapped_genes
 
