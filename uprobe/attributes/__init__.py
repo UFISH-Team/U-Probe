@@ -41,15 +41,17 @@ def add_attributes(
                 assert 'bowtie2' in genome['align_index'] 
                 fasta_path = Path(genome['fasta'])
                 index_prefix = fasta_path.parent / 'bowtie2_genome' / fasta_path.stem
-                outdir = workdir / "tmp"
-                outdir.mkdir(exist_ok=True, parents=True)
+                tmp_dir = Path("tmp")
+                tmp_dir.mkdir(exist_ok=True, parents=True)
                 vals = df_probes.apply(
                     lambda row: count_n_bowtie2_aligned_genes(
-                        str(outdir), {f"{row['exon_name']}_{row['start']}": row[actual_target]}, task_id,
+                        str(tmp_dir), {f"{row['exon_name']}_{row['start']}": row[actual_target]}, task_id,
                         str(index_prefix),
                         attr.get("threads", 10), 
                     ), axis=1
                 )
+                import shutil
+                shutil.rmtree(tmp_dir)
             else:
                 raise NotImplementedError(
                     f"Aligner {attr['aligner']} is not implemented."
