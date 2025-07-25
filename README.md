@@ -1,4 +1,4 @@
-<h1 align="center">U-Probe: Universal Probe Design Tool</h1>
+<h1 align="center">🧬 U-Probe: Universal Probe Design Tool</h1>
 
 <div align="center">
   <img src="./assets/3.png" alt="uprobe logo", width="710px", height="210px">
@@ -41,7 +41,7 @@ conda env create -n environments.yaml
 
 You will need two main configuration files: `genomes.yaml` (defining the paths to your genome files) and `protocol.yaml` (defining the target genes and probe design parameters).
 
-1.  **Prepare configuration files:**
+1.  **🛠️ Prepare configuration files:**
 
     *   `genomes.yaml`:
         ```yaml
@@ -61,7 +61,7 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
         ```
         More detailed configurations refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
-2.  **Run the workflow:**
+2.  **🔬 Run the workflow:**
     ```bash
     python -m uprobe \
         --genomes_yaml /path/to/your/genomes.yaml \
@@ -112,7 +112,7 @@ except (ValueError, IOError) as e:
 
 ```
 
-## Configuration Details
+## 🔍 Configuration Details
 
 ### `genomes.yaml`
 This file maps a genome name to its corresponding file paths.
