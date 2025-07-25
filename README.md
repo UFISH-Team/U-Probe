@@ -33,6 +33,8 @@ Using conda:
 git clone https://github.com/UFISH-Team/U-Probe.git
 cd u-probe
 conda env create -n environments.yaml
+conda activate uprobe
+conda deactivate
 ```
 
 *(Note: A `requirements.txt` file should be created.)*
@@ -41,7 +43,7 @@ conda env create -n environments.yaml
 
 You will need two main configuration files: `genomes.yaml` (defining the paths to your genome files) and `protocol.yaml` (defining the target genes and probe design parameters).
 
-**🛠️ Prepare configuration files:**
+1. ** Prepare configuration files:**
 
     *   `genomes.yaml`:
         ```yaml
@@ -61,8 +63,7 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
         ```
         More detailed configurations refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
-**🔬 Run the workflow:**
-
+2. ** Run the workflow:**
     ```bash
     python -m uprobe \
         --genomes_yaml /path/to/your/genomes.yaml \
@@ -71,7 +72,7 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
         --workdir ./temp_work
         --raw_csv True
     ```
-    
+
     This command will generate the final probe set as a CSV file in the `./results` directory.
     If parameter `--raw_csv` is `True`, will generate raw results without filtering and sorting.
 
