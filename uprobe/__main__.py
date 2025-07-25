@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from .workflow import construct_workflow
+from .api import run_workflow
 import sys
 import os
 import typing as T
@@ -14,25 +14,29 @@ def main():
                         help="Path to the genomes YAML file.")
     parser.add_argument("--protocol_yaml", type=Path, required=True,
                         help="Path to the protocol YAML file.")
-    parser.add_argument("--output_csv", type=Path, required=True,
-                        help="Path to the output CSV file.")
+    parser.add_argument("--output_dir", type=Path, required=True,
+                        help="Path to the output directory.")
     parser.add_argument("--raw_csv", type=bool, default=False,
                         help="Path to the raw results CSV file.")
     parser.add_argument("--workdir", type=Path, default=Path("."),
                         help="Working directory (default: current directory).")
+    parser.add_argument("--continue_on_invalid", action='store_true',
+                        help="Continue with valid targets if some are invalid.")
 
     args = parser.parse_args()
 
-    workflow = construct_workflow(
-        args.protocol_yaml,
-        args.genomes_yaml,
-        args.output_csv,
-        args.workdir,
-        args.raw_csv
-    )
-
-    workflow()
-
+    try:
+        run_workflow(
+            protocol_config=args.protocol_yaml,
+            genomes_config=args.genomes_yaml,
+            output_dir=args.output_dir,
+            workdir=args.workdir,
+            raw_csv=args.raw_csv,
+            continue_on_invalid_targets=args.continue_on_invalid
+        )
+    except (ValueError, IOError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
