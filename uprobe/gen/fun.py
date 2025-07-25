@@ -11,6 +11,7 @@ GTF_FIELDS = [
     'chr', 'source', 'type', 'start', 'end', 'score', 'strand', 'score', 'info'
 ]
 
+
 def read_gtf(
         gtf: str,
         filter_by_type: t.Optional[str]=None,
@@ -37,6 +38,44 @@ def read_gtf(
             #chr_new.append(f'{chr_}')
     df.chr = chr_new
     return df
+
+def process_gtf_inplace(filepath):
+    """If gene_name does not exist, replace gene with gene_name."""
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
+
+    updated_lines = []
+    for line in lines:
+        if line.startswith('#') or not line.strip():
+            updated_lines.append(line)
+            continue
+        fields = line.strip().split('\t')
+        if len(fields) < 9:
+            log.warning(f"not a valid GTF line: {line.strip()}")
+            updated_lines.append(line)
+            continue
+        
+        attributes = fields[8]
+        if "gene_name" in attributes:
+            updated_lines.append(line)
+        else:
+            updated_attributes = []
+            for attr in attributes.split(';'):
+                attr = attr.strip()
+                if not attr:
+                    continue
+                
+                if attr.startswith("gene "):
+                    updated_attributes.append(attr.replace("gene ", "gene_name ")) 
+                else:
+                    updated_attributes.append(attr)
+
+            fields[8] = '; '.join(updated_attributes)
+            updated_lines.append('\t'.join(fields) + '\n')
+
+    with open(filepath, 'w') as file:
+        file.writelines(updated_lines)
+    log.info(f"processed GTF file: {filepath}")
 
 def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
                   genelist: pd.DataFrame, min_length: int=40
@@ -68,11 +107,7 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
             chr_, start, end, strand, trans_name = str(row['chr']), row['start'], row['end'], row['strand'], row['transcript_name']
             exon_name = '_'.join([chr_, str(start), str(end), strand])
             n_trans = row['count']
-            if "chr" not in chr_:
-                chr_ = f"chr{chr_}"
-            else:
-                chr_ = chr_.replace('chr', '')
-            #chr_ = chr_.replace('chr', '')
+            chr_ = chr_.replace('chr', '')
             seq = fa[chr_][start:end].seq.upper()
             if strand == '-':
                 seq = reverse_complement(seq)
@@ -184,7 +219,7 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
                 seq = fa[chrom][exons[i][0]:exons[i][1]].seq
             except KeyError:
                 #import ipdb; ipdb.set_trace()
-                chrom = change_chrom_name(chrom)
+                #chrom = change_chrom_name(chrom)
                 seq = fa[chrom][exons[i][0]:exons[i][1]].seq
             if strand == '-':
                 seq = reverse_complement(seq)
@@ -223,7 +258,7 @@ def generate_target_seqs(
                         gene_id = f"{gene_name}_{n}"
                         n += 1
                         data_list.append([gene_id, gene_name, exon_name, trans_name, start, end, tem, n_trans])
-        data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'exon_name', 'transcript_name','start', 
+        data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'exon_name', 'transcript_names','start', 
                                                 'end', 'target_region', 'n_trans'])
         return data
 
@@ -241,8 +276,12 @@ def generate_target_seqs(
 
 def validate_targets(targets, gtf_path):
     """validate targets in gtf file"""
+
     log.info(f"validating targets in gtf file: {targets}")
     df_gtf = read_gtf(gtf_path)
+    if 'gene_name' not in df_gtf.columns:
+        process_gtf_inplace(gtf_path)
+        df_gtf = read_gtf(gtf_path)
     genome_genes = set(df_gtf['gene_name'].unique())
     valid_targets = []
     invalid_targets = []
