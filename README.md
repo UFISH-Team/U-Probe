@@ -5,15 +5,16 @@
 
 ## Features
 
-- **End-to-End Workflow**: Automates the entire probe design process, from sequence extraction to final filtering.
-- **Highly Customizable**: Use simple YAML configuration files to define target genes, probe structures, and filtering criteria.
-- **Advanced Filtering**: Filter probes based on a wide range of attributes like GC content, melting temperature (Tm), and off-target potential.
+- **End-to-end workflow**: Automates the entire probe design process, from sequence extraction to final filtering.
+- **Highly customizable**: Use simple YAML configuration files to define target genes, probe structures, and filtering criteria.
+- **Advanced filtering**: Filter probes based on a wide range of attributes like GC content, melting temperature (Tm), and off-target potential.
 - **Extensible API**: In addition to a command-line interface, U-Probe offers a clean Python API for programmatic access and integration into other bioinformatics pipelines.
-- **Built-in Indexing**: Automatically handles the creation of genome indices for alignment tools like Bowtie2 and BLAST.
+- **Built-in indexing**: Automatically handles the creation of genome indices for alignment tools like Bowtie2 and BLAST.
 
 ## Installation
 
 To get started with U-Probe, clone the repository and install the required dependencies.
+
 Using pip:
 
 ```bash
@@ -21,6 +22,7 @@ git clone https://github.com/UFISH-Team/U-Probe.git
 cd u-probe
 pip install -r requirements.txt
 ```
+
 Using conda:
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
@@ -34,7 +36,7 @@ conda env create -n environments.yaml
 
 You will need two main configuration files: `genomes.yaml` (defining the paths to your genome files) and `protocol.yaml` (defining the target genes and probe design parameters).
 
-1.  **Prepare your configuration files:**
+1.  **Prepare configuration files:**
     *   `genomes.yaml`:
         ```yaml
         human_hg38:
@@ -44,13 +46,14 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
         ```
     *   `protocol.yaml`:
         ```yaml
-        name: "MyFirstProbeSet"
-        genome: "human_hg38"
+        name: "MyWorkflowName"
+        genome: "hg38"
         targets:
           - "GENE1"
           - "GENE2"
         # ... other protocol parameters ...
         ```
+More detailed configurations refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
 2.  **Run the workflow:**
     ```bash
@@ -83,9 +86,8 @@ import yaml
 protocol_path = Path("path/to/your/protocol.yaml")
 genomes_path = Path("path/to/your/genomes.yaml")
 
-# 2. Define output and working directories
+# 2. Define output directories
 output_dir = Path("./results")
-workdir = Path("./temp_work")
 
 # 3. Run the workflow
 try:
@@ -93,7 +95,6 @@ try:
         protocol_config=protocol_path,
         genomes_config=genomes_path,
         output_dir=output_dir,
-        workdir=workdir,
         raw_csv=True, # Optionally save raw, unfiltered probes
         continue_on_invalid_targets=False
     )
