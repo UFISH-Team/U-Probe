@@ -1,22 +1,33 @@
 name: RNAprobe
-description: Protocol for designing probe type Probe_4345 from species hg19
 
-genome: hg19
+description: Protocol for designing probe type Probe_4345 from species Arabidopsis thaliana
+
+genome: hg38
 
 targets:
-  - GAPDH
-  - TP53
+  - TRNT
+  - CYTB
+  - BRCA1 
+  - TP53 
 
 encoding:
-  GAPDH:
+  TRNT:
     BC1: GGAGACTGATTACACG
-  TP53:
+    BC2: GGAGACGGACTTTACA
+  CYTB:
     BC1: TAGGCATGAACGTCGA
+    BC2: GGACGGAGATTACACT
+  BRCA1:
+    BC1: GGAGATTACACGGACT
+    BC2: GGACTGATAGTACACG
+  TP53:
+    BC1: TAGGACGTCATGACGA
+    BC2: GGAACGGAGATTACCT
 
 extracts:
   target_region:
     source: exon
-    length: 50
+    length: 40
     overlap: 20
     
 probes:
@@ -24,27 +35,38 @@ probes:
     template: "{part1}{part2}{part3}"
     parts:
       part1:
-        length: 12
-        expr: target_region[0:12]
+        length: 13
+        expr: "rc(target_region[0:13])"
       part2:
-        length: 12
-        expr: encoding[gene_id]['BC1']
+        template: "{barcode1}N{barcode2}"
+        parts:
+          barcode1:
+            expr: "encoding[gene_id]['BC1']"
+          barcode2:
+            expr: "encoding[gene_id]['BC2']"
       part3:
-        length: 11
-        expr: target_region[0:11]
+        length: 13
+        expr: "rc(target_region[13:26])"
+  probe_2:
+    template: "{part1}N{part2}"
+    parts:
+      part1:
+        expr: "rc(probe_1.part2.barcode2)"
+      part2:
+        expr: "rc(target_region[-13:])"
 
 attributes:
-  # 目标区域质量评估
-  target_gc_content:
+  # target region attributes
+  target_gcContent:
     target: target_region
     type: gc_content
-  target_mapped_genes:
-    target: target_region
-    type: n_mapped_genes
-    aligner: bowtie2
-    similarity_threshold_ratio: 0.75
+  #target_mappedGenes:
+  #  target: target_region
+  #  type: n_mapped_genes
+  #  aligner: bowtie2
+  #  similarity_threshold_ratio: 0.75
     
-  # 探针各部分属性
+  # probe attributes
   probe1_part1_foldScore:
     target: probe_1:part1
     type: fold_score
@@ -57,13 +79,13 @@ attributes:
   probe1_part3_selfMatch:
     target: probe_1:part3
     type: self_match
-  probe1_part3_mappedGenes:
-    target: probe_1:part3
-    type: n_mapped_genes
-    aligner: bowtie2
-    similarity_threshold_ratio: 0.8
+  #probe1_part3_mappedGenes:
+  #  target: probe_1:part3
+  #  type: n_mapped_genes
+  #  aligner: bowtie2
+  #  similarity_threshold_ratio: 0.8
     
-  # 完整探针属性
+  # probe attributes
   probe1_foldScore:
     target: probe_1
     type: fold_score
@@ -76,32 +98,45 @@ attributes:
 
 post_process:
   filters:
-    # 基础质量过滤
-    target_quality:
-      condition: target_gc_content >= 40 & target_gc_content <= 90 & target_mapped_genes <= 5
+    # target region
+    target_gcContent:
+      condition: target_gcContent >= 0.4 & target_gcContent <= 0.8
+    #target_mappedGenes:
+    #  type: n_mapped_genes
+    #  condition: target_mappedGenes <= 5
       
-    # 探针部分质量过滤  
-    part1_quality:
-      condition: probe1_part1_foldScore <= 90
-    part2_quality:
-      condition: probe1_part2_gcContent >= 40 & probe1_part2_gcContent >= 60 & probe1_part2_tm >= 35 & probe1_part2_tm <= 75
-    part3_quality:
-      condition: probe1_part3_selfMatch <= 4 & probe1_part3_mappedGenes <= 5
-      
-    # 整体探针质量
-    probe_overall:
-      condition: probe1_foldScore <= 90 & probe1_gcContent <= 90 & probe1_gcContent >= 60
+    # probe part  
+    probe1_part1_foldScore:
+      condition: probe1_part1_foldScore <= 9.5
+    probe1_part2_gcContent:
+      condition: probe1_part2_gcContent >= 0.4 & probe1_part2_gcContent <= 0.6
+    probe1_part2_tm:
+      condition: probe1_part2_tm >= 35 & probe1_part2_tm <= 75
+    probe1_part3_selfMatch:
+      condition: probe1_part3_selfMatch <= 6
+    #probe1_part3_mappedGenes:
+    #  type: n_mapped_genes
+    #  condition: probe1_part3_mappedGenes <= 5
+
+    # probe overall
+    probe1_foldScore:
+      condition: probe1_foldScore <= 9.5
+    probe1_gcContent:
+      condition: probe1_gcContent >= 0.4 & probe1_gcContent <= 0.8
+    probe1_tm:
+      condition: probe1_tm >= 35 & probe1_tm <= 75
       
   sorts:
     is_ascending:
       - probe1_part1_foldScore
       - probe1_foldScore
       - probe1_part3_selfMatch
-      - probe1_part3_mappedGenes
+      #- probe1_part3_mappedGenes
     is_descending:
       - probe1_part2_gcContent
       - probe1_part2_tm
+      - probe1_gcContent
       - probe1_tm
       
   remove_overlap:
-    location_interval: 0
+    location_interval: 3
