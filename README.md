@@ -37,6 +37,7 @@ conda env create -n environments.yaml
 You will need two main configuration files: `genomes.yaml` (defining the paths to your genome files) and `protocol.yaml` (defining the target genes and probe design parameters).
 
 1.  **Prepare configuration files:**
+
     *   `genomes.yaml`:
         ```yaml
         human_hg38:
@@ -53,7 +54,7 @@ You will need two main configuration files: `genomes.yaml` (defining the paths t
           - "GENE2"
         # ... other protocol parameters ...
         ```
-More detailed configurations refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
+        More detailed configurations refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
 2.  **Run the workflow:**
     ```bash
@@ -69,7 +70,7 @@ More detailed configurations refer to the [`tests/data/*.yaml`](https://github.c
 
 ## Programmatic Usage (API)
 
-### Core Functions
+### Core functions:
 
 - `uprobe.api.run_workflow()`: The main entry point to execute the entire probe design process.
 - `uprobe.api.build_genome_index()`: Use this to pre-build genome indices.
@@ -126,4 +127,4 @@ This file defines all parameters for a specific probe design run.
 - `encoding`: Mapping of genes to barcodes or other identifiers.
 - `filters`: Criteria for post-processing and filtering probes (e.g., GC content, Tm).
 
-For more detailed examples and advanced configurations, please refer to the `tests/data` directory.
+For more detailed examples and advanced configurations, please refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
