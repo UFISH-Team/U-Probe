@@ -1,4 +1,4 @@
-<h1 style="text-align: center">U-Probe: Universal Probe Design Tool</h1>
+# U-Probe: Universal Probe Design Tool
 <br>
 
 <div align="center">
