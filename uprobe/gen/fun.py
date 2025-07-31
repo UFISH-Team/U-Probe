@@ -34,8 +34,8 @@ def read_gtf(
         if str(chr_).startswith('chr'):
             chr_new.append(chr_)
         else:
-            chr_new.append(f'chr{chr_}')
-            #chr_new.append(f'{chr_}')
+            #chr_new.append(f'chr{chr_}')
+            chr_new.append(f'{chr_}')
     df.chr = chr_new
     return df
 
@@ -237,10 +237,10 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
 def generate_target_seqs(
                         source,
                         target_genes, 
-                         fasta_path, 
-                         gtf_path, 
-                         min_length: int = 40, 
-                         overlap: int = 20
+                        fasta_path, 
+                        gtf_path, 
+                        min_length: int = 40, 
+                        overlap: int = 20
                          ):
     if source == 'exon' or source == 'CDS':
         exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
@@ -274,12 +274,12 @@ def generate_target_seqs(
                                                 'end', 'target_region', 'n_trans'])
         return data
 
-def validate_targets(targets, gtf_path):
+def validate_targets(targets, gtf_path, DTF_NAME_FIX=False):
     """validate targets in gtf file"""
 
     log.info(f"validating targets in gtf file: {targets}")
     df_gtf = read_gtf(gtf_path)
-    if 'gene_name' not in df_gtf.columns:
+    if DTF_NAME_FIX:
         process_gtf_inplace(gtf_path)
         df_gtf = read_gtf(gtf_path)
     genome_genes = set(df_gtf['gene_name'].unique())
