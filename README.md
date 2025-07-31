@@ -55,7 +55,7 @@ Before using U-Probe, you need to prepare two YAML configuration files:
      align_index: ["bowtie2", "blast"]
    ```
 
-2. **protocol.yaml** - 定义探针设计参数：
+2. **protocol.yaml** - Define probe design parameters：
    ```yaml
    name: "MyExperiment"
    genome: "human_hg38"
