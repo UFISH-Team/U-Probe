@@ -39,81 +39,177 @@ conda deactivate
 
 *(Note: A `requirements.txt` file should be created.)*
 
-## Quick Start (CLI)
+## Use guide
 
-You will need two main configuration files: `genomes.yaml` (defining the paths to your genome files) and `protocol.yaml` (defining the target genes and probe design parameters).
+U-Probe provides two ways to use: Command Line Interface (CLI) and Python API.
 
-1.  **Prepare configuration files:**
+### Configuration Files
 
-    *   `genomes.yaml`:
-        ```yaml
-        human_hg38:
-          fasta: "/path/to/your/hg38.fa"
-          gtf: "/path/to/your/gencode.v38.annotation.gtf"
-          align_index: ["bowtie2", "blast"]
-        ```
-    *   `protocol.yaml`:
-        ```yaml
-        name: "MyWorkflowName"
-        genome: "hg38"
-        targets:
-          - "GENE1"
-          - "GENE2"
-        # ... other protocol parameters ...
-        ```
-        More detailed configurations refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
+Before using U-Probe, you need to prepare two YAML configuration files:
 
-2.  **Run the workflow:**
-    ```bash
-    python -m uprobe \
-        --genomes_yaml /path/to/your/genomes.yaml \
-        --protocol_yaml /path/to/your/protocol.yaml \
-        --output_dir ./results \
-        --workdir ./temp_work
-        --raw_csv True
-    ```
-    This command will generate the final probe set as a CSV file in the `./results` directory.
-    If parameter `--raw_csv` is `True`, will generate raw results without filtering and sorting.
+1. **genomes.yaml** - Define genome information:
+   ```yaml
+   human_hg38:
+     fasta: "/path/to/hg38.fa"
+     gtf: "/path/to/gencode.v38.annotation.gtf"
+     align_index: ["bowtie2", "blast"]
+   ```
 
-## Programmatic Usage (API)
+2. **protocol.yaml** - 定义探针设计参数：
+   ```yaml
+   name: "MyExperiment"
+   genome: "human_hg38"
+   targets:
+     - "GENE1"
+     - "GENE2"
+   extracts:
+     target_region:
+       source: "exon"
+       overlap: 10
+       length: 120
+   # For more parameter configurations, please refer to tests/data/*.yaml
+   ```
 
-### Core functions:
+### Command Line Interface (CLI)
 
-- `uprobe.api.run_workflow()`: The main entry point to execute the entire probe design process.
-- `uprobe.api.build_genome_index()`: Use this to pre-build genome indices.
-- `uprobe.api.get_gene_barcodes()`: A utility to extract gene-to-barcode mappings from your protocol.
+#### Complete Workflow
 
-### Example: 
+One-click execution of the complete process from genome index construction to probe design:
+
+```bash
+python -m uprobe.cli run \
+  --protocol protocol.yaml \
+  --genomes genomes.yaml \
+  --output ./results \
+  --raw \
+  --threads 10
+```
+
+#### Individual Step Execution
+
+**1. Build Genome Index**
+```bash
+python -m uprobe.cli build-index \
+  --protocol protocol.yaml \
+  --genomes genomes.yaml \
+  --threads 10
+```
+
+**2. Validate Target Genes**
+```bash
+python -m uprobe.cli validate-targets \
+  --protocol protocol.yaml \
+  --genomes genomes.yaml \
+  --continue-invalid
+```
+
+**3. Generate Barcode Sequences**
+```bash
+python -m uprobe.cli generate-barcodes \
+  --protocol protocol.yaml \
+  --output ./barcodes
+```
+
+#### Common Parameters
+
+| Parameter | Description |
+|------|------|
+| `--protocol` | Path to probe design protocol configuration file |
+| `--genomes` | Path to genome configuration file |
+| `--output` | Output directory |
+| `--raw` | Save unfiltered raw probe data |
+| `--continue-invalid` | Continue execution even if some targets are invalid |
+| `--threads` | Number of threads for index building and computation |
+
+#### Get Help
+
+```bash
+# View all commands
+python -m uprobe.cli --help
+
+# View help for specific command
+python -m uprobe.cli run --help
+```
+
+### Python API
+
+U-Probe provides an object-oriented API for easy integration into other Python projects.
+
+#### Basic Usage
 
 ```python
-# Running the Workflow in Python
 from pathlib import Path
-from uprobe.api import run_workflow
-import yaml
+from uprobe.api import UProbeAPI
 
-# 1. Load configuration files (or define them as dicts)
-protocol_path = Path("path/to/your/protocol.yaml")
-genomes_path = Path("path/to/your/genomes.yaml")
+# 初始化API
+api = UProbeAPI(
+    protocol_config=Path("protocol.yaml"),
+    genomes_config=Path("genomes.yaml"),
+    output_dir=Path("./results")
+)
 
-# 2. Define output directories
-output_dir = Path("./results")
-
-# 3. Run the workflow
-try:
-    final_probes_df = run_workflow(
-        protocol_config=protocol_path,
-        genomes_config=genomes_path,
-        output_dir=output_dir,
-        raw_csv=True, # Optionally save raw, unfiltered probes
-        continue_on_invalid_targets=False
-    )
-    print(f"Workflow complete. {len(final_probes_df)} probes generated.")
-    print(final_probes_df.head())
-
-except (ValueError, IOError) as e:
-    print(f"An error occurred: {e}")
-
+# 执行完整工作流
+probes_df = api.run_workflow(
+    raw_csv=True,
+    continue_on_invalid_targets=False,
+    threads=10
+)
 ```
+
+#### Step-by-Step Execution
+
+```python
+# Initialize API
+api = UProbeAPI(
+    protocol_config=Path("protocol.yaml"),
+    genomes_config=Path("genomes.yaml"),
+    output_dir=Path("./results")
+)
+
+# 1. Build genome index
+api.build_genome_index(threads=10)
+
+# 2. Validate target genes
+if not api.validate_targets(continue_on_invalid=False):
+    print("Target validation failed")
+    exit(1)
+
+# 3. Generate target sequences
+df_targets = api.generate_target_seqs()
+if df_targets.empty:
+    print("No target sequences generated")
+    exit(1)
+
+# 4. Construct probes
+df_probes = api.construct_probes(df_targets)
+if df_probes.empty:
+    print("No probes constructed")
+    exit(1)
+
+# 5. Merge target and probe data
+import pandas as pd
+df_combined = pd.concat([df_targets.reset_index(drop=True), 
+                        df_probes.reset_index(drop=True)], axis=1)
+
+# 6. Post-process probes
+df_final = api.post_process_probes(df_combined, raw_csv=True)
+print(f"Generated {len(df_final)} probes")
+
+# 7. Generate barcode sequences (optional)
+barcode_sets = api.generate_barcodes()
+```
+
+#### Main Methods
+
+| Method | Description |
+|------|------|
+| `build_genome_index(threads=10)` | Build genome index |
+| `validate_targets(continue_on_invalid=False)` | Validate target genes |
+| `generate_target_seqs()` | Generate target region sequences |
+| `construct_probes(df_targets)` | Construct probes |
+| `post_process_probes(df_probes, raw_csv=False)` | Add attributes and filter probes |
+| `generate_barcodes()` | Generate DNA barcode sequences |
+| `run_workflow(...)` | Execute complete probe design workflow |
 
 ## Configuration Details
 
