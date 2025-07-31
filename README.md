@@ -32,7 +32,7 @@ Using conda:
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
 cd u-probe
-conda env create -n environments.yaml
+conda env create -f environments.yaml
 conda activate uprobe
 conda deactivate
 ```
