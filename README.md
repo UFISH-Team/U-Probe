@@ -141,15 +141,15 @@ U-Probe provides an object-oriented API for easy integration into other Python p
 from pathlib import Path
 from uprobe.api import UProbeAPI
 
-# 初始化API
-api = UProbeAPI(
+# init
+uprobe = UProbeAPI(
     protocol_config=Path("protocol.yaml"),
     genomes_config=Path("genomes.yaml"),
     output_dir=Path("./results")
 )
 
-# 执行完整工作流
-probes_df = api.run_workflow(
+# run 
+probes_df = uprobe.run_workflow(
     raw_csv=True,
     continue_on_invalid_targets=False,
     threads=10
@@ -159,29 +159,29 @@ probes_df = api.run_workflow(
 #### Step-by-Step Execution
 
 ```python
-# Initialize API
-api = UProbeAPI(
+# Initialize api
+uprobe = UProbeAPI(
     protocol_config=Path("protocol.yaml"),
     genomes_config=Path("genomes.yaml"),
     output_dir=Path("./results")
 )
 
 # 1. Build genome index
-api.build_genome_index(threads=10)
+uprobe.build_genome_index(threads=10)
 
-# 2. Validate target genes
-if not api.validate_targets(continue_on_invalid=False):
+# 2. Validate target genes in gtf
+if not uprobe.validate_targets(continue_on_invalid=False):
     print("Target validation failed")
     exit(1)
 
 # 3. Generate target sequences
-df_targets = api.generate_target_seqs()
+df_targets = uprobe.generate_target_seqs()
 if df_targets.empty:
     print("No target sequences generated")
     exit(1)
 
 # 4. Construct probes
-df_probes = api.construct_probes(df_targets)
+df_probes = uprobe.construct_probes(df_targets)
 if df_probes.empty:
     print("No probes constructed")
     exit(1)
@@ -192,11 +192,11 @@ df_combined = pd.concat([df_targets.reset_index(drop=True),
                         df_probes.reset_index(drop=True)], axis=1)
 
 # 6. Post-process probes
-df_final = api.post_process_probes(df_combined, raw_csv=True)
+df_final = uprobe.post_process_probes(df_combined, raw_csv=True)
 print(f"Generated {len(df_final)} probes")
 
 # 7. Generate barcode sequences (optional)
-barcode_sets = api.generate_barcodes()
+barcode_sets = uprobe.generate_barcodes()
 ```
 
 #### Main Methods

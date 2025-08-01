@@ -45,7 +45,7 @@ def build_index(protocol: str, genomes: str, threads: int):
     api = UProbeAPI(
         protocol_config=Path(protocol),
         genomes_config=Path(genomes),
-        output_dir=Path("/tmp/uprobe_index_build") # Dummy output dir
+        output_dir=Path("/tmp/uprobe_index_build") 
     )
     api.build_genome_index(threads=threads)
     log.info("Genome index building finished.")
@@ -59,7 +59,7 @@ def validate_targets_cmd(protocol: str, genomes: str, continue_invalid: bool):
     api = UProbeAPI(
         protocol_config=Path(protocol),
         genomes_config=Path(genomes),
-        output_dir=Path("/tmp/uprobe_validate") # Dummy output dir
+        output_dir=Path("/tmp/uprobe_validate") 
     )
     if api.validate_targets(continue_on_invalid=continue_invalid):
         log.info("Target validation successful.")
@@ -73,22 +73,17 @@ def generate_barcodes_cmd(protocol: str, output: str):
     """Generate DNA barcodes based on the protocol configuration."""
     api = UProbeAPI(
         protocol_config=Path(protocol),
-        genomes_config=Path("dummy_genomes.yml"), # Genomes config is not needed but required by API
+        genomes_config=Path("dummy_genomes.yml"), 
         output_dir=Path(output)
     )
-    # A bit of a hack since genomes config is required but not used for barcode generation.
-    # We can refine the API later if this becomes a common use case.
     try:
-        api.genomes = {} # Clear genomes to avoid validation errors
+        api.genomes = {} 
         api.generate_barcodes()
         log.info("Barcode generation finished.")
     except Exception as e:
-        # Create a dummy genomes file to satisfy the API init
         dummy_genomes_path = Path("dummy_genomes.yml")
         with open(dummy_genomes_path, "w") as f:
             f.write("dummy_genome:\n  fasta: dummy.fa\n  gtf: dummy.gtf\n")
-        
-        # We also need dummy fasta and gtf files
         Path("dummy.fa").touch()
         Path("dummy.gtf").touch()
 
@@ -98,8 +93,6 @@ def generate_barcodes_cmd(protocol: str, output: str):
             output_dir=Path(output)
         )
         api.generate_barcodes()
-
-        # Clean up dummy files
         dummy_genomes_path.unlink()
         Path("dummy.fa").unlink()
         Path("dummy.gtf").unlink()
