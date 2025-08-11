@@ -133,3 +133,5 @@ tests/temp_barcode_test/
 temp_*
 
 results/
+
+*/docs/build
