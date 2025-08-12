@@ -303,4 +303,64 @@ This file defines all parameters for a specific probe design run.
 
 For more detailed examples and advanced configurations, please refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
+## Documentation
+
+📖 **Complete documentation is available at [uprobe.readthedocs.io](https://uprobe.readthedocs.io/)**
+
+The documentation includes:
+- Detailed installation instructions
+- Step-by-step tutorials
+- Complete CLI and Python API reference  
+- Real-world examples for FISH, PCR, and sequencing applications
+- Configuration file reference
+- Troubleshooting guide
+- Contributing guidelines
+
+### Building Documentation Locally
+
+```bash
+# Install documentation dependencies
+pip install -e ".[docs]"
+
+# Build documentation
+cd docs/
+./build_docs.sh
+```
+
+Open `docs/build/html/index.html` in your browser to view the local documentation.
+
+## Community & Support
+
+- 📖 **Documentation**: [uprobe.readthedocs.io](https://uprobe.readthedocs.io/)
+- 💬 **GitHub Discussions**: [Ask questions and share ideas](https://github.com/UFISH-Team/U-Probe/discussions)
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/UFISH-Team/U-Probe/issues)
+- 🚀 **Contributing**: See our [contributing guide](https://uprobe.readthedocs.io/en/latest/contributing.html)
+
+## Citation
+
+If you use U-Probe in your research, please cite:
+
+```bibtex
+@software{uprobe2024,
+  title={U-Probe: Universal Probe Design Tool},
+  author={Xu, Weize and Cai, Huaiyuan and Zhang, Qian and Chen, Yu},
+  year={2024},
+  url={https://github.com/UFISH-Team/U-Probe},
+  version={1.0.0}
+}
+```
+
+## License
+
+U-Probe is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+We thank the bioinformatics community for valuable feedback during development, and the authors of the following tools that U-Probe integrates:
+
+- [Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/) - Fast sequence alignment
+- [BLAST+](https://blast.ncbi.nlm.nih.gov/) - Sequence similarity search  
+- [Jellyfish](https://github.com/gmarcais/Jellyfish) - K-mer counting
+- [ViennaRNA](https://www.tbi.univie.ac.at/RNA/) - Secondary structure prediction
+
 
