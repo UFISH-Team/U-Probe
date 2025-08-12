@@ -1,0 +1,68 @@
+# build_docs.ps1
+$ErrorActionPreference = "Stop"
+
+Write-Host "🟢 Building U-Probe Documentation" -ForegroundColor Green
+Write-Host "======================================"
+
+# 检查是否在正确的目录
+if (-not (Test-Path "source/conf.py")) {
+    Write-Host "🔴 Error: Please run this script from the docs/ directory" -ForegroundColor Red
+    exit 1
+}
+
+# 清理构建目录（如果传入 clean 参数）
+if ($args[0] -eq "clean") {
+    Write-Host "🟡 Cleaning previous build..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
+}
+
+# 创建构建目录
+New-Item -ItemType Directory -Path build -Force | Out-Null
+
+# 检查依赖
+Write-Host "🟡 Checking dependencies..." -ForegroundColor Yellow
+python -c "import sphinx; print(f'Sphinx version: {sphinx.__version__}')" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "🔴 Error: Sphinx not found. Install with: pip install -r requirements.txt" -ForegroundColor Red
+    exit 1
+}
+
+python -c "import sphinx_rtd_theme; print('RTD theme: OK')" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "🔴 Error: sphinx_rtd_theme not found. Install with: pip install sphinx_rtd_theme" -ForegroundColor Red
+    exit 1
+}
+
+# 构建 HTML
+Write-Host "🟡 Building HTML documentation..." -ForegroundColor Yellow
+sphinx-build -W --keep-going -b html source build/html
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ Documentation built successfully!" -ForegroundColor Green
+    Write-Host "📖 Open build/html/index.html in your browser"
+    
+    # 自动打开浏览器
+    Invoke-Item build/html/index.html
+} else {
+    Write-Host "❌ Documentation build failed!" -ForegroundColor Red
+    exit 1
+}
+
+# 可选：构建 PDF（需要 LaTeX，如 MiKTeX）
+if ($args[0] -eq "pdf" -or $args[1] -eq "pdf") {
+    Write-Host "🟡 Building PDF documentation..." -ForegroundColor Yellow
+    sphinx-build -b latex source build/latex
+
+    if ($LASTEXITCODE -eq 0) {
+        Push-Location build/latex
+        # 在 Windows 上运行 make，需要安装 make（如 Git Bash 提供）
+        make
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "✅ PDF documentation built successfully!" -ForegroundColor Green
+            Write-Host "📄 PDF location: build/latex/U-Probe.pdf" -ForegroundColor Green
+        } else {
+            Write-Host "❌ PDF build failed!" -ForegroundColor Red
+        }
+        Pop-Location
+    }
+}
