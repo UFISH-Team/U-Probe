@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath('../../'))
 
 # -- Project information -----------------------------------------------------
 project = 'U-Probe'
-copyright = '2025, UFISH Team - Qian Zhang'
+copyright = '2025, Qian Zhang'
 author = 'Qian Zhang'
 
 # The version info for the project you're documenting
