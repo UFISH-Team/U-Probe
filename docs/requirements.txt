@@ -1,0 +1,20 @@
+# Documentation build requirements
+sphinx
+sphinx_rtd_theme
+myst-parser
+sphinx-copybutton
+sphinx-click
+sphinx-grid
+
+# For API documentation
+sphinx-autodoc-typehints
+
+# Additional dependencies for building docs
+pyyaml
+pandas
+numpy
+click
+
+# Optional: for better rendering
+sphinx-tabs
+sphinx-design
