@@ -63,14 +63,26 @@ def get_install_requires():
 
 
 packages_for_dev = get_requirements_from_file("requirements-dev.txt")
-packages_for_docs = get_requirements_from_file("requirements-doc.txt")
+
+# Try to get docs requirements, fallback to empty list if file doesn't exist
+try:
+    packages_for_docs = get_requirements_from_file("requirements-doc.txt")
+except FileNotFoundError:
+    packages_for_docs = [
+        'sphinx',
+        'sphinx_rtd_theme',
+        'myst-parser',
+        'sphinx-copybutton',
+        'sphinx-click',
+    ]
+
 requires_dev = packages_for_dev + packages_for_docs
 
 
 setup(
     name='uprobe',
-    author='Weize Xu, Huaiyuan Cai, Qian Zhang, Yu Chen',
-    author_email='vet.xwz@gmail.com',
+    author='Qian Zhang, Weize Xu, Huaiyuan Cai, Yu Chen',
+    author_email='jshn2022@163.com',
     version=get_version(),
     license='MIT',
     description='Universal oligo probe design tools.',
@@ -84,8 +96,9 @@ setup(
     install_requires=get_install_requires(),
     extras_require={
         'dev': requires_dev,
+        'docs': packages_for_docs,
     },
-    python_requires='>=3.9, <4',
+    python_requires='>=3.8, <4',
     entry_points={
         'console_scripts': [
             'uprobe = uprobe.__main__:main',
