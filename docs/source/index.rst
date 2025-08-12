@@ -5,7 +5,7 @@
    :target: https://github.com/UFISH-Team/U-Probe/blob/main/LICENSE
    :alt: License
 
-.. image:: https://img.shields.io/badge/python-3.9+-blue
+.. image:: https://img.shields.io/badge/python-3.8+-blue
    :target: https://www.python.org/downloads/
    :alt: Python Version
 
