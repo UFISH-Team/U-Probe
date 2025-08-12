@@ -13,89 +13,125 @@ extracts:
 samples:
   - pool7-ASPSCR1;chr17:79837392-80267392;6000;2e-5
   - pool7-RBI1;chr17:79837392-80267392;6000;2e-5
-  - pool7-RARA;chr17:38092814-38578814;6000;1e-4
-  # ... 更多池信息
+
 
 encoding:
   pool7-ASPSCR1:
-    barcode1: XXXXXXXXXXXXXXXX
+    BC1: CCCCCCCCCCCCCCCC
+    BC2: TTTTTTTTTTTTTTTT
   pool7-RBI1:
-    barcode1: YYYYYYYYYYYYYYYY
-  # ... 更多池的条形码
+    BC1: GGGGGGGGGGGGGGGG
+    BC2: AAAAAAAAAAAAAAAA
+
 
 probes:
   probe_1:
-    template: "{part1}{part2}"
+    template: "{part1}{part2}{part3}"
     parts:
       part1:
-        length: 11
-        expr: target_region[0:11]
+        length: 13
+        expr: "rc(target_region[0:13])"
       part2:
-        length: 10
-        expr: encoding[gene_id]['BC4']
+        template: "CC{barcode1}TGCGTCTATTT{barcode2}TAGTGGAGCCT"
+        parts:
+          barcode1:
+            expr: "encoding[gene_id]['BC1']"
+          barcode2:
+            expr: "encoding[gene_id]['BC2']"
+      part3:
+        length: 13
+        expr: "rc(target_region[13:26])"
+  probe_2:
+    template: "{part1}{part2}AGGCTCCACTA"
+    parts:
+      part1:
+        expr: "rc(target_region[-13:])"
+      part2:
+        expr: "target_region[26]"
 
 attributes:
-  probe_1:
-    parts:
-      part1:
-        label: target: 1-11
-        attributes:
-          tm:
-            name: tm
-            min: 60
-            max: 75
-          specific:
-            name: specific
-            threshold: 80
-            aligner: BLAST
-      part2:
-        label: barcode: BC4
-        attributes:
-          gcContent:
-            name: gcContent
-            min: 40
-            max: 60
-          foldScore:
-            name: foldScore
-            max: 40
-          selfMatch:
-            name: selfMatch
-            max: 4
-          mappedGenes:
-            name: mappedGenes
-            max: 5
-            aligner: BLAST
-    attributes:
-      gcContent:
-        name: gcContent
-        min: 40
-        max: 60
-      foldScore:
-        name: foldScore
-        max: 40
-      tm:
-        name: tm
-        min: 60
-        max: 75
-      selfMatch:
-        name: selfMatch
-        max: 4
-      mappedGenes:
-        name: mappedGenes
-        max: 5
-        aligner: BLAST
-      specific:
-        name: specific
-        threshold: 80
-        aligner: BLAST
+  # target region attributes
+  target_gcContent:
+    target: target_region
+    type: gc_content
+  target_tm:
+    target: target_region
+    type: annealing_temperature
+  target_mappedGenes:
+    target: target_region
+    type: n_mapped_genes
+    aligner: bowtie2
+    min_mapq: 30
+  target_selfMatch:
+    target: target_region
+    type: self_match
+  target_foldScore:
+    target: target_region
+    type: fold_score
+    
+  # probe part attributes
+  probe1_part1_tm:
+    target: probe_1:part1
+    type: annealing_temperature
+  probe1_part3_tm:
+    target: probe_1:part3
+    type: annealing_temperature
+  probe2_part1_tm:
+    target: probe_2:part1
+    type: annealing_temperature
+    
+  # probe attributes
+  probe1_foldScore:
+    target: probe_1
+    type: fold_score
+  probe1_gcContent:
+    target: probe_1
+    type: gc_content
+  probe1_tm:
+    target: probe_1
+    type: annealing_temperature
+  probe2_foldScore:
+    target: probe_2
+    type: fold_score
+  probe2_gcContent:
+    target: probe_2
+    type: gc_content
+  probe2_kmerCount:
+    target: probe_2
+    type: kmer_count
+    kmer_length: 10
+    kmer_threshold: 10
+    kmer_file: genome.jf
 
 post_process:
+  filters:
+    # target region
+    target_gcContent:
+      condition: target_gcContent >= 0.4 & target_gcContent <= 0.8
+    target_mappedGenes:
+      condition: target_mappedGenes <= 5
+      
+    # probe part  
+    probe1_part1_tm:
+      condition: probe1_part1_tm >= 35 & probe1_part1_tm <= 44
+    probe1_part3_tm:
+      condition: probe1_part3_tm >= 35 & probe1_part3_tm <= 44
+    probe2_part1_tm:
+      condition: probe2_part1_tm >= 35 & probe2_part1_tm <= 44
+    probe1_tm:
+      condition: probe1_tm >= 35 & probe1_tm <= 44
+      
   sorts:
-    is_descending:
-      - probe.0.foldScore
-      - target.gcContent
     is_ascending:
-      - part.0.1.gcContent
-      - probe.1.tm
+      - probe1_part1_tm
+      - probe1_part3_tm
+      - probe2_part1_tm
+      - probe1_tm
+    is_descending:
+      - target_mappedGenes
+      - target_selfMatch
+      - target_foldScore
+
+      
   remove_overlap:
-    location_interval: 20
+    location_interval: 5
