@@ -20,7 +20,7 @@
 
 To get started with U-Probe, clone the repository and install the package.
 
-### Method 1: Install from source (Recommended)
+### Install from source (Recommended)
 
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
@@ -30,7 +30,7 @@ pip install .
 
 After installation, you can use U-Probe directly with the `uprobe` command.
 
-### Method 2: Development install
+### Development install
 
 For development purposes, install in editable mode:
 
@@ -40,7 +40,7 @@ cd u-probe
 pip install -e .
 ```
 
-### Method 3: Using conda environment
+### Using conda environment
 
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
@@ -362,5 +362,6 @@ We thank the bioinformatics community for valuable feedback during development, 
 - [BLAST+](https://blast.ncbi.nlm.nih.gov/) - Sequence similarity search  
 - [Jellyfish](https://github.com/gmarcais/Jellyfish) - K-mer counting
 - [ViennaRNA](https://www.tbi.univie.ac.at/RNA/) - Secondary structure prediction
+
 
 
