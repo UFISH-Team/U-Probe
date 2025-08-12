@@ -343,8 +343,8 @@ If you use U-Probe in your research, please cite:
 ```bibtex
 @software{uprobe2024,
   title={U-Probe: Universal Probe Design Tool},
-  author={Xu, Weize and Cai, Huaiyuan and Zhang, Qian and Chen, Yu},
-  year={2024},
+  author={Zhang, Qian and Xu, Weize and Cai, Huaiyuan},
+  year={2025},
   url={https://github.com/UFISH-Team/U-Probe},
   version={1.0.0}
 }
@@ -362,6 +362,7 @@ We thank the bioinformatics community for valuable feedback during development, 
 - [BLAST+](https://blast.ncbi.nlm.nih.gov/) - Sequence similarity search  
 - [Jellyfish](https://github.com/gmarcais/Jellyfish) - K-mer counting
 - [ViennaRNA](https://www.tbi.univie.ac.at/RNA/) - Secondary structure prediction
+
 
 
 
