@@ -50,47 +50,6 @@ conda activate uprobe
 pip install .
 ```
 
-### Create Standalone Executable
-
-To create a standalone executable file that doesn't require Python installation on the target system:
-
-```bash
-# Install build dependencies
-pip install -r requirements-build.txt
-
-# Create executable
-pyinstaller --onefile --name uprobe \
-  --hidden-import uprobe \
-  --hidden-import uprobe.api \
-  --hidden-import uprobe.cli \
-  --hidden-import click \
-  --collect-all uprobe \
-  uprobe/__main__.py
-```
-
-The executable will be created in the `dist/` directory. You can then distribute this single file to systems that don't have Python installed.
-
-**Alternative build script:**
-
-Create a simple build script `build.sh`:
-
-```bash
-#!/bin/bash
-echo "Building U-Probe standalone executable..."
-pip install -r requirements.txt
-pip install -r requirements-build.txt
-pyinstaller --onefile --name uprobe \
-  --hidden-import uprobe \
-  --hidden-import uprobe.api \
-  --hidden-import uprobe.cli \
-  --hidden-import click \
-  --collect-all uprobe \
-  uprobe/__main__.py
-echo "Build complete! Executable available in dist/uprobe"
-```
-
-Then run: `chmod +x build.sh && ./build.sh`
-
 ## Use guide
 
 U-Probe provides two ways to use: Command Line Interface (CLI) and Python API.
