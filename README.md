@@ -18,26 +18,78 @@
 
 ## Installation
 
-To get started with U-Probe, clone the repository and install the required dependencies.
+To get started with U-Probe, clone the repository and install the package.
 
-Using pip:
+### Method 1: Install from source (Recommended)
 
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
 cd u-probe
-pip install -r requirements.txt
+pip install .
 ```
 
-Using conda:
+After installation, you can use U-Probe directly with the `uprobe` command.
+
+### Method 2: Development install
+
+For development purposes, install in editable mode:
+
+```bash
+git clone https://github.com/UFISH-Team/U-Probe.git
+cd u-probe
+pip install -e .
+```
+
+### Method 3: Using conda environment
+
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
 cd u-probe
 conda env create -f environments.yaml
 conda activate uprobe
-conda deactivate
+pip install .
 ```
 
-*(Note: A `requirements.txt` file should be created.)*
+### Create Standalone Executable
+
+To create a standalone executable file that doesn't require Python installation on the target system:
+
+```bash
+# Install build dependencies
+pip install -r requirements-build.txt
+
+# Create executable
+pyinstaller --onefile --name uprobe \
+  --hidden-import uprobe \
+  --hidden-import uprobe.api \
+  --hidden-import uprobe.cli \
+  --hidden-import click \
+  --collect-all uprobe \
+  uprobe/__main__.py
+```
+
+The executable will be created in the `dist/` directory. You can then distribute this single file to systems that don't have Python installed.
+
+**Alternative build script:**
+
+Create a simple build script `build.sh`:
+
+```bash
+#!/bin/bash
+echo "Building U-Probe standalone executable..."
+pip install -r requirements.txt
+pip install -r requirements-build.txt
+pyinstaller --onefile --name uprobe \
+  --hidden-import uprobe \
+  --hidden-import uprobe.api \
+  --hidden-import uprobe.cli \
+  --hidden-import click \
+  --collect-all uprobe \
+  uprobe/__main__.py
+echo "Build complete! Executable available in dist/uprobe"
+```
+
+Then run: `chmod +x build.sh && ./build.sh`
 
 ## Use guide
 
@@ -72,12 +124,14 @@ Before using U-Probe, you need to prepare two YAML configuration files:
 
 ### Command Line Interface (CLI)
 
+After installation, U-Probe provides a comprehensive CLI that can be accessed via the `uprobe` command.
+
 #### Complete Workflow
 
 One-click execution of the complete process from genome index construction to probe design:
 
 ```bash
-python -m uprobe.cli run \
+uprobe run \
   --protocol protocol.yaml \
   --genomes genomes.yaml \
   --output ./results \
@@ -89,7 +143,7 @@ python -m uprobe.cli run \
 
 **1. Build Genome Index**
 ```bash
-python -m uprobe.cli build-index \
+uprobe build-index \
   --protocol protocol.yaml \
   --genomes genomes.yaml \
   --threads 10
@@ -97,15 +151,43 @@ python -m uprobe.cli build-index \
 
 **2. Validate Target Genes**
 ```bash
-python -m uprobe.cli validate-targets \
+uprobe validate-targets \
   --protocol protocol.yaml \
   --genomes genomes.yaml \
   --continue-invalid
 ```
 
-**3. Generate Barcode Sequences**
+**3. Generate Target Sequences**
 ```bash
-python -m uprobe.cli generate-barcodes \
+uprobe generate-targets \
+  --protocol protocol.yaml \
+  --genomes genomes.yaml \
+  --output ./results \
+  --continue-invalid
+```
+
+**4. Construct Probes**
+```bash
+uprobe construct-probes \
+  --protocol protocol.yaml \
+  --genomes genomes.yaml \
+  --targets ./results/target_sequences.csv \
+  --output ./results
+```
+
+**5. Post-process Probes**
+```bash
+uprobe post-process \
+  --protocol protocol.yaml \
+  --genomes genomes.yaml \
+  --probes ./results/combined_data.csv \
+  --output ./results \
+  --raw
+```
+
+**6. Generate Barcode Sequences**
+```bash
+uprobe generate-barcodes \
   --protocol protocol.yaml \
   --output ./barcodes
 ```
@@ -114,21 +196,50 @@ python -m uprobe.cli generate-barcodes \
 
 | Parameter | Description |
 |------|------|
-| `--protocol` | Path to probe design protocol configuration file |
-| `--genomes` | Path to genome configuration file |
-| `--output` | Output directory |
+| `--protocol, -p` | Path to probe design protocol configuration file (YAML) |
+| `--genomes, -g` | Path to genome configuration file (YAML) |
+| `--output, -o` | Output directory [default: ./results] |
 | `--raw` | Save unfiltered raw probe data |
 | `--continue-invalid` | Continue execution even if some targets are invalid |
-| `--threads` | Number of threads for index building and computation |
+| `--threads, -t` | Number of threads for computation [default: 10] |
+| `--verbose, -v` | Enable verbose logging |
+| `--quiet, -q` | Suppress all output except errors |
 
 #### Get Help
 
 ```bash
 # View all commands
-python -m uprobe.cli --help
+uprobe --help
 
 # View help for specific command
-python -m uprobe.cli run --help
+uprobe run --help
+
+# Show version
+uprobe version
+```
+
+#### Example Workflow with Individual Steps
+
+```bash
+# 1. First, build the genome index
+uprobe build-index -p my_protocol.yaml -g my_genomes.yaml -t 8
+
+# 2. Validate your target genes
+uprobe validate-targets -p my_protocol.yaml -g my_genomes.yaml
+
+# 3. Generate target sequences
+uprobe generate-targets -p my_protocol.yaml -g my_genomes.yaml -o ./my_results
+
+# 4. Construct probes from target sequences
+uprobe construct-probes -p my_protocol.yaml -g my_genomes.yaml \
+  --targets ./my_results/target_sequences.csv -o ./my_results
+
+# 5. Post-process and filter probes
+uprobe post-process -p my_protocol.yaml -g my_genomes.yaml \
+  --probes ./my_results/combined_data.csv -o ./my_results --raw
+
+# 6. Optional: Generate barcodes
+uprobe generate-barcodes -p my_protocol.yaml -o ./barcodes
 ```
 
 ### Python API
@@ -232,3 +343,5 @@ This file defines all parameters for a specific probe design run.
 - `filters`: Criteria for post-processing and filtering probes (e.g., GC content, Tm).
 
 For more detailed examples and advanced configurations, please refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
+
+
