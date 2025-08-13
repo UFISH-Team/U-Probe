@@ -86,7 +86,6 @@ Documentation Contents
    :hidden:
 
    contributing
-   changelog
 
 Getting Started
 ~~~~~~~~~~~~~~~
