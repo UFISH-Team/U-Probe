@@ -35,6 +35,30 @@ def add_attributes(
         
         attr_type: str = attr.get('type', '').lower() 
 
+        if attr_type == "avoid_otp":
+            if attr.get('aligner') == "bowtie2":
+                assert 'bowtie2' in genome['align_index'] 
+                fasta_path = Path(genome['fasta'])
+                index_prefix = fasta_path.parent / 'bowtie2_genome' / fasta_path.stem
+                tmp_dir = Path("tmp")
+                tmp_dir.mkdir(exist_ok=True, parents=True)
+                from uprobe.attributes._attributes import static_otp
+                pool_name = df_probes['pool_name'].iloc[0]
+                region = df_probes['region'].iloc[0]
+                target_seq = df_probes['target_seq'].iloc[0]
+                targets = protocol['targets']
+                target_regions = [target.split(';')[1] for target in targets if target.split(';')[0] == pool_name]
+                counted = static_otp(tmp_dir, pool_name, region, target_seq, index_prefix, attr.get("threads", 10), target_regions, attr.get("density_thresh", 1e-5), attr.get("avoid_target_overlap", True), attr.get("search_range", (-10**6, 10**6)))
+                df_probes[f'{attr_name}_in_target'] = [counted[i][1][0] for i in range(len(counted))]
+                df_probes[f'{attr_name}_out_target'] = [counted[i][1][1] for i in range(len(counted))]
+                df_probes[f'{attr_name}_ratio'] = [counted[i][1][0]/(counted[i][1][0] + counted[i][1][1]) for i in range(len(counted))]
+                import shutil
+                shutil.rmtree(tmp_dir)
+            else:
+                raise NotImplementedError(
+                    f"Aligner {attr['aligner']} is not implemented."
+                )
+
         if attr_type == "n_mapped_genes":
             if attr.get('aligner') == "bowtie2":
                 assert 'bowtie2' in genome['align_index'] 
