@@ -87,7 +87,7 @@ class UProbeAPI:
         extract_params = self.protocol['extracts']['target_region']      
         df_targets = generate_target_seqs(
             source=extract_params['source'],
-            target_genes=self.protocol["targets"],
+            targets=self.protocol["targets"],
             fasta_path=self.genome['fasta'],
             gtf_path=self.genome['gtf'],
             min_length=extract_params['length'],
