@@ -2,26 +2,22 @@ name: DNAprobe
 
 description: Protocol for designing probe type Probe_9379 from species hg19
 
-genome: hg19
+genome: hg38
 
 extracts:
   target_region:
     source: genome
-    length: 50
+    length: 70
     overlap: 20
 
-samples:
-  - pool7-ASPSCR1;chr17:79837392-80267392;6000;2e-5
-  - pool7-RBI1;chr17:79837392-80267392;6000;2e-5
+targets:
+  - pool7-RARA;chr17:38092814-38578814;6000;1e-4
 
 
 encoding:
-  pool7-ASPSCR1:
+  pool7-RARA:
     BC1: CCCCCCCCCCCCCCCC
     BC2: TTTTTTTTTTTTTTTT
-  pool7-RBI1:
-    BC1: GGGGGGGGGGGGGGGG
-    BC2: AAAAAAAAAAAAAAAA
 
 
 probes:
@@ -29,25 +25,11 @@ probes:
     template: "{part1}{part2}{part3}"
     parts:
       part1:
-        length: 13
-        expr: "rc(target_region[0:13])"
+        expr: "encoding[gene_id]['BC1']"
       part2:
-        template: "CC{barcode1}TGCGTCTATTT{barcode2}TAGTGGAGCCT"
-        parts:
-          barcode1:
-            expr: "encoding[gene_id]['BC1']"
-          barcode2:
-            expr: "encoding[gene_id]['BC2']"
+        expr: "target_region[:]"
       part3:
-        length: 13
-        expr: "rc(target_region[13:26])"
-  probe_2:
-    template: "{part1}{part2}AGGCTCCACTA"
-    parts:
-      part1:
-        expr: "rc(target_region[-13:])"
-      part2:
-        expr: "target_region[26]"
+        expr: "encoding[gene_id]['BC2']"
 
 attributes:
   # target region attributes
@@ -68,7 +50,10 @@ attributes:
   target_foldScore:
     target: target_region
     type: fold_score
-    
+  target_AvoidOTP:
+    target: target_region
+    type: avoid_otp
+    aligner: bowtie2
   # probe part attributes
   probe1_part1_tm:
     target: probe_1:part1
@@ -76,9 +61,7 @@ attributes:
   probe1_part3_tm:
     target: probe_1:part3
     type: annealing_temperature
-  probe2_part1_tm:
-    target: probe_2:part1
-    type: annealing_temperature
+
     
   # probe attributes
   probe1_foldScore:
@@ -90,18 +73,7 @@ attributes:
   probe1_tm:
     target: probe_1
     type: annealing_temperature
-  probe2_foldScore:
-    target: probe_2
-    type: fold_score
-  probe2_gcContent:
-    target: probe_2
-    type: gc_content
-  probe2_kmerCount:
-    target: probe_2
-    type: kmer_count
-    kmer_length: 10
-    kmer_threshold: 10
-    kmer_file: genome.jf
+
 
 post_process:
   filters:
@@ -116,8 +88,6 @@ post_process:
       condition: probe1_part1_tm >= 35 & probe1_part1_tm <= 44
     probe1_part3_tm:
       condition: probe1_part3_tm >= 35 & probe1_part3_tm <= 44
-    probe2_part1_tm:
-      condition: probe2_part1_tm >= 35 & probe2_part1_tm <= 44
     probe1_tm:
       condition: probe1_tm >= 35 & probe1_tm <= 44
       
@@ -125,7 +95,6 @@ post_process:
     is_ascending:
       - probe1_part1_tm
       - probe1_part3_tm
-      - probe2_part1_tm
       - probe1_tm
     is_descending:
       - target_mappedGenes
