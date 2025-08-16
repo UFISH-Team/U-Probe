@@ -69,6 +69,30 @@ def bowtie2_align_se_sen(
                 log.error(f.read())
     return sam_path
 
+def static_otp(outdir: str, 
+                pool_name: str, 
+                region: str, 
+                target_seq: str,
+                index_prefix: str, 
+                threads: int = 10,
+                target_regions: str = None,
+                density_thresh: float = 1e-5,
+                avoid_target_overlap: bool = True,
+                search_range: t.Tuple[int, int] = (-1e5, 1e5)
+                ):
+    recname2seq = {region: target_seq}
+    fq_path = write_fastq(outdir, pool_name, recname2seq)
+    sam_path = f"{outdir}/{pool_name}.sam"
+    if not os.path.exists(sam_path):
+        bowtie2_align_se_sen(
+            fq_path, index_prefix,
+            sam_path, threads=threads,
+            log_file=f"{outdir}/{pool_name}.bowtie2.log")
+    out_path = f"{outdir}/{pool_name}.otp.csv"
+    counted = cal_otp(sam_path, out_path, target_regions, density_thresh, 
+            avoid_target_overlap, search_range)
+    return counted
+
 def count_n_bowtie2_aligned_genes(
         outdir: str,
         recname2seq: t.Mapping[str, str],
@@ -144,3 +168,12 @@ def cal_target_blocks(seq: str, offset: float):
 def cal_self_match(seq: str):
     return self_match(seq)
 
+def cal_otp(sam_path: str, 
+            out_path: str,
+            target_regions: t.List[str], 
+            density_thresh: float = 1e-5, 
+            avoid_target_overlap: bool = True, 
+            search_range: t.Tuple[int, int] = (-1e5, 1e5)):
+    from uprobe.attributes.otp import avoid_otp
+    counted = avoid_otp(sam_path, out_path, target_regions, density_thresh, avoid_target_overlap, search_range)
+    return counted
