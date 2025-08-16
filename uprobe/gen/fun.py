@@ -3,7 +3,7 @@ import os
 import typing as t
 from pyfaidx import Fasta
 
-from uprobe.utils import get_logger, reverse_complement
+from uprobe.utils import *
 
 log = get_logger(__name__)
 
@@ -236,14 +236,14 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
 
 def generate_target_seqs(
                         source,
-                        target_genes, 
+                        targets, 
                         fasta_path, 
                         gtf_path, 
                         min_length: int = 40, 
                         overlap: int = 20
                          ):
     if source == 'exon' or source == 'CDS':
-        exon_info = get_exon_seq(target_genes, fasta_path, gtf_path)
+        exon_info = get_exon_seq(targets, fasta_path, gtf_path)
         data_list = [] 
         for gene_name, exon_list in exon_info.items():
             n = 1
@@ -263,7 +263,7 @@ def generate_target_seqs(
         return data
 
     elif source == 'UTR':
-        utr_info = extract_gene_features(target_genes, fasta_path, gtf_path)
+        utr_info = extract_gene_features(targets, fasta_path, gtf_path)
         data_list = []
         for gene_name, utr_list in utr_info.items():
             n = 1
@@ -272,6 +272,18 @@ def generate_target_seqs(
                 data_list.append([gene_id, gene_name, utr_name, trans_name, start, end, tem, n_trans])
         data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'utr_name', 'transcript_name','start', 
                                                 'end', 'target_region', 'n_trans'])
+        return data
+
+    elif source == 'genome':
+        data_list = []
+        for target in targets:
+            pool_name = target.split(';')[0]
+            bed = target.split(';')[1]
+            ref_name, region = bed.split(':')
+            start, end = region.split('-')
+            seq_list = extract_fasta(fasta_path, pool_name, ref_name, start, end, min_length, overlap)
+            data_list.extend(seq_list)
+        data = pd.DataFrame(data_list, columns=['pool_name','probe_id', 'region', 'sub_start', 'sub_end', 'target_seq'])
         return data
 
 def validate_targets(targets, gtf_path, DTF_NAME_FIX=False):
