@@ -1,28 +1,16 @@
-name: RNAprobe
+name: double_hyb_iss
+description: Protocol for designing double hybrid ISS probes from species Mus musculus
 
-description: Protocol for designing probe type Probe_4345 from species Arabidopsis thaliana
-
-genome: test
+genome: mm39
 
 targets:
-  - LOC102653793
-  - LOC413089
-  - g28306 
-  - LOC410975_g9553 
+  - Rb1cc1
 
 encoding:
-  LOC102653793:
-    BC1: GGAGACTGATTACACG
-    BC2: GGAGACGGACTTTACA
-  LOC413089:
-    BC1: TAGGCATGAACGTCGA
-    BC2: GGACGGAGATTACACT
-  g28306:
-    BC1: GGAGATTACACGGACT
-    BC2: GGACTGATAGTACACG
-  LOC410975_g9553:
-    BC1: TAGGACGTCATGACGA
-    BC2: GGAACGGAGATTACCT
+  Rb1cc1:
+    BC1: ACT
+    BC2: GGA
+
 
 extracts:
   target_region:
@@ -38,52 +26,54 @@ probes:
         length: 13
         expr: "rc(target_region[0:13])"
       part2:
-        template: "{barcode1}N{barcode2}"
+        template: "CC{barcode1}TGCGTCTATTT{barcode2}TAGTGGAGCCT"
         parts:
           barcode1:
-            expr: "encoding[gene_id]['BC1']"
+            expr: "encoding[target]['BC1']"
           barcode2:
-            expr: "encoding[gene_id]['BC2']"
+            expr: "encoding[target]['BC2']"
       part3:
         length: 13
         expr: "rc(target_region[13:26])"
   probe_2:
-    template: "{part1}N{part2}"
+    template: "{part1}{part2}AGGCTCCACTA"
     parts:
       part1:
-        expr: "rc(probe_1.part2.barcode2)"
-      part2:
         expr: "rc(target_region[-13:])"
+      part2:
+        expr: "target_region[26]"
 
 attributes:
   # target region attributes
   target_gcContent:
     target: target_region
     type: gc_content
+  target_tm:
+    target: target_region
+    type: annealing_temperature
   target_mappedGenes:
     target: target_region
     type: n_mapped_genes
     aligner: bowtie2
     min_mapq: 30
-    
-  # probe attributes
-  probe1_part1_foldScore:
-    target: probe_1:part1
-    type: fold_score
-  probe1_part2_gcContent:
-    target: probe_1:part2
-    type: gc_content
-  probe1_part2_tm:
-    target: probe_1:part2
-    type: annealing_temperature
-  probe1_part3_selfMatch:
-    target: probe_1:part3
+  target_selfMatch:
+    target: target_region
     type: self_match
-  probe1_part3_mappedGenes:
+  target_foldScore:
+    target: target_region
+    type: fold_score
+
+    
+  # probe part attributes
+  probe1_part1_tm:
+    target: probe_1:part1
+    type: annealing_temperature
+  probe1_part3_tm:
     target: probe_1:part3
-    type: n_mapped_genes
-    aligner: bowtie2
-    min_mapq: 30
+    type: annealing_temperature
+  probe2_part1_tm:
+    target: probe_2:part1
+    type: annealing_temperature
     
   # probe attributes
   probe1_foldScore:
@@ -95,6 +85,13 @@ attributes:
   probe1_tm:
     target: probe_1
     type: annealing_temperature
+  probe2_foldScore:
+    target: probe_2
+    type: fold_score
+  probe2_gcContent:
+    target: probe_2
+    type: gc_content
+
 
 post_process:
   filters:
@@ -105,36 +102,29 @@ post_process:
       condition: target_mappedGenes <= 5
       
     # probe part  
-    probe1_part1_foldScore:
-      condition: probe1_part1_foldScore <= 9.5
-    probe1_part2_gcContent:
-      condition: probe1_part2_gcContent >= 0.4 & probe1_part2_gcContent <= 0.6
-    probe1_part2_tm:
-      condition: probe1_part2_tm >= 35 & probe1_part2_tm <= 75
-    probe1_part3_selfMatch:
-      condition: probe1_part3_selfMatch <= 6
-    probe1_part3_mappedGenes:
-      condition: probe1_part3_mappedGenes <= 5
-
-    # probe overall
-    probe1_foldScore:
-      condition: probe1_foldScore <= 9.5
-    probe1_gcContent:
-      condition: probe1_gcContent >= 0.4 & probe1_gcContent <= 0.8
+    probe1_part1_tm:
+      condition: probe1_part1_tm >= 35 & probe1_part1_tm <= 44
+    probe1_part3_tm:
+      condition: probe1_part3_tm >= 35 & probe1_part3_tm <= 44
+    probe2_part1_tm:
+      condition: probe2_part1_tm >= 35 & probe2_part1_tm <= 44
     probe1_tm:
-      condition: probe1_tm >= 35 & probe1_tm <= 75
+      condition: probe1_tm >= 35 & probe1_tm <= 44
       
   sorts:
     is_ascending:
-      - probe1_part1_foldScore
-      - probe1_foldScore
-      - probe1_part3_selfMatch
-      #- probe1_part3_mappedGenes
-    is_descending:
-      - probe1_part2_gcContent
-      - probe1_part2_tm
-      - probe1_gcContent
+      - probe1_part1_tm
+      - probe1_part3_tm
+      - probe2_part1_tm
       - probe1_tm
-      
+    is_descending:
+      - target_mappedGenes
+      - target_selfMatch
+      - target_foldScore
+
   remove_overlap:
-    location_interval: 3
+    location_interval: 5
+
+report:
+  - base_info
+  - plot
