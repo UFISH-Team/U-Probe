@@ -13,6 +13,9 @@ from .gen.barcodes import generate_barcodes_from_config
 from .gen.fun import generate_target_seqs, validate_targets
 from .gen.probe import construct_probes
 from .process import post_process
+from .report import generate_plot_report
+from .report.html import save_html_report
+
 from .tools import build_genome
 from .utils import get_logger
 
@@ -32,6 +35,11 @@ class UProbeAPI:
         self.protocol = self._load_config(protocol_config)
         self.genomes = self._load_config(genomes_config)
         self.genome = self._validate_and_get_genome()
+        # Report generation preferences (根据用户要求默认改为HTML)
+        self._generate_pdf = False  # 默认不生成PDF
+        self._generate_html = True  # 默认生成HTML 
+        self._include_plots = True  # 默认包含图表
+        self._embed_plots = True  # 默认将图表嵌入HTML而不单独保存
 
     def _load_config(self, config: T.Union[Path, dict]) -> dict:
         if isinstance(config, Path):
@@ -102,8 +110,7 @@ class UProbeAPI:
         contexts = [
             {
                 "target_region": row['target_region'],
-                "gene_id": row['gene_id'],
-                "gene_name": row['gene'],
+                "target": row.get('target') or row.get('gene'),
                 "encoding": self.protocol['encoding'],
             }
             for _, row in df_targets.iterrows()
@@ -124,6 +131,14 @@ class UProbeAPI:
             raw_path = self.output_dir / f"{name}_{time_str}_raw.csv"
             log.info(f"Saving raw results to {raw_path}")
             df_final.to_csv(raw_path, index=False)
+            # Generate report for raw data if configured
+            if self.protocol.get('report') and not df_final.empty:
+                log.info("Generating report for raw data...")
+                self.generate_report(df_final, 
+                                   include_plots=self._include_plots,
+                                   report_suffix="_raw", 
+                                   generate_html=self._generate_html,
+                                   embed_plots=self._embed_plots)
         log.info("Post-processing probes...")
         df_processed = post_process(df_final, self.protocol)       
         if df_processed.empty:
@@ -138,10 +153,13 @@ class UProbeAPI:
         log.info("--- Starting U-Probe Workflow ---")
         # 1. Build Genome Index (if needed)
         self.build_genome_index(threads=threads)
-        # 2. Validate Targets
-        if not self.validate_targets(continue_on_invalid=continue_on_invalid_targets):
-            log.error("Workflow halted due to target validation failure.")
-            return pd.DataFrame()
+        # 2. Validate Targets(RNA)
+        if self.protocol['extracts']['target_region']['source'] == 'genome':
+            pass
+        else:
+            if not self.validate_targets(continue_on_invalid=continue_on_invalid_targets):
+                log.error("Workflow halted due to target validation failure.")
+                return pd.DataFrame()        
         # 3. Generate Target Region Sequences
         df_targets = self.generate_target_seqs()
         if df_targets.empty:
@@ -152,6 +170,72 @@ class UProbeAPI:
             return pd.DataFrame()
         # 5. Post-process
         df_combined = pd.concat([df_targets.reset_index(drop=True), df_probes.reset_index(drop=True)], axis=1)
-        df_processed = self.post_process_probes(df_combined, raw_csv=raw_csv)        
+        df_processed = self.post_process_probes(df_combined, raw_csv=raw_csv)
+        # 6. Generate Report (if configured)
+        if self.protocol.get('report') and not df_processed.empty:
+            self.generate_report(df_processed, 
+                               include_plots=self._include_plots,
+                               generate_html=self._generate_html,
+                               embed_plots=self._embed_plots)
         log.info("--- U-Probe Workflow Completed ---")
         return df_processed
+
+    def generate_report(self, df_processed: pd.DataFrame, include_plots: bool = True, report_suffix: str = "", generate_html: bool = True, embed_plots: bool = True) -> T.Dict[str, T.List[Path]]:
+        """
+        Args:
+            df_processed: DataFrame with probe data
+            include_plots: Whether to include visualization plots
+            report_suffix: Suffix to add to report filenames (e.g. "_raw")
+            generate_html: Whether to generate HTML reports (always True now)
+            embed_plots: If True, embed plots in HTML (not save separately)
+        """
+        if df_processed.empty:
+            log.warning("No probe data available for report generation")
+            return {"html_reports": []}
+        
+        html_paths = []
+        
+        # Get report configuration
+        report_config = self.protocol.get('report', [])
+        
+        if 'base_info' in report_config:
+            try:
+                # Handle plots first
+                plot_data = {}
+                if 'plot' in report_config and include_plots:
+                    try:
+                        # Generate plots as base64 data for embedding
+                        plot_result = generate_plot_report(
+                            df_processed, 
+                            self.protocol, 
+                            self.output_dir, 
+                            report_suffix,
+                            save_files=False,  # Don't save plot files
+                            return_base64=True # Return base64 data for embedding
+                        )
+                        
+                        plot_data = plot_result.get("plot_data", {}) 
+                    except Exception as e:
+                        log.error(f"Failed to generate plots: {e}")
+                
+                # Generate HTML report with embedded plots
+                protocol_name = self.protocol.get('name', 'probes')
+                time_str = time.strftime("%Y%m%d_%H%M%S")
+                html_output_path = self.output_dir / f"{protocol_name}_report{report_suffix}_{time_str}.html"
+                
+                html_path = save_html_report(
+                    df_processed, 
+                    self.protocol, 
+                    html_output_path,
+                    plot_data=plot_data
+                )
+                
+                if html_path:
+                    html_paths.append(html_path)
+                    log.info(f"HTML report generated: {html_path}")
+                        
+            except Exception as e:
+                log.error(f"Failed to generate HTML report: {e}")
+        
+        log.info(f"Report generation completed: {len(html_paths)} HTML reports")
+        return {"html_reports": html_paths}
