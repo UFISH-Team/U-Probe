@@ -5,17 +5,11 @@
 # 或者是先提取出所有的密度超标的区块，然后找出贡献最大的探针，删除后该探针后，筛选出剩余的超标的探针，进行循环淘汰
 ####################################################################
 
-'''
-实现说明，待完善
-'''
-
 import typing as t
 from collections import defaultdict
 from intervaltree import IntervalTree, Interval
 import pysam
 
-
-#需求函数1
 GenomicRegion = t.Tuple[str, int, int]
 Aln = t.Tuple[str, int, int]
 Block = t.Tuple[str, str, t.List[Aln]]
