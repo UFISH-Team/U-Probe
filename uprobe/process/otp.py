@@ -66,9 +66,6 @@ def count_overlap_with_region(
             n_in += 1
     return n_in, len(alns) - n_in
 
-
-#需求函数2
-
 class AvoidOTP(object):
     """Avoid Out of Target Peak."""
     def __init__(self,
