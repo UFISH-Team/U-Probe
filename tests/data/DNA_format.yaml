@@ -11,96 +11,94 @@ extracts:
     overlap: 20
 
 targets:
-  - pool7-RARA;chr17:38092814-38578814;6000;1e-4
-
+  - NC_000017.11:40304334-40362489
+  - NC_000003.12:197795559-198295559
 
 encoding:
-  pool7-RARA:
+  NC_000017.11:40304334-40362489:
     BC1: CCCCCCCCCCCCCCCC
     BC2: TTTTTTTTTTTTTTTT
-
+  NC_000003.12:197795559-198295559:
+    BC1: CCCCCCCCCCCCCCCC
+    BC2: TTTTTTTTTTTTTTTT
 
 probes:
   probe_1:
     template: "{part1}{part2}{part3}"
     parts:
       part1:
-        expr: "encoding[gene_id]['BC1']"
+        expr: "encoding[target]['BC1']"
       part2:
         expr: "target_region[:]"
       part3:
-        expr: "encoding[gene_id]['BC2']"
+        expr: "encoding[target]['BC2']"
 
 attributes:
-  # target region attributes
-  target_gcContent:
-    target: target_region
+  # probe_1 part2 attributes
+  probe1_part2_gcContent:
+    target: probe_1.part2
     type: gc_content
-  target_tm:
-    target: target_region
+  probe1_part2_tm:
+    target: probe_1.part2
     type: annealing_temperature
-  target_mappedGenes:
-    target: target_region
-    type: n_mapped_genes
-    aligner: bowtie2
-    min_mapq: 30
-  target_selfMatch:
-    target: target_region
+  probe1_part2_selfMatch:
+    target: probe_1.part2
     type: self_match
-  target_foldScore:
-    target: target_region
+  probe1_part2_foldScore:
+    target: probe_1.part2
     type: fold_score
-  target_AvoidOTP:
-    target: target_region
-    type: avoid_otp
+  probe1_part2_mappedSites:
+    target: probe_1.part2
+    type: mapped_sites
     aligner: bowtie2
-  # probe part attributes
-  probe1_part1_tm:
-    target: probe_1:part1
-    type: annealing_temperature
-  probe1_part3_tm:
-    target: probe_1:part3
-    type: annealing_temperature
-
-    
-  # probe attributes
-  probe1_foldScore:
-    target: probe_1
-    type: fold_score
-  probe1_gcContent:
-    target: probe_1
-    type: gc_content
-  probe1_tm:
-    target: probe_1
-    type: annealing_temperature
-
+  probe1_part2_kmerCount:
+    target: probe_1.part2
+    type: kmer_count
+    kmer_len: 35
+    threads: 10
+    size: 1G
+    aligner: jellyfish
 
 post_process:
   filters:
-    # target region
-    target_gcContent:
-      condition: target_gcContent >= 0.4 & target_gcContent <= 0.8
-    target_mappedGenes:
-      condition: target_mappedGenes <= 5
-      
-    # probe part  
-    probe1_part1_tm:
-      condition: probe1_part1_tm >= 35 & probe1_part1_tm <= 44
-    probe1_part3_tm:
-      condition: probe1_part3_tm >= 35 & probe1_part3_tm <= 44
-    probe1_tm:
-      condition: probe1_tm >= 35 & probe1_tm <= 44
-      
+    # probe1 part2
+    probe1_part2_kmerCount:
+      condition: probe1_part2_kmerCount <= 100
+
+  # clean
+  avoid_otp:
+    NC_000017.11:40304334-40362489:
+      target_regions:
+        - NC_000017.11:40304334-40362489
+      density_thresh: 1e-5
+      search_range: [-1000000, 1000000]
+      avoid_target_overlap: False
+    NC_000003.12:197795559-198295559:
+      target_regions:
+        - NC_000003.12:197795559-198295559
+      density_thresh: 1e-5
+      search_range: [-1000000, 1000000]
+      avoid_target_overlap: False
+
+  # equal_space
+  equal_space:
+    NC_000017.11:40304334-40362489:
+      number_desired: 500
+    NC_000003.12:197795559-198295559:
+      number_desired: 1000
+
+  # remove overlap
+  remove_overlap:
+    location_interval: 0
+
   sorts:
     is_ascending:
-      - probe1_part1_tm
-      - probe1_part3_tm
-      - probe1_tm
+      - probe1_part2_gcContent
+      - probe1_part2_tm
     is_descending:
-      - target_mappedGenes
-      - target_selfMatch
-      - target_foldScore
+      - probe1_part2_selfMatch
+      - probe1_part2_foldScore
+      - probe1_part2_kmerCount
 
-      
-  remove_overlap:
-    location_interval: 5
+report:
+  - base_info
