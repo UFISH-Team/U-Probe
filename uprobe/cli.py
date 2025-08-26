@@ -80,12 +80,9 @@ def run(protocol, genomes, output, raw, continue_invalid, threads):
             threads=threads
         )
         
-        if result_df.empty:
-            log.error("No probes were generated. Check your configuration and input files.")
-            sys.exit(1)
-        else:
-            log.info(f"Workflow completed successfully! Generated {len(result_df)} probes.")
-            
+        if not result_df.empty:
+            log.info(f"Workflow completed successfully with {len(result_df)} final probes!")
+    
     except Exception as e:
         log.error(f"Workflow failed: {e}")
         sys.exit(1)
@@ -321,6 +318,72 @@ def generate_barcodes(protocol, output):
             
     except Exception as e:
         log.error(f"Barcode generation failed: {e}")
+        sys.exit(1)
+
+
+@cli.command(name='generate-report')
+@click.option('--protocol', '-p', required=True, type=click.Path(exists=True),
+              help='Path to probe design protocol configuration file (YAML).')
+@click.option('--genomes', '-g', required=True, type=click.Path(exists=True),
+              help='Path to genome configuration file (YAML).')
+@click.option('--probes', required=True, type=click.Path(exists=True),
+              help='Path to processed probe results CSV file.')
+@click.option('--output', '-o', default='./results', type=click.Path(),
+              help='Output directory for report files. [default: ./results]')
+@click.option('--no-plots', is_flag=True,
+              help='Skip plot generation and only create text reports.')
+@click.option('--pdf', is_flag=True, default=True,
+              help='Generate PDF version of reports (default: enabled).')
+@click.option('--no-pdf', is_flag=True,
+              help='Skip PDF generation and only create markdown reports.')
+def generate_report(protocol, genomes, probes, output, no_plots, pdf, no_pdf):
+    """
+    Generate interpretation report and plots for probe results.
+    
+    Creates detailed explanations of probe data columns and visualization plots
+    to help users understand and select optimal probes.
+    """
+    try:
+        import pandas as pd
+        
+        log.info("Generating probe analysis report...")
+        uprobe = UProbeAPI(
+            protocol_config=Path(protocol),
+            genomes_config=Path(genomes),
+            output_dir=Path(output)
+        )
+        
+        # Load probe results
+        df_probes = pd.read_csv(probes)
+        
+        if df_probes.empty:
+            log.error("No probe data found in the input file!")
+            sys.exit(1)
+        
+        # Determine PDF generation preference (--no-pdf overrides --pdf)
+        generate_pdf = pdf and not no_pdf
+        
+        # Generate report
+        results = uprobe.generate_report(df_probes, include_plots=not no_plots, generate_pdf=generate_pdf)
+        
+        # Log results
+        n_reports = len(results.get('reports', []))
+        n_plots = len(results.get('plots', []))
+        n_pdfs = len(results.get('pdfs', []))
+        
+        if n_reports + n_plots + n_pdfs == 0:
+            log.warning("No reports or plots were generated. Check your protocol configuration.")
+        else:
+            log.info(f"Report generation completed!")
+            if n_reports > 0:
+                log.info(f"Generated {n_reports} markdown report(s)")
+            if n_pdfs > 0:
+                log.info(f"Generated {n_pdfs} PDF report(s)")
+            if n_plots > 0:
+                log.info(f"Generated {n_plots} visualization plot(s)")
+        
+    except Exception as e:
+        log.error(f"Report generation failed: {e}")
         sys.exit(1)
 
 
