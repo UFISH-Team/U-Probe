@@ -7,12 +7,14 @@ from pyfaidx import Fasta
 
 def get_logger(name):
     log = logging.getLogger(name)
-    handler = logging.StreamHandler(sys.stderr)
-    LOGGING_FMT = "%(name)-20s %(levelname)-7s @ %(asctime)s: %(message)s"
-    LOGGING_DATE_FMT = "%m/%d/%y %H:%M:%S"
-    handler.setFormatter(logging.Formatter(fmt=LOGGING_FMT, datefmt=LOGGING_DATE_FMT))
-    log.addHandler(handler)
-    log.setLevel(logging.DEBUG)
+    if not log.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        LOGGING_FMT = "%(name)-20s %(levelname)-7s @ %(asctime)s: %(message)s"
+        LOGGING_DATE_FMT = "%m/%d/%y %H:%M:%S"
+        handler.setFormatter(logging.Formatter(fmt=LOGGING_FMT, datefmt=LOGGING_DATE_FMT))
+        log.addHandler(handler)
+        log.setLevel(logging.DEBUG)
+        log.propagate = False
     return log
 
 def get_base_map():
@@ -73,19 +75,23 @@ def write_fastq(outdir, gene, recname2seq: t.Mapping[str, str]):
             f.write("~"*len(seq)+"\n")
     return fq
 
-def extract_fasta(fasta_path, pool_name, ref_name, start, end, 
-                    min_length=40, overlap=20):
+def extract_fasta(fasta_path, target, 
+                    min_length, overlap):
     fa = Fasta(str(fasta_path))
-    seq = fa[ref_name][start:end].seq.upper()
+    chrom, region = target.split(':')
+    start, end = region.split('-')
+    seq = fa[chrom][int(start):int(end)].seq.upper()
     seq_list = []
+    m = 1
     for i in range(0, len(seq) - min_length + 1,  min_length - overlap):
         tem = seq[i:i + min_length]
         if len(tem) == min_length: 
             sub_start = i + 1  
             sub_end = i + min_length
-            region = f"{ref_name}:{start}-{end}:{sub_start}-{sub_end}"
-            id = f"{pool_name}_{i+1}"
-            seq_list.append([pool_name, id, region, sub_start, sub_end, tem])
+            sub_region = f"{sub_start}-{sub_end}"
+            id = f"{target}_{m}"
+            seq_list.append([id, target, sub_region, tem])
+            m += 1
     return seq_list
     
 def gene_barcode(config: dict) -> dict:
@@ -106,9 +112,7 @@ def gene_barcode(config: dict) -> dict:
 
 if __name__ == "__main__":
     fasta_path = "/data/zhangqian/genomes/hg38/hg38.fa"
-    ref_name = "NC_000017.11"
-    start = 40304334
-    end = 40362489
-    pool_name = "pool7-RARA"
-    seq_list = extract_fasta(fasta_path, pool_name, ref_name, start, end)
-    print(seq_list)
+    target = "NC_000017.11:40304334-40362489"
+    seq_list = extract_fasta(fasta_path, target)
+    for id, region, seq in seq_list:
+        print(id, region, seq)
