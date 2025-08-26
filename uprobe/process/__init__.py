@@ -1,19 +1,23 @@
 import pandas as pd 
 import re
+from .otp import avoid_otp
+from .equal_space import equal_space
+from uprobe.utils import get_logger
+
+logger = get_logger(__name__)
+
 
 def parse_condition(condition: str) -> list:
     """Parse a condition string into list of (column, operator, value) tuples
     """
-    # Split by & if present
     conditions = [c.strip() for c in condition.split('&')]
-    
     result = []
     # Match patterns like "column <= 80" or "column >= 35"
     pattern = r'(\w+)\s*([<>=]+)\s*(\d+(?:\.\d+)?)'
-    
     for cond in conditions:
         match = re.match(pattern, cond)
         if not match:
+            logger.error(f"Invalid condition format: {cond}")
             raise ValueError(f"Invalid condition format: {cond}")
         column, operator, value = match.groups()
         try:
@@ -44,6 +48,7 @@ def apply_condition(df: pd.DataFrame,
         elif operator == '==':
             df = df[df[column] == value]
         else:
+            logger.error(f"Unsupported operator: {operator}")
             raise ValueError(f"Unsupported operator: {operator}")
     return df
 
@@ -82,26 +87,38 @@ def sort_table(df: pd.DataFrame,
     return df.sort_values(by=valid_keys, ascending=valid_ascending)
 
 def remove_overlap(df: pd.DataFrame, 
+                   config: dict,
                    location_interval: int
                    ) -> pd.DataFrame:
     """
     Remove overlapping entries based on a specified location interval, considering each transcript separately.
     """
-    if 'transcript_name' not in df.columns:
-        return df
-        
-    df['transcript_name'] = df['transcript_name'].apply(lambda x: 
-                                                        ', '.join(x) if isinstance(x, list) else x)
-
-    df = df.sort_values(by=['transcript_name', 'start'])
-    non_overlapping = []
-    for _, group in df.groupby('transcript_name'):
-        current_end = None
-        for _, row in group.iterrows():
-            if current_end is None or row['start'] > current_end + location_interval:
-                non_overlapping.append(row)
-                current_end = row['end']
-    return pd.DataFrame(non_overlapping).reset_index(drop=True)
+    if 'transcript_name' in df.columns:
+        df['transcript_name'] = df['transcript_name'].apply(lambda x: 
+                                                            ', '.join(x) if isinstance(x, list) else x)
+        df = df.sort_values(by=['transcript_name', 'start'])
+        non_overlapping = []
+        for _, group in df.groupby('transcript_name'):
+            current_end = None
+            for _, row in group.iterrows():
+                if current_end is None or row['start'] > current_end + location_interval:
+                    non_overlapping.append(row)
+                    current_end = row['end']
+        return pd.DataFrame(non_overlapping).reset_index(drop=True)
+    elif 'target' in df.columns:
+        df = df.sort_values(by=['target', 'sub_region'])
+        non_overlapping = []
+        for target_name, group in df.groupby('target'):
+            group = group.sort_values('sub_region')
+            current_end = None
+            for _, row in group.iterrows():
+                s, e = row['sub_region'].split('-')
+                start = int(s)
+                end = int(e)
+                if current_end is None or start > current_end + location_interval:
+                    non_overlapping.append(row)
+                    current_end = end
+        return pd.DataFrame(non_overlapping).reset_index(drop=True)
 
 def post_process(df: pd.DataFrame, 
                  config: dict
@@ -110,17 +127,115 @@ def post_process(df: pd.DataFrame,
     Post-process the data frame according to the protocol.
     """
     processes = config.get('post_process', {})
-    if 'filters' in processes:
+    if 'filters' in processes and processes['filters']:
+        logger.info("Filtering the table")
         filters = processes['filters']
         df = filter_table(df, filters)
-    if 'sorts' in processes:
+    if "avoid_otp" in processes and processes['avoid_otp']:
+        logger.info("Avoiding OTP")
+        config = processes['avoid_otp']
+        mapped_sites_cols = []
+        for col in df.columns:
+            if not col.endswith('_num') and f"{col}_num" in df.columns:
+                # find the first non-empty list of samples
+                sample_val = None
+                non_na_series = df[col].dropna()
+                for val in non_na_series:
+                    try:
+                        if isinstance(val, str):
+                            import ast
+                            parsed_val = ast.literal_eval(val)
+                            if isinstance(parsed_val, list) and len(parsed_val) > 0:
+                                sample_val = parsed_val
+                                break
+                        elif isinstance(val, list) and len(val) > 0:
+                            sample_val = val
+                            break
+                    except Exception:
+                        continue
+                
+                if sample_val is not None:
+                    if isinstance(sample_val[0], (tuple, list)) and len(sample_val[0]) == 3:
+                        mapped_sites_cols.append(col)
+        
+        if mapped_sites_cols:
+            for target, target_config in config.items():
+                target_regions = target_config.get('target_regions', [])
+                density_thresh = float(target_config.get('density_thresh', 1e-4))
+                search_range = tuple(map(float, target_config.get('search_range', [-1000000, 1000000])))
+                avoid_target_overlap = target_config.get('avoid_target_overlap', True)
+                
+                target_df = df[df['target'] == target] if 'target' in df.columns else df
+                if target_df.empty:
+                    logger.warning(f"No probes found for target {target}, skipping OTP filtering")
+                    continue
+                
+                blocks = []
+                for _, row in target_df.iterrows():
+                    probe_id = row.get('probe_id', f"probe_{row.name}")
+                    seq = row.get('target_region', '')
+                    all_alns = []
+                    for col in mapped_sites_cols:
+                        mapped_sites = row[col]
+                        try:
+                            if isinstance(mapped_sites, str):
+                                import ast
+                                mapped_sites = ast.literal_eval(mapped_sites)
+                            if isinstance(mapped_sites, list) and len(mapped_sites) > 0:
+                                alns = [(ref_name, start_pos-1, end_pos) for ref_name, start_pos, end_pos in mapped_sites]
+                                all_alns.extend(alns)
+                        except Exception:
+                            pass
+                    if all_alns:
+                        blocks.append((probe_id, seq, all_alns))
+                
+                if not blocks:
+                    logger.warning(f"No alignment data found for target {target}, skipping OTP filtering")
+                    continue
+                counted = avoid_otp(blocks, target_regions, density_thresh, avoid_target_overlap, search_range)
+                if counted:
+                    filtered_probe_ids = []
+                    on_target_counts = {}
+                    off_target_counts = {}
+                    on_target_rates = {}
+                    for b, c in counted:
+                        name, seq, alns = b
+                        on_target = c[0]
+                        off_target = c[1]
+                        total = on_target + off_target
+                        on_target_rate = on_target / total if total > 0 else 0
+                        filtered_probe_ids.append(name)
+                        on_target_counts[name] = on_target
+                        off_target_counts[name] = off_target
+                        on_target_rates[name] = on_target_rate
+                    if 'probe_id' in df.columns:
+                        target_mask = df['target'] == target if 'target' in df.columns else pd.Series([True] * len(df))
+                        probe_mask = df['probe_id'].isin(filtered_probe_ids)
+                        keep_mask = (~target_mask) | probe_mask
+                        df = df[keep_mask].reset_index(drop=True)
+                        for probe_id in filtered_probe_ids:
+                            mask = df['probe_id'] == probe_id
+                            df.loc[mask, 'on_target'] = on_target_counts[probe_id]
+                            df.loc[mask, 'off_target'] = off_target_counts[probe_id]
+                            df.loc[mask, 'target_ratio'] = on_target_rates[probe_id]
+                else:
+                    if 'target' in df.columns:
+                        df = df[df['target'] != target].reset_index(drop=True)
+        else:
+            logger.error("No mapped_sites columns found in DataFrame, please check the input data")
+    if "remove_overlap" in processes and processes['remove_overlap']:
+        logger.info("Removing overlap")
+        location_interval = processes['remove_overlap'].get('location_interval', 0)
+        df = remove_overlap(df, config, location_interval)
+    if "equal_space" in processes and processes['equal_space']:
+        logger.info("Equalizing space")
+        df = equal_space(df, processes['equal_space'])
+    if 'sorts' in processes and processes['sorts']:
+        logger.info("Sorting the table")
         sorts = processes['sorts']
         pos_fields = sorts.get('is_ascending', [])
         neg_fields = sorts.get('is_descending', [])
         sort_keys = pos_fields + neg_fields
         is_ascending = [True] * len(pos_fields) + [False] * len(neg_fields)
         df = sort_table(df, sort_keys, is_ascending)
-    if "remove_overlap" in processes:
-        location_interval = processes['remove_overlap'].get('location_interval', 0)
-        df = remove_overlap(df, location_interval)
     return df
