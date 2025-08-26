@@ -8,3 +8,7 @@ fire
 seqwalk
 pyyaml
 click
+base64
+intervaltree
+matplotlib
+seaborn
