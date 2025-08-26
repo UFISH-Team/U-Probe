@@ -7,7 +7,7 @@ test:
   align_index:
     - bowtie2
     - blast
-  jellyfish: false
+  jellyfish: true
 
 hg19:
   description: "Human genome build 19"
