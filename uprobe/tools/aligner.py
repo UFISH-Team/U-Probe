@@ -16,7 +16,7 @@ def build_bowtie2_index(fasta_path: Path,
     cmd = " ".join(cmd)
     log.info(f"Call cmd: {cmd}")
     subp.check_call(cmd, shell=True)
-
+    
 def build_blast_db(fasta_path: Path, 
                    db_prefix: Path, 
                    title: str = "blast_db"
@@ -47,7 +47,7 @@ def build_mmseqs_index(fa_path, output_path):
     subp.check_call(cmd, shell=True)
     return output_path
 
-def build_jf_index(fasta, k, out_jf, threads=1, size='1G'):
+def build_jf_index(fasta, k, out_jf, threads=10, size='64G'):
     """
     Build Jellyfish index.
 
