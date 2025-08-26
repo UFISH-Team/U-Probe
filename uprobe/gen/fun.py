@@ -258,7 +258,7 @@ def generate_target_seqs(
                         gene_id = f"{gene_name}_{n}"
                         n += 1
                         data_list.append([gene_id, gene_name, exon_name, trans_name, start, end, tem, n_trans])
-        data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'exon_name', 'transcript_names','start', 
+        data = pd.DataFrame(data_list, columns=['probe_id', 'gene', 'exon_name', 'transcript_names','start', 
                                                 'end', 'target_region', 'n_trans'])
         return data
 
@@ -269,21 +269,25 @@ def generate_target_seqs(
             n = 1
             for j, utr_data in enumerate(utr_list, start=1):
                 utr_name, trans_name, seq, n_trans = utr_data
-                data_list.append([gene_id, gene_name, utr_name, trans_name, start, end, tem, n_trans])
-        data = pd.DataFrame(data_list, columns=['gene_id', 'gene', 'utr_name', 'transcript_name','start', 
+                # extract target region seqs
+                for i in range(0, len(seq) - min_length + 1,  min_length - overlap):
+                    tem = seq[i:i + min_length]
+                    if len(tem) == min_length: 
+                        start = i + 1  
+                        end = i + min_length
+                        gene_id = f"{gene_name}_{n}"
+                        n += 1
+                        data_list.append([gene_id, gene_name, utr_name, trans_name, start, end, tem, n_trans])
+        data = pd.DataFrame(data_list, columns=['probe_id', 'gene', 'utr_name', 'transcript_name','start', 
                                                 'end', 'target_region', 'n_trans'])
         return data
 
     elif source == 'genome':
         data_list = []
         for target in targets:
-            pool_name = target.split(';')[0]
-            bed = target.split(';')[1]
-            ref_name, region = bed.split(':')
-            start, end = region.split('-')
-            seq_list = extract_fasta(fasta_path, pool_name, ref_name, start, end, min_length, overlap)
+            seq_list = extract_fasta(fasta_path, target, min_length, overlap)
             data_list.extend(seq_list)
-        data = pd.DataFrame(data_list, columns=['pool_name','probe_id', 'region', 'sub_start', 'sub_end', 'target_seq'])
+        data = pd.DataFrame(data_list, columns=['probe_id', 'target', 'sub_region', 'target_region'])
         return data
 
 def validate_targets(targets, gtf_path, DTF_NAME_FIX=False):
