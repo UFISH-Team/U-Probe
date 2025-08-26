@@ -100,24 +100,6 @@ class ExprProbe(Probe):
             "rc": reverse_complement
         } 
         eval_locals = context.copy()
-        
-        # Handle encoding lookup: prefer gene_name if available, fallback to processed gene_id
-        if 'gene_name' in eval_locals and 'gene_id' in eval_locals:
-            eval_locals['gene_id'] = eval_locals['gene_name']
-        elif 'gene_id' in eval_locals:
-            # Fallback: extract base gene name from gene_id with suffix
-            def get_base_gene_id(gene_id_with_suffix):
-                """Extract base gene name from gene_id with suffix (e.g., 'g42115_1' -> 'g42115')"""
-                if isinstance(gene_id_with_suffix, str) and '_' in gene_id_with_suffix:
-                    parts = gene_id_with_suffix.split('_')
-                    if len(parts) >= 2 and parts[-1].isdigit():
-                        return '_'.join(parts[:-1])  # Remove last numeric part
-                return gene_id_with_suffix
-            
-            original_gene_id = eval_locals['gene_id']
-            base_gene_id = get_base_gene_id(original_gene_id)
-            eval_locals['gene_id'] = base_gene_id
-        
         dep_name_map = {}
         for dep in self.deps:
             if not dep.done:
