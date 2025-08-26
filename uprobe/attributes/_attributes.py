@@ -69,29 +69,113 @@ def bowtie2_align_se_sen(
                 log.error(f.read())
     return sam_path
 
-def static_otp(outdir: str, 
-                pool_name: str, 
-                region: str, 
-                target_seq: str,
+def parse_cigar(cigar: str) -> int:
+    if cigar == "*":  
+        return 0
+    import re
+    ops = re.findall(r'(\d+)([MIDNSHPX=])', cigar)
+    ref_len = 0
+    for length, op in ops:
+        length = int(length)
+        if op in "M=XDN":  
+            ref_len += length
+    return ref_len
+
+def cal_mapped_sites(outdir: str, 
+                target: str,
+                recname2seq: t.Mapping[str, str],
                 index_prefix: str, 
                 threads: int = 10,
-                target_regions: str = None,
-                density_thresh: float = 1e-5,
-                avoid_target_overlap: bool = True,
-                search_range: t.Tuple[int, int] = (-1e5, 1e5)
-                ):
-    recname2seq = {region: target_seq}
-    fq_path = write_fastq(outdir, pool_name, recname2seq)
-    sam_path = f"{outdir}/{pool_name}.sam"
+                ) -> t.Dict[str, t.List[t.Tuple[str, int, int]]]:
+    """
+    return:
+        mapped_sites_dict: t.Dict[str, t.List[t.Tuple[str, int, int]]]
+            - key: sequence name
+            - value: list of (ref_name, start_pos, end_pos) tuples
+    """
+    fq_path = write_fastq(outdir, target, recname2seq)
+    sam_path = f"{outdir}/{target}.mapped_sites.sam"
     if not os.path.exists(sam_path):
         bowtie2_align_se_sen(
             fq_path, index_prefix,
             sam_path, threads=threads,
-            log_file=f"{outdir}/{pool_name}.bowtie2.log")
-    out_path = f"{outdir}/{pool_name}.otp.csv"
-    counted = cal_otp(sam_path, out_path, target_regions, density_thresh, 
-            avoid_target_overlap, search_range)
-    return counted
+            log_file=f"{outdir}/{target}.bowtie2.log")
+    mapped_sites_dict: t.Dict[str, t.List[t.Tuple[str, int, int]]] = {}
+    for seq_name in recname2seq.keys():
+        mapped_sites_dict[seq_name] = []
+    with open(sam_path, 'r') as f:
+        for line in f:
+            if line.startswith('@'):  
+                continue
+            parts = line.rstrip('\n').split('\t')
+            if len(parts) < 11:  
+                continue
+            flag = int(parts[1])
+            if flag & 0x4:  
+                continue
+            query_name = parts[0]  
+            ref_name = parts[2]  
+            start_pos = int(parts[3])  
+            cigar = parts[5] 
+            ref_len = parse_cigar(cigar)
+            end_pos = start_pos + ref_len - 1  
+            if query_name in mapped_sites_dict:
+                mapped_sites_dict[query_name].append((ref_name, start_pos, end_pos))
+    os.remove(fq_path)
+    return mapped_sites_dict
+
+def cal_kmer_count(outdir: str,
+                   target: str,
+                   recname2seq: t.Mapping[str, str],
+                   index_prefix: str,
+                   kmer_len: int = 35,
+                   threads: int = 10,
+                ) -> t.Dict[str, int]:
+    """
+    calculate kmer count for each sequence
+    """
+    import numpy as np
+    randomInt = np.random.randint(0, 1000000)
+    temp_fasta = f"{outdir}/{target}_{kmer_len}_{randomInt}_temp.fa"
+    with open(temp_fasta, 'w') as f:
+        for rec_name, seq in recname2seq.items():
+            f.write(f">{rec_name}\n{seq}\n")
+    temp_output = f"{outdir}/{target}_{kmer_len}_{randomInt}_temp.txt"
+    cmd = [
+        'jellyfish', 'query', f'{index_prefix}',
+        '-s', temp_fasta,
+        '-o', temp_output
+    ]
+    try:
+        subp.check_call(cmd, stderr=None, shell=False)
+    except subp.CalledProcessError as e:
+        log.error(f"Jellyfish query failed: {e}")
+        raise
+    with open(temp_output, 'r') as f:
+        jf_lines = [line.strip() for line in f]
+    seq_kmer_counts = {}
+    line_idx = 0
+    for rec_name, seq in recname2seq.items():
+        seq_length = len(seq)
+        num_kmers = seq_length - kmer_len + 1
+        
+        if num_kmers <= 0:
+            seq_kmer_counts[rec_name] = 0
+            continue
+        max_count = 0
+        for i in range(num_kmers):
+            if line_idx < len(jf_lines):
+                count_val = int(jf_lines[line_idx].split(' ')[1])
+                max_count = max(max_count, count_val)
+                line_idx += 1
+        
+        seq_kmer_counts[rec_name] = max_count
+    try:
+        os.remove(temp_fasta)
+        os.remove(temp_output)
+    except OSError:
+        pass
+    return seq_kmer_counts 
 
 def count_n_bowtie2_aligned_genes(
         outdir: str,
@@ -109,7 +193,6 @@ def count_n_bowtie2_aligned_genes(
             log_file=f"{outdir}/{name}.bowtie2.log")
     n_mapped_genes = {}
     for rec_name, seq, alns in read_sam_align_blocks(sam_path, min_mapq=min_mapq):
-
         n_genes = len(set(["_".join(chr_.split("_")[-4:]) for chr_, s, e in alns]))
         n_mapped_genes[rec_name] = n_genes
     return n_mapped_genes
@@ -167,13 +250,3 @@ def cal_target_blocks(seq: str, offset: float):
 
 def cal_self_match(seq: str):
     return self_match(seq)
-
-def cal_otp(sam_path: str, 
-            out_path: str,
-            target_regions: t.List[str], 
-            density_thresh: float = 1e-5, 
-            avoid_target_overlap: bool = True, 
-            search_range: t.Tuple[int, int] = (-1e5, 1e5)):
-    from uprobe.attributes.otp import avoid_otp
-    counted = avoid_otp(sam_path, out_path, target_regions, density_thresh, avoid_target_overlap, search_range)
-    return counted
