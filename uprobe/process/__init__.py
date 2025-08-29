@@ -93,12 +93,19 @@ def remove_overlap(df: pd.DataFrame,
     """
     Remove overlapping entries based on a specified location interval, considering each transcript separately.
     """
+    # Check for RNA probes (transcript_name or transcript_names columns)
+    transcript_col = None
     if 'transcript_name' in df.columns:
-        df['transcript_name'] = df['transcript_name'].apply(lambda x: 
-                                                            ', '.join(x) if isinstance(x, list) else x)
-        df = df.sort_values(by=['transcript_name', 'start'])
+        transcript_col = 'transcript_name'
+    elif 'transcript_names' in df.columns:
+        transcript_col = 'transcript_names'
+    
+    if transcript_col:
+        df[transcript_col] = df[transcript_col].apply(lambda x: 
+                                                     ', '.join(x) if isinstance(x, list) else x)
+        df = df.sort_values(by=[transcript_col, 'start'])
         non_overlapping = []
-        for _, group in df.groupby('transcript_name'):
+        for _, group in df.groupby(transcript_col):
             current_end = None
             for _, row in group.iterrows():
                 if current_end is None or row['start'] > current_end + location_interval:
@@ -119,6 +126,10 @@ def remove_overlap(df: pd.DataFrame,
                     non_overlapping.append(row)
                     current_end = end
         return pd.DataFrame(non_overlapping).reset_index(drop=True)
+    else:
+        # Fallback: return original DataFrame if no recognized grouping columns
+        logger.warning("No recognized grouping columns (transcript_name/transcript_names/target) found for overlap removal. Returning original DataFrame.")
+        return df
 
 def post_process(df: pd.DataFrame, 
                  config: dict
