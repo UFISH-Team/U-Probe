@@ -58,7 +58,7 @@ def detect_protocol_type(df: pd.DataFrame, protocol: Dict) -> str:
         return 'DNA'
     
     # Check column names  
-    rna_indicators = ['transcript', 'exon_rank', 'transcript_name']
+    rna_indicators = ['transcript', 'exon_rank', 'transcript_name', 'transcript_names']
     dna_indicators = ['kmerCount', 'NC_']
     
     columns = df.columns.tolist()
@@ -112,6 +112,8 @@ def plot_transcript_coverage(df: pd.DataFrame, output_path: Optional[Path] = Non
     # Prepare transcript data
     if 'transcript_name' in df.columns:
         transcript_col = 'transcript_name'
+    elif 'transcript_names' in df.columns:
+        transcript_col = 'transcript_names'
     elif 'transcript' in df.columns:
         transcript_col = 'transcript'
     else:
