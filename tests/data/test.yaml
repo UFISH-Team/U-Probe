@@ -1,0 +1,44 @@
+name: rnaprobe
+description: Protocol for designing RNAprobe probes from species hg38
+genome: hg38
+targets:
+  - NC_000017.11:40304334-40362489
+encoding:
+  NC_000017.11:40304334-40362489:
+    BC1: TCTAGAGAAGGGGACTCAGG
+    BC2: CGTACTACCGCCGCTCCCTT
+extracts:
+  target_region:
+    source: genome
+    length: 70
+    overlap: 20
+probes:
+  probe_1:
+    template: "{part1}{part2}{part3}"
+    parts:
+      part1:
+        length: 12
+        expr: "encoding[target]['BC1']"
+      part2:
+        length: 70
+        expr: "target_region[0:70]"
+      part3:
+        length: 12
+        expr: "encoding[target]['BC2']"
+attributes:
+  probe1_part3_mappedGenes:
+    target: probe_1.part3
+    type: n_mapped_genes
+    aligner: bowtie2
+    min_mapq: 30
+post_process:
+  filters:
+    probe1_part3_mappedGenes:
+      condition: probe1_part3_mappedGenes <= 5
+  remove_overlap:
+    location_interval: 0
+  sorts:
+    is_ascending:
+      - probe1_part3_mappedGenes
+report:
+  - base_info
