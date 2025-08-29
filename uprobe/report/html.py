@@ -379,7 +379,7 @@ def get_protocol_type(df: pd.DataFrame, protocol: Dict) -> str:
     elif extract_source == 'genome':
         return 'DNA'
     
-    rna_indicators = ['transcript', 'exon_rank', 'transcript_name']
+    rna_indicators = ['transcript', 'exon_rank', 'transcript_name', 'transcript_names']
     dna_indicators = ['kmerCount', 'NC_']
     columns = df.columns.tolist()
     
