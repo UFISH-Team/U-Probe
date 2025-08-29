@@ -71,14 +71,11 @@ post_process:
       target_regions:
         - NC_000017.11:40304334-40362489
       density_thresh: 1e-5
-      search_range: [-1000000, 1000000]
-      avoid_target_overlap: False
     NC_000003.12:197795559-198295559:
       target_regions:
         - NC_000003.12:197795559-198295559
       density_thresh: 1e-5
-      search_range: [-1000000, 1000000]
-      avoid_target_overlap: False
+  
 
   # equal_space
   equal_space:
