@@ -6,19 +6,6 @@ from uprobe.utils import get_logger
 log = get_logger(__name__)
 
 def equal_space(df: pd.DataFrame, config: Dict[str, Any]) -> pd.DataFrame:
-    """
-    select probes from each target to ensure the number of probes is equal to the desired number
-    
-    Args:
-        df: DataFrame with probe data
-        config: equal_space configuration, format:
-               {
-                   "target1": {"number_desired": 1000},
-                   "target2": {"number_desired": 2000}
-               }
-               or global configuration:
-               {"number_desired": 1000}
-    """
     if df.empty:
         return df
     if 'target' not in df.columns:
