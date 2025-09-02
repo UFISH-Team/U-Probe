@@ -2,6 +2,7 @@ import pandas as pd
 import re
 from .otp import avoid_otp
 from .equal_space import equal_space
+from .summary import process_summary
 from uprobe.utils import get_logger
 
 logger = get_logger(__name__)
@@ -90,9 +91,6 @@ def remove_overlap(df: pd.DataFrame,
                    config: dict,
                    location_interval: int
                    ) -> pd.DataFrame:
-    """
-    Remove overlapping entries based on a specified location interval, considering each transcript separately.
-    """
     # Check for RNA probes (transcript_name or transcript_names columns)
     transcript_col = None
     if 'transcript_name' in df.columns:
@@ -249,4 +247,8 @@ def post_process(df: pd.DataFrame,
         sort_keys = pos_fields + neg_fields
         is_ascending = [True] * len(pos_fields) + [False] * len(neg_fields)
         df = sort_table(df, sort_keys, is_ascending)
+    # Note: Summary is now handled in report generation, not here
+    # This avoids duplicate summary generation and ensures it's always fresh
+    if 'summary' in processes and processes['summary']:
+        logger.info("Summary configuration found - will be processed during report generation")
     return df
