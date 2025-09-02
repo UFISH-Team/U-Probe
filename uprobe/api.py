@@ -127,27 +127,42 @@ class UProbeAPI:
         df_final = add_attributes(df_probes, self.protocol, self.genome)
         time_str = time.strftime("%Y%m%d_%H%M%S")
         name = self.protocol.get("name", "probes")
+        
+        # Always save raw CSV if requested
         if raw_csv:
             raw_path = self.output_dir / f"{name}_{time_str}_raw.csv"
             log.info(f"Saving raw results to {raw_path}")
             df_final.to_csv(raw_path, index=False)
-            # Generate report for raw data if configured
-            if self.protocol.get('report') and not df_final.empty:
-                log.info("Generating report for raw data...")
-                self.generate_report(df_final, 
-                                   include_plots=self._include_plots,
-                                   report_suffix="_raw", 
-                                   generate_html=self._generate_html,
-                                   embed_plots=self._embed_plots)
-        log.info("Post-processing probes...")
-        df_processed = post_process(df_final, self.protocol)       
-        if df_processed.empty:
-            log.warning("No probes remaining after post-processing filters.")
+        
+        # Check if post-processing is configured
+        post_process_config = self.protocol.get('post_process', {})
+        has_post_processing = any(post_process_config.get(key) for key in 
+                                ['filters', 'sorts', 'remove_overlap', 'equal_space', 'avoid_otp', 'summary'])
+        
+        if has_post_processing:
+            log.info("Post-processing probes...")
+            df_processed = post_process(df_final, self.protocol)
+            
+            if df_processed.empty:
+                log.warning("No probes remaining after post-processing filters. Using raw data for final result.")
+                # Save raw data as final result when post-processing filters everything out
+                output_path = self.output_dir / f"{name}_{time_str}.csv"
+                log.info(f"Saving {df_final.shape[0]} raw probes to {output_path} (post-processing resulted in empty dataset)")
+                df_final.to_csv(output_path, index=False)
+                return df_final
+            else:
+                # Save processed results
+                output_path = self.output_dir / f"{name}_{time_str}.csv"
+                log.info(f"Saving {df_processed.shape[0]} processed probes to {output_path}")
+                df_processed.to_csv(output_path, index=False)
+                return df_processed
         else:
+            log.info("No post-processing steps configured, using raw data as final result")
+            # Save as final result (without "_raw" suffix since it's the final output)
             output_path = self.output_dir / f"{name}_{time_str}.csv"
-            log.info(f"Saving {df_processed.shape[0]} processed probes to {output_path}")
-            df_processed.to_csv(output_path, index=False)        
-        return df_processed
+            log.info(f"Saving {df_final.shape[0]} probes to {output_path}")
+            df_final.to_csv(output_path, index=False)
+            return df_final
 
     def run_workflow(self, raw_csv: bool = False, continue_on_invalid_targets: bool = False, threads: int = 10) -> pd.DataFrame:      
         log.info("--- Starting U-Probe Workflow ---")
@@ -171,8 +186,9 @@ class UProbeAPI:
         # 5. Post-process
         df_combined = pd.concat([df_targets.reset_index(drop=True), df_probes.reset_index(drop=True)], axis=1)
         df_processed = self.post_process_probes(df_combined, raw_csv=raw_csv)
-        # 6. Generate Report (if configured)
+        # 6. Generate Report (if configured) - always generate for final results
         if self.protocol.get('report') and not df_processed.empty:
+            log.info("Generating final report with summary statistics...")
             self.generate_report(df_processed, 
                                include_plots=self._include_plots,
                                generate_html=self._generate_html,
@@ -198,11 +214,37 @@ class UProbeAPI:
         # Get report configuration
         report_config = self.protocol.get('report', [])
         
-        if 'base_info' in report_config:
+        # Handle both old list format and new dict format
+        if isinstance(report_config, dict):
+            report_types = report_config.get('types', [])
+        else:
+            report_types = report_config
+        
+        if 'base_info' in report_types:
             try:
-                # Handle plots first
+                # Generate summary data first (if configured)
+                from .process.summary import generate_summary_data
+                summary_config = self.protocol.get('post_process', {}).get('summary', {})
+                if summary_config:
+                    log.info("Generating summary statistics for report...")
+                    summary_data = generate_summary_data(df_processed, summary_config)
+                    # Store summary data in DataFrame attrs
+                    if hasattr(df_processed, 'attrs'):
+                        df_processed.attrs['summary_data'] = summary_data
+                    else:
+                        # Fallback for older pandas versions
+                        import tempfile
+                        import pickle
+                        import os
+                        temp_dir = tempfile.gettempdir()
+                        summary_file = os.path.join(temp_dir, 'uprobe_summary_data.pkl')
+                        with open(summary_file, 'wb') as f:
+                            pickle.dump(summary_data, f)
+                        log.info(f"Summary data saved to temporary file: {summary_file}")
+                
+                # Handle plots
                 plot_data = {}
-                if 'plot' in report_config and include_plots:
+                if 'plot' in report_types and include_plots:
                     try:
                         # Generate plots as base64 data for embedding
                         plot_result = generate_plot_report(
@@ -223,10 +265,19 @@ class UProbeAPI:
                 time_str = time.strftime("%Y%m%d_%H%M%S")
                 html_output_path = self.output_dir / f"{protocol_name}_report{report_suffix}_{time_str}.html"
                 
+                # Get template type from report configuration
+                report_config = self.protocol.get('report', {})
+                if isinstance(report_config, dict):
+                    template_type = report_config.get('template', 'detailed')
+                else:
+                    # Handle legacy list format
+                    template_type = 'detailed'
+                
                 html_path = save_html_report(
                     df_processed, 
                     self.protocol, 
                     html_output_path,
+                    template_type=template_type,
                     plot_data=plot_data
                 )
                 
