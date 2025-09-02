@@ -95,21 +95,21 @@ attributes:
 
 post_process:
   filters:
-    # target region
+    # target region (relaxed filters for testing)
     target_gcContent:
-      condition: target_gcContent >= 0.4 & target_gcContent <= 0.8
+      condition: target_gcContent >= 0.2 & target_gcContent <= 0.9
     target_mappedGenes:
-      condition: target_mappedGenes <= 5
+      condition: target_mappedGenes <= 10
       
-    # probe part  
+    # probe part (relaxed filters for testing)
     probe1_part1_tm:
-      condition: probe1_part1_tm >= 35 & probe1_part1_tm <= 44
+      condition: probe1_part1_tm >= 20 & probe1_part1_tm <= 60
     probe1_part3_tm:
-      condition: probe1_part3_tm >= 35 & probe1_part3_tm <= 44
+      condition: probe1_part3_tm >= 20 & probe1_part3_tm <= 60
     probe2_part1_tm:
-      condition: probe2_part1_tm >= 35 & probe2_part1_tm <= 44
+      condition: probe2_part1_tm >= 20 & probe2_part1_tm <= 60
     probe1_tm:
-      condition: probe1_tm >= 35 & probe1_tm <= 44
+      condition: probe1_tm >= 50 & probe1_tm <= 90
       
   sorts:
     is_ascending:
@@ -124,7 +124,43 @@ post_process:
 
   remove_overlap:
     location_interval: 5
+    
+  summary:
+    attributes:
+      target_gcContent:
+        stats: ["count", "mean", "std", "min", "max", "median"]  # count, mean, std, min, max, median, q25, q75, range
+        visualizations: ["histogram", "boxplot"]  # histogram, boxplot, scatter, bar
 
+      target_tm:
+        stats: ["count", "mean", "std", "min", "max"]
+        visualizations: ["histogram", "boxplot"]
+      target_mappedGenes:
+        stats: ["count", "mean", "median", "max"]
+        visualizations: ["histogram", "boxplot"]
+      
+      probe1_part1_tm:
+        stats: ["count", "mean", "std", "min", "max"]
+        visualizations: ["histogram"]
+      probe1_part3_tm:
+        stats: ["count", "mean", "std", "min", "max"]
+        visualizations: ["histogram"]
+      probe2_part1_tm:
+        stats: ["count", "mean", "std", "min", "max"]
+        visualizations: ["histogram"]
+
+      probe1_foldScore:
+        stats: ["count", "mean", "std", "min", "max"]
+        visualizations: ["histogram", "boxplot"]
+      probe1_gcContent:
+        stats: ["count", "mean", "std", "min", "max"]
+        visualizations: ["histogram", "boxplot"]
+      probe1_tm:
+        stats: ["count", "mean", "std", "min", "max"]
+        visualizations: ["histogram", "boxplot"]
+
+      
 report:
-  - base_info
-  - plot
+  types:
+    - base_info
+    - plot
+  template: "scientific"  # Options: basic, detailed, scientific
