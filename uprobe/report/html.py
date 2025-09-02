@@ -1,669 +1,818 @@
 """
-HTML report generation utilities for U-Probe.
-直接生成美观简洁的HTML报告，不依赖markdown转换。
+HTML report generation for U-Probe analysis.
 """
-import base64
-import io
-from pathlib import Path
-from typing import Dict, List
-import pandas as pd
+import json
 from datetime import datetime
-from ..utils import get_logger
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+import pandas as pd
+
+from uprobe.utils import get_logger
 
 logger = get_logger(__name__)
 
-def generate_modern_css() -> str:
-    """Generate modern CSS styles for the HTML report."""
-    return """
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #333;
-        }
-        
-        .report-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px;
-            text-align: center;
-            position: relative;
-        }
-        
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>') repeat;
-            z-index: 1;
-        }
-        
-        .header-content {
-            position: relative;
-            z-index: 2;
-        }
-        
-        .header h1 {
-            font-size: 2.5em;
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .header .subtitle {
-            font-size: 1.2em;
-            opacity: 0.9;
-            font-weight: 300;
-        }
-        
-        .content {
-            padding: 40px;
-        }
-        
-        .overview-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
-        }
-        
-        .overview-card {
-            background: linear-gradient(135deg, #f8f9ff 0%, #e8f4f8 100%);
-            border-radius: 15px;
-            padding: 30px 25px;
-            text-align: center;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border: 1px solid rgba(102, 126, 234, 0.1);
-        }
-        
-        .overview-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-        
-        .overview-card .icon {
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-        }
-        
-        .overview-card h3 {
-            color: #2c3e50;
-            font-size: 1.1em;
-            margin-bottom: 10px;
-            font-weight: 600;
-        }
-        
-        .overview-card .value {
-            font-size: 2.2em;
-            font-weight: 700;
-            color: #667eea;
-            margin-bottom: 5px;
-        }
-        
-        .overview-card .label {
-            color: #7f8c8d;
-            font-size: 0.9em;
-        }
-        
-        .section {
-            margin: 40px 0;
-            background: #fff;
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        }
-        
-        .section-title {
-            font-size: 1.8em;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 3px solid #667eea;
-            display: flex;
-            align-items: center;
-            font-weight: 600;
-        }
-        
-        .section-title::before {
-            content: '';
-            width: 8px;
-            height: 8px;
-            background: #667eea;
-            border-radius: 50%;
-            margin-right: 15px;
-        }
-        
-        .guide-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-        
-        .guide-item {
-            background: linear-gradient(135deg, #f8f9ff 0%, #e8f4f8 100%);
-            border-radius: 12px;
-            padding: 25px;
-            border-left: 5px solid #667eea;
-        }
-        
-        .guide-item h4 {
-            color: #2c3e50;
-            font-size: 1.2em;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .guide-item h4::before {
-            content: '✓';
-            color: #27ae60;
-            font-weight: bold;
-            margin-right: 10px;
-            background: rgba(39, 174, 96, 0.1);
-            padding: 5px;
-            border-radius: 50%;
-            width: 25px;
-            height: 25px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8em;
-        }
-        
-        .guide-item p {
-            color: #555;
-            line-height: 1.6;
-        }
-        
-        .parameters-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        }
-        
-        .parameters-table th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 15px;
-            text-align: left;
-            font-weight: 600;
-        }
-        
-        .parameters-table td {
-            padding: 15px;
-            border-bottom: 1px solid #f1f3f4;
-        }
-        
-        .parameters-table tr:hover {
-            background: #f8f9ff;
-        }
-        
-        .parameter-name {
-            font-family: 'Monaco', 'Consolas', monospace;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        
-        .parameter-range {
-            color: #27ae60;
-            font-weight: 600;
-        }
-        
-        .plot-container {
-            background: #fff;
-            border-radius: 15px;
-            padding: 30px;
-            margin: 20px 0;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        }
-        
-        .plot-title {
-            font-size: 1.3em;
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-        
-        .plot-image {
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 20px;
-            margin: 30px 0;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        
-        .action-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 30px;
-            border-radius: 25px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-        }
-        
-        .action-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-            color: white;
-            text-decoration: none;
-        }
-        
-        .footer {
-            background: #f8f9fa;
-            padding: 30px;
-            text-align: center;
-            color: #7f8c8d;
-            border-top: 1px solid #e9ecef;
-        }
-        
-        .alert {
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 5px solid;
-        }
-        
-        .alert-info {
-            background: #e8f4f8;
-            border-left-color: #17a2b8;
-            color: #0c5460;
-        }
-        
-        .alert-warning {
-            background: #fff3cd;
-            border-left-color: #ffc107;
-            color: #856404;
-        }
-        
-        .alert-success {
-            background: #d4edda;
-            border-left-color: #28a745;
-            color: #155724;
-        }
-        
-        @media (max-width: 768px) {
-            .overview-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .guide-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .header h1 {
-                font-size: 2em;
-            }
-            
-            .content {
-                padding: 20px;
-            }
-            
-            .action-buttons {
-                flex-direction: column;
-                align-items: center;
-            }
-        }
-    </style>
-    """
 
-def generate_html_report(title: str, content: str, custom_css: str = "") -> str:
-    """Generate a complete HTML document with modern styling."""
-    css = generate_modern_css() + custom_css
-    
-    html_template = f"""<!DOCTYPE html>
-<html lang="zh-CN">
+def get_basic_template() -> str:
+    """Get basic HTML template."""
+    return '''
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    {css}
+    <title>U-Probe Analysis Report - {protocol_name}</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }}
+        .container {{
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            text-align: center;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }}
+        .header h1 {{
+            color: #007acc;
+            margin: 0;
+            font-size: 2.5em;
+        }}
+        .header .subtitle {{
+            color: #666;
+            font-size: 1.2em;
+            margin-top: 10px;
+        }}
+        .section {{
+            margin-bottom: 30px;
+        }}
+        .section h2 {{
+            color: #007acc;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+            font-size: 1.8em;
+        }}
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }}
+        .stat-card {{
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 3px solid #007acc;
+            text-align: center;
+        }}
+        .stat-value {{
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #007acc;
+            margin-bottom: 3px;
+        }}
+        .stat-label {{
+            color: #666;
+            font-size: 0.9em;
+        }}
+        .table-container {{
+            overflow-x: auto;
+            margin: 20px 0;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+        }}
+        th, td {{
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            font-size: 0.9em;
+        }}
+        th {{
+            background-color: #007acc;
+            color: white;
+            font-weight: bold;
+        }}
+        tr:nth-child(even) {{
+            background-color: #f8f9fa;
+        }}
+        .plot-container {{
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+        }}
+        .plot-container img {{
+            max-width: 80%;
+            max-height: 400px;
+            height: auto;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }}
+        .footer {{
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            color: #666;
+            font-size: 0.9em;
+        }}
+    </style>
 </head>
 <body>
-    {content}
-</body>
-</html>"""
-    return html_template
-
-def get_protocol_type(df: pd.DataFrame, protocol: Dict) -> str:
-    """Detect protocol type based on data columns and configuration."""
-    extract_source = protocol.get('extracts', {}).get('target_region', {}).get('source', '')
-    if extract_source == 'exon':
-        return 'RNA'
-    elif extract_source == 'genome':
-        return 'DNA'
-    
-    rna_indicators = ['transcript', 'exon_rank', 'transcript_name', 'transcript_names']
-    dna_indicators = ['kmerCount', 'NC_']
-    columns = df.columns.tolist()
-    
-    if any(indicator in ' '.join(columns) for indicator in rna_indicators):
-        return 'RNA'
-    elif any(indicator in ' '.join(columns) for indicator in dna_indicators):
-        return 'DNA'
-    
-    return 'Unknown'
-
-def generate_overview_section(df: pd.DataFrame, protocol: Dict) -> str:
-    """Generate overview statistics section."""
-    protocol_type = get_protocol_type(df, protocol)
-    
-    total_probes = len(df)
-    
-    # Calculate key metrics
-    numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
-    gc_cols = [col for col in numeric_cols if 'gcContent' in col]
-    tm_cols = [col for col in numeric_cols if 'tm' in col]
-    
-    avg_gc = df[gc_cols[0]].mean() if gc_cols else 0
-    avg_tm = df[tm_cols[0]].mean() if tm_cols else 0
-    
-    # Count unique targets
-    target_cols = ['gene', 'target', 'transcript']
-    unique_targets = 0
-    for col in target_cols:
-        if col in df.columns:
-            unique_targets = df[col].nunique()
-            break
-    
-    return f"""
-    <div class="overview-grid">
-        <div class="overview-card">
-            <div class="icon">🧬</div>
-            <h3>总探针数量</h3>
-            <div class="value">{total_probes:,}</div>
-            <div class="label">个探针序列</div>
-        </div>
-        <div class="overview-card">
-            <div class="icon">🎯</div>
-            <h3>靶标数量</h3>
-            <div class="value">{unique_targets}</div>
-            <div class="label">个独特靶标</div>
-        </div>
-        <div class="overview-card">
-            <div class="icon">⚗️</div>
-            <h3>协议类型</h3>
-            <div class="value">{protocol_type}</div>
-            <div class="label">探针设计</div>
-        </div>
-        <div class="overview-card">
-            <div class="icon">🌡️</div>
-            <h3>平均Tm值</h3>
-            <div class="value">{avg_tm:.1f}°C</div>
-            <div class="label">退火温度</div>
-        </div>
-    </div>
-    """
-
-def generate_selection_guide_section(protocol_type: str) -> str:
-    """Generate probe selection guide section."""
-    common_guides = [
-        {
-            "title": "GC含量筛选",
-            "content": "选择GC含量在40-80%之间的探针，确保最佳的杂交效率和稳定性。过低或过高的GC含量都会影响探针性能。"
-        },
-        {
-            "title": "退火温度优化", 
-            "content": "根据实验条件选择合适的Tm值范围（通常35-44°C）。相近的Tm值有助于实现一致的杂交条件。"
-        },
-        {
-            "title": "特异性评估",
-            "content": "优先选择映射基因数量较少的探针（≤5个），降低非特异性结合的风险，提高检测准确性。"
-        },
-        {
-            "title": "二级结构检查",
-            "content": "选择折叠得分较低的探针，避免自身互补配对形成二级结构，影响杂交效率。"
-        }
-    ]
-    
-    if protocol_type == 'RNA':
-        specific_guides = [
-            {
-                "title": "转录本覆盖",
-                "content": "对于多异构体基因，建议选择覆盖组成型外显子的探针，确保检测的一致性和可靠性。"
-            },
-            {
-                "title": "外显子选择",
-                "content": "优先选择位于功能重要外显子的探针，避开剪接变异频繁的区域。"
-            }
-        ]
-        common_guides.extend(specific_guides)
-    
-    elif protocol_type == 'DNA':
-        specific_guides = [
-            {
-                "title": "基因组覆盖",
-                "content": "确保探针在目标区域内均匀分布，获得完整的基因组覆盖信息。"
-            },
-            {
-                "title": "k-mer唯一性",
-                "content": "选择k-mer计数较低的探针，提高基因组特异性，减少交叉反应。"
-            }
-        ]
-        common_guides.extend(specific_guides)
-    
-    guide_html = ""
-    for guide in common_guides:
-        guide_html += f"""
-        <div class="guide-item">
-            <h4>{guide['title']}</h4>
-            <p>{guide['content']}</p>
-        </div>
-        """
-    
-    return f"""
-    <div class="section">
-        <h2 class="section-title">探针筛选指南</h2>
-        <div class="guide-grid">
-            {guide_html}
-        </div>
-    </div>
-    """
-
-def generate_parameters_section() -> str:
-    """Generate recommended parameters section."""
-    parameters = [
-        {"name": "GC含量", "range": "40% - 80%", "description": "最佳杂交稳定性"},
-        {"name": "退火温度", "range": "35°C - 44°C", "description": "实验条件兼容性"},
-        {"name": "映射基因数", "range": "≤ 5", "description": "特异性保证"},
-        {"name": "自匹配得分", "range": "越低越好", "description": "避免自互补"},
-        {"name": "折叠得分", "range": "越低越好", "description": "减少二级结构"},
-        {"name": "k-mer计数", "range": "越低越好", "description": "基因组唯一性"}
-    ]
-    
-    table_rows = ""
-    for param in parameters:
-        table_rows += f"""
-        <tr>
-            <td class="parameter-name">{param['name']}</td>
-            <td class="parameter-range">{param['range']}</td>
-            <td>{param['description']}</td>
-        </tr>
-        """
-    
-    return f"""
-    <div class="section">
-        <h2 class="section-title">推荐参数范围</h2>
-        <table class="parameters-table">
-            <thead>
-                <tr>
-                    <th>参数</th>
-                    <th>推荐范围</th>
-                    <th>说明</th>
-                </tr>
-            </thead>
-            <tbody>
-                {table_rows}
-            </tbody>
-        </table>
-    </div>
-    """
-
-def generate_plots_section(plot_data: Dict[str, str]) -> str:
-    """Generate plots section with embedded images."""
-    if not plot_data:
-        return ""
-    
-    plot_descriptions = {
-        "quality_metrics": {
-            "title": "质量指标分布",
-            "description": "显示探针各项质量指标的统计分布，帮助识别数据范围和异常值"
-        },
-        "correlation_matrix": {
-            "title": "参数相关性矩阵", 
-            "description": "展示不同参数之间的相关关系，指导探针筛选策略"
-        },
-        "genomic_coverage": {
-            "title": "基因组覆盖分布",
-            "description": "DNA探针在目标基因组区域的空间分布情况"
-        },
-        "transcript_coverage": {
-            "title": "转录本覆盖分析",
-            "description": "RNA探针在不同转录本和外显子上的分布模式"
-        }
-    }
-    
-    plots_html = ""
-    for plot_name, base64_data in plot_data.items():
-        plot_info = plot_descriptions.get(plot_name, {"title": plot_name, "description": ""})
-        plots_html += f"""
-        <div class="plot-container">
-            <div class="plot-title">{plot_info['title']}</div>
-            <p style="color: #7f8c8d; margin-bottom: 20px;">{plot_info['description']}</p>
-            <img src="{base64_data}" alt="{plot_info['title']}" class="plot-image" />
-        </div>
-        """
-    
-    return f"""
-    <div class="section">
-        <h2 class="section-title">数据可视化分析</h2>
-        {plots_html}
-    </div>
-    """
-
-def generate_action_buttons_section() -> str:
-    """Generate action buttons section."""
-    return """
-    <div class="section">
-        <h2 class="section-title">下一步操作</h2>
-        <div class="alert alert-info">
-            <strong>💡 使用建议：</strong> 根据上述指南筛选高质量探针，建议优先考虑特异性和温度一致性。
-        </div>
-        <div class="action-buttons">
-            <div class="action-button" onclick="window.print()">
-                🖨️ 打印报告
-            </div>
-            <div class="action-button" onclick="alert('请在数据表格中应用筛选条件')">
-                🔍 开始筛选
-            </div>
-            <div class="action-button" onclick="alert('请参考参数范围进行排序')">
-                📊 排序优化
-            </div>
-        </div>
-        <div class="alert alert-warning">
-            <strong>⚠️ 重要提醒：</strong> 所有计算结果仅供参考，实际使用前请进行实验验证。
-        </div>
-    </div>
-    """
-
-def generate_complete_html_report(df: pd.DataFrame, protocol: Dict, plot_data: Dict[str, str] = None) -> str:
-    """Generate a complete, modern HTML report directly without markdown."""
-    protocol_name = protocol.get('name', '探针设计')
-    current_time = datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
-    
-    # Generate content sections
-    overview_section = generate_overview_section(df, protocol)
-    protocol_type = get_protocol_type(df, protocol)
-    guide_section = generate_selection_guide_section(protocol_type)
-    parameters_section = generate_parameters_section()
-    plots_section = generate_plots_section(plot_data or {})
-    actions_section = generate_action_buttons_section()
-    
-    content = f"""
-    <div class="report-container">
+    <div class="container">
         <div class="header">
-            <div class="header-content">
-                <h1>U-Probe 探针分析报告</h1>
-                <div class="subtitle">{protocol_name} • {current_time}</div>
-            </div>
+            <h1>U-Probe Analysis Report</h1>
+            <div class="subtitle">Protocol: {protocol_name}</div>
+            <div class="subtitle">Generated: {timestamp}</div>
         </div>
         
-        <div class="content">
-            {overview_section}
-            {guide_section}
-            {parameters_section}
-            {plots_section}
-            {actions_section}
-        </div>
+        {content}
         
         <div class="footer">
-            <p>报告由 U-Probe v1.0 自动生成 • 数据仅供研究使用</p>
+            <p>Generated by U-Probe Analysis Pipeline</p>
+            <p>Report Type: Basic Template</p>
         </div>
     </div>
-    """
-    
-    return generate_html_report(f"U-Probe 报告 - {protocol_name}", content)
+</body>
+</html>
+'''
 
-def save_html_report(df: pd.DataFrame, protocol: Dict, output_path: Path, plot_data: Dict[str, str] = None) -> Path:
-    """Generate and save HTML report to file."""
+
+def get_detailed_template() -> str:
+    """Get detailed HTML template with enhanced styling."""
+    return '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>U-Probe Detailed Analysis Report - {protocol_name}</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }}
+        .container {{
+            background-color: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            text-align: center;
+            border-bottom: 3px solid #007acc;
+            padding-bottom: 25px;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #007acc, #0056b3);
+            color: white;
+            margin: -40px -40px 40px -40px;
+            padding: 40px;
+            border-radius: 15px 15px 0 0;
+        }}
+        .header h1 {{
+            margin: 0;
+            font-size: 3em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }}
+        .header .subtitle {{
+            font-size: 1.3em;
+            margin-top: 15px;
+            opacity: 0.9;
+        }}
+        .section {{
+            margin-bottom: 40px;
+        }}
+        .section h2 {{
+            color: #007acc;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 15px;
+            font-size: 2em;
+            position: relative;
+        }}
+        .section h2:before {{
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 50px;
+            height: 2px;
+            background: #28a745;
+        }}
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+            margin: 18px 0;
+        }}
+        .stat-card {{
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 18px;
+            border-radius: 10px;
+            border-left: 4px solid #007acc;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }}
+        .stat-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }}
+        .stat-value {{
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #007acc;
+            margin-bottom: 6px;
+        }}
+        .stat-label {{
+            color: #666;
+            font-size: 1em;
+            font-weight: 500;
+        }}
+        .table-container {{
+            overflow-x: auto;
+            margin: 25px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }}
+        th, td {{
+            padding: 10px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 0.9em;
+        }}
+        th {{
+            background: linear-gradient(135deg, #007acc, #0056b3);
+            color: white;
+            font-weight: bold;
+            font-size: 1.1em;
+        }}
+        tr:nth-child(even) {{
+            background-color: #f8f9fa;
+        }}
+        tr:hover {{
+            background-color: #e3f2fd;
+        }}
+        .plot-container {{
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }}
+        .plot-container img {{
+            max-width: 75%;
+            max-height: 350px;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }}
+        .plot-title {{
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #007acc;
+            margin-bottom: 15px;
+        }}
+        .method-info {{
+            background: #e8f4f8;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #17a2b8;
+            margin: 20px 0;
+        }}
+        .method-info h3 {{
+            color: #17a2b8;
+            margin-top: 0;
+        }}
+        .footer {{
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 25px;
+            border-top: 2px solid #e9ecef;
+            color: #666;
+        }}
+        .collapsible {{
+            background-color: #f1f1f1;
+            color: #444;
+            cursor: pointer;
+            padding: 18px;
+            width: 100%;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 15px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }}
+        .collapsible:hover {{
+            background-color: #ddd;
+        }}
+        .collapsible-content {{
+            padding: 0 18px;
+            display: none;
+            overflow: hidden;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }}
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {{
+            var coll = document.getElementsByClassName("collapsible");
+            for (var i = 0; i < coll.length; i++) {{
+                coll[i].addEventListener("click", function() {{
+                    this.classList.toggle("active");
+                    var content = this.nextElementSibling;
+                    if (content.style.display === "block") {{
+                        content.style.display = "none";
+                    }} else {{
+                        content.style.display = "block";
+                    }}
+                }});
+            }}
+        }});
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>U-Probe Detailed Analysis Report</h1>
+            <div class="subtitle">Protocol: {protocol_name}</div>
+            <div class="subtitle">Generated: {timestamp}</div>
+        </div>
+        
+        {content}
+        
+        <div class="footer">
+            <p><strong>Generated by U-Probe Analysis Pipeline</strong></p>
+            <p>Report Type: Detailed Template | Version 1.0</p>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+
+def get_scientific_template() -> str:
+    """Get scientific HTML template with comprehensive analysis."""
+    return '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>U-Probe Scientific Analysis Report - {protocol_name}</title>
+    <style>
+        body {{
+            font-family: 'Times New Roman', serif;
+            line-height: 1.8;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 30px;
+            background-color: #fafafa;
+        }}
+        .container {{
+            background-color: white;
+            padding: 50px;
+            border-radius: 5px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            text-align: center;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+        }}
+        .header h1 {{
+            color: #2c3e50;
+            margin: 0;
+            font-size: 2.8em;
+            font-weight: normal;
+        }}
+        .header .subtitle {{
+            color: #7f8c8d;
+            font-size: 1.1em;
+            margin-top: 15px;
+            font-style: italic;
+        }}
+        .abstract {{
+            background: #ecf0f1;
+            padding: 25px;
+            border-radius: 5px;
+            margin: 30px 0;
+            border-left: 5px solid #3498db;
+        }}
+        .abstract h3 {{
+            color: #2c3e50;
+            margin-top: 0;
+        }}
+        .section {{
+            margin-bottom: 40px;
+        }}
+        .section h2 {{
+            color: #2c3e50;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 10px;
+            font-size: 1.8em;
+            font-weight: normal;
+        }}
+        .section h3 {{
+            color: #34495e;
+            font-size: 1.3em;
+            margin-top: 25px;
+        }}
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }}
+        .stat-card {{
+            background: #f8f9fa;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }}
+        .stat-value {{
+            font-size: 1.6em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }}
+        .stat-label {{
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }}
+        .table-container {{
+            overflow-x: auto;
+            margin: 25px 0;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border: 1px solid #dee2e6;
+        }}
+        th, td {{
+            padding: 8px 12px;
+            text-align: left;
+            border: 1px solid #dee2e6;
+            font-size: 0.9em;
+        }}
+        th {{
+            background-color: #2c3e50;
+            color: white;
+            font-weight: bold;
+        }}
+        .plot-container {{
+            text-align: center;
+            margin: 20px 0;
+            page-break-inside: avoid;
+            padding: 10px;
+        }}
+        .plot-container img {{
+            max-width: 80%;
+            max-height: 400px;
+            height: auto;
+            border: 1px solid #dee2e6;
+        }}
+        .plot-caption {{
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 10px;
+            font-style: italic;
+        }}
+        .method-section {{
+            background: #f8f9fa;
+            padding: 25px;
+            border: 1px solid #dee2e6;
+            margin: 25px 0;
+        }}
+        .method-section h3 {{
+            color: #2c3e50;
+            margin-top: 0;
+        }}
+        .citation {{
+            font-size: 0.9em;
+            color: #7f8c8d;
+            font-style: italic;
+        }}
+        .footer {{
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 25px;
+            border-top: 1px solid #dee2e6;
+            color: #7f8c8d;
+            font-size: 0.9em;
+        }}
+        .reference {{
+            font-size: 0.9em;
+            margin: 5px 0;
+        }}
+        .equation {{
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>U-Probe Scientific Analysis Report</h1>
+            <div class="subtitle">Comprehensive Probe Design and Quality Assessment</div>
+            <div class="subtitle">Protocol: {protocol_name}</div>
+            <div class="subtitle">Generated: {timestamp}</div>
+        </div>
+        
+        {content}
+        
+        <div class="footer">
+            <p><strong>U-Probe Analysis Pipeline</strong></p>
+            <p>Scientific Report Template | Computational Biology Analysis</p>
+            <p class="citation">For research use. Please cite appropriate references when publishing.</p>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
+
+def generate_summary_content(summary_data: Dict[str, Any], plots: Dict[str, str]) -> str:
+    """Generate summary content section."""
+    content = []
     
+    # Overall statistics
+    content.append('<div class="section">')
+    content.append('<h2>📊 Summary Statistics</h2>')
+    
+    # Basic info
+    data_info = summary_data.get('data_info', {})
+    total_probes = data_info.get('total_probes', 0)
+    targets = data_info.get('targets', [])
+    
+    content.append('<div class="stats-grid">')
+    content.append(f'''
+        <div class="stat-card">
+            <div class="stat-value">{total_probes:,}</div>
+            <div class="stat-label">Total Probes</div>
+        </div>
+    ''')
+    content.append(f'''
+        <div class="stat-card">
+            <div class="stat-value">{len(targets)}</div>
+            <div class="stat-label">Target Regions</div>
+        </div>
+    ''')
+    
+    # Probe counts by target
+    probe_counts = summary_data.get('probe_counts', {})
+    if probe_counts:
+        avg_probes = sum(probe_counts.values()) / len(probe_counts)
+        content.append(f'''
+            <div class="stat-card">
+                <div class="stat-value">{avg_probes:.0f}</div>
+                <div class="stat-label">Avg Probes/Target</div>
+            </div>
+        ''')
+    
+    content.append('</div>')
+    
+    # Probe count chart
+    if 'probe_counts' in plots:
+        content.append('<div class="plot-container">')
+        content.append('<h4 style="color: #007acc; margin-bottom: 10px;">Probe Distribution by Target</h4>')
+        content.append(f'<img src="data:image/png;base64,{plots["probe_counts"]}" alt="Probe Count Chart">')
+        content.append('</div>')
+    
+    content.append('</div>')
+    
+    # Attribute statistics
+    attribute_stats = summary_data.get('attribute_stats', {})
+    if attribute_stats:
+        content.append('<div class="section">')
+        content.append('<h2>🔬 Attribute Analysis</h2>')
+        
+        for attr_name, stats in attribute_stats.items():
+            content.append(f'<h3>{attr_name.replace("_", " ").title()}</h3>')
+            
+            # Statistics table
+            content.append('<div class="table-container">')
+            content.append('<table>')
+            content.append('<tr><th>Statistic</th><th>Value</th></tr>')
+            
+            for stat_name, value in stats.items():
+                if isinstance(value, float):
+                    formatted_value = f'{value:.3f}'
+                else:
+                    formatted_value = str(value)
+                content.append(f'<tr><td>{stat_name.title()}</td><td>{formatted_value}</td></tr>')
+            
+            content.append('</table>')
+            content.append('</div>')
+            
+            # Add plots if available
+            hist_key = f'{attr_name}_histogram'
+            box_key = f'{attr_name}_boxplot'
+            
+            # Create a grid layout for plots if both histogram and boxplot exist
+            has_hist = hist_key in plots
+            has_box = box_key in plots
+            
+            if has_hist and has_box:
+                content.append('<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 15px 0;">')
+                content.append('<div class="plot-container" style="margin: 0;">')
+                content.append(f'<h4 style="color: #007acc; margin-bottom: 10px;">{attr_name.replace("_", " ").title()} Distribution</h4>')
+                content.append(f'<img src="data:image/png;base64,{plots[hist_key]}" alt="{attr_name} Histogram">')
+                content.append('</div>')
+                content.append('<div class="plot-container" style="margin: 0;">')
+                content.append(f'<h4 style="color: #007acc; margin-bottom: 10px;">{attr_name.replace("_", " ").title()} by Target</h4>')
+                content.append(f'<img src="data:image/png;base64,{plots[box_key]}" alt="{attr_name} Boxplot">')
+                content.append('</div>')
+                content.append('</div>')
+            elif has_hist:
+                content.append('<div class="plot-container">')
+                content.append(f'<h4 style="color: #007acc; margin-bottom: 10px;">{attr_name.replace("_", " ").title()} Distribution</h4>')
+                content.append(f'<img src="data:image/png;base64,{plots[hist_key]}" alt="{attr_name} Histogram">')
+                content.append('</div>')
+            elif has_box:
+                content.append('<div class="plot-container">')
+                content.append(f'<h4 style="color: #007acc; margin-bottom: 10px;">{attr_name.replace("_", " ").title()} by Target</h4>')
+                content.append(f'<img src="data:image/png;base64,{plots[box_key]}" alt="{attr_name} Boxplot">')
+                content.append('</div>')
+        
+        content.append('</div>')
+    
+    # Correlation plots
+    scatter_plots = {k: v for k, v in plots.items() if '_scatter' in k}
+    if scatter_plots:
+        content.append('<div class="section">')
+        content.append('<h2>📈 Correlation Analysis</h2>')
+        
+        # Create a grid layout for scatter plots if there are multiple
+        scatter_items = list(scatter_plots.items())
+        if len(scatter_items) > 1:
+            # Use 2-column grid for multiple scatter plots
+            content.append('<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 15px 0;">')
+            for plot_name, plot_data in scatter_items:
+                title = plot_name.replace('_scatter', '').replace('_vs_', ' vs ').title()
+                content.append('<div class="plot-container" style="margin: 0;">')
+                content.append(f'<h4 style="color: #007acc; margin-bottom: 10px;">{title}</h4>')
+                content.append(f'<img src="data:image/png;base64,{plot_data}" alt="{title} Scatter Plot">')
+                content.append('</div>')
+            content.append('</div>')
+        elif len(scatter_items) == 1:
+            plot_name, plot_data = scatter_items[0]
+            title = plot_name.replace('_scatter', '').replace('_vs_', ' vs ').title()
+            content.append('<div class="plot-container">')
+            content.append(f'<h4 style="color: #007acc; margin-bottom: 10px;">{title}</h4>')
+            content.append(f'<img src="data:image/png;base64,{plot_data}" alt="{title} Scatter Plot">')
+            content.append('</div>')
+        
+        content.append('</div>')
+    
+    return '\n'.join(content)
+
+
+def generate_method_section(protocol: Dict[str, Any]) -> str:
+    """Generate methods section for scientific template."""
+    content = []
+    
+    content.append('<div class="method-section">')
+    content.append('<h3>Methods</h3>')
+    
+    # Protocol information
+    content.append('<h4>Probe Design Protocol</h4>')
+    content.append(f'<p><strong>Protocol Name:</strong> {protocol.get("name", "N/A")}</p>')
+    content.append(f'<p><strong>Description:</strong> {protocol.get("description", "N/A")}</p>')
+    content.append(f'<p><strong>Genome:</strong> {protocol.get("genome", "N/A")}</p>')
+    
+    # Probe design parameters
+    probes = protocol.get('probes', {})
+    if probes:
+        content.append('<h4>Probe Design Parameters</h4>')
+        content.append('<ul>')
+        for probe_name, probe_config in probes.items():
+            content.append(f'<li><strong>{probe_name}:</strong> {probe_config.get("template", "N/A")}</li>')
+        content.append('</ul>')
+    
+    # Quality filters
+    filters = protocol.get('post_process', {}).get('filters', {})
+    if filters:
+        content.append('<h4>Quality Control Filters</h4>')
+        content.append('<ul>')
+        for filter_name, filter_config in filters.items():
+            condition = filter_config.get('condition', 'N/A')
+            content.append(f'<li><strong>{filter_name}:</strong> {condition}</li>')
+        content.append('</ul>')
+    
+    content.append('</div>')
+    
+    return '\n'.join(content)
+
+
+def save_html_report(
+    df: pd.DataFrame,
+    protocol: Dict[str, Any],
+    output_path: Path,
+    template_type: str = "detailed",
+    plot_data: Optional[Dict[str, str]] = None
+) -> Optional[Path]:
+    """Save HTML report to file.
+    
+    Args:
+        df: DataFrame containing probe data
+        protocol: Protocol configuration
+        output_path: Output file path
+        template_type: Template type ('basic', 'detailed', 'scientific')
+        plot_data: Dictionary of plot data (base64 encoded)
+        
+    Returns:
+        Path to saved HTML file or None if failed
+    """
     try:
-        html_content = generate_complete_html_report(df, protocol, plot_data)
+        logger.info(f"Generating {template_type} HTML report...")
         
-        # Ensure output directory exists
+        # Get summary data
+        summary_data = getattr(df, 'attrs', {}).get('summary_data', {})
+        logger.info(f"Retrieved summary data from DataFrame attrs: {bool(summary_data)}")
+        if not summary_data:
+            # Try to load from temporary file (fallback)
+            try:
+                import tempfile
+                import pickle
+                import os
+                
+                temp_dir = tempfile.gettempdir()
+                summary_file = os.path.join(temp_dir, 'uprobe_summary_data.pkl')
+                if os.path.exists(summary_file):
+                    with open(summary_file, 'rb') as f:
+                        summary_data = pickle.load(f)
+                    logger.info("Loaded summary data from temporary file")
+            except Exception as e:
+                logger.warning(f"Could not load summary data: {e}")
+                summary_data = {}
+        
+        if not plot_data:
+            plot_data = {}
+        
+        # Generate content
+        content = generate_summary_content(summary_data, plot_data)
+        
+        # Add methods section for scientific template
+        if template_type == "scientific":
+            content += generate_method_section(protocol)
+        
+        # Get template
+        if template_type == "basic":
+            template = get_basic_template()
+        elif template_type == "scientific":
+            template = get_scientific_template()
+        else:  # detailed
+            template = get_detailed_template()
+        
+        # Fill template
+        protocol_name = protocol.get('name', 'Unknown Protocol')
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        html_content = template.format(
+            protocol_name=protocol_name,
+            timestamp=timestamp,
+            content=content
+        )
+        
+        # Save to file
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Write HTML file
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
+        
+        logger.info(f"HTML report saved to: {output_path}")
         return output_path
         
     except Exception as e:
-        logger.error(f"Failed to generate HTML report: {e}")
+        logger.error(f"Error generating HTML report: {e}")
         return None
