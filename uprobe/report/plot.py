@@ -1,341 +1,494 @@
 """
-Generate visualization plots for probe results.
+Plot generation for probe analysis reports.
 """
-import pandas as pd
 import base64
 import io
-from typing import Dict, List, Tuple, Optional
+import pandas as pd
+import numpy as np
+from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
-from ..utils import get_logger
+
+try:
+    import matplotlib
+    matplotlib.use('Agg')  # Use non-interactive backend
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    PLOTTING_AVAILABLE = True
+except ImportError:
+    PLOTTING_AVAILABLE = False
+
+from uprobe.utils import get_logger
 
 logger = get_logger(__name__)
 
-# Try to import plotting libraries
-try:
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import numpy as np
-    # Set default matplotlib and seaborn style
+# Set plotting style
+if PLOTTING_AVAILABLE:
     plt.style.use('default')
     sns.set_palette("husl")
-    PLOTTING_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"Plotting libraries not available: {e}")
-    logger.warning("Install matplotlib and seaborn for plot generation: pip install matplotlib seaborn")
-    PLOTTING_AVAILABLE = False
 
-def plot_to_base64() -> str:
-    """Convert current matplotlib plot to base64 string for HTML embedding."""
+
+def create_histogram(
+    data: List[float],
+    title: str,
+    xlabel: str,
+    ylabel: str = "Frequency",
+    bins = 30,  # Can be int or 'auto'
+    figsize: Tuple[int, int] = (6, 4),
+    bar_width_ratio: float = 0.8
+) -> str:
+    """Create histogram plot and return as base64 string.
+    
+    Args:
+        data: List of numeric values
+        title: Plot title
+        xlabel: X-axis label
+        ylabel: Y-axis label
+        bins: Number of bins (int) or 'auto' for automatic calculation
+        figsize: Figure size tuple
+        bar_width_ratio: Width ratio of bars (0.0-1.0), controls bar spacing
+        
+    Returns:
+        Base64 encoded plot image
+    """
+    if not PLOTTING_AVAILABLE:
+        logger.warning("Matplotlib not available, skipping histogram generation")
+        return ""
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
     try:
+        # Auto-adjust bins based on data size and range
+        data_array = np.array(data)
+        n_data = len(data_array)
+        
+        if bins == 'auto' or (isinstance(bins, int) and bins <= 0):
+            # Use Sturges' rule combined with square root choice for optimal binning
+            sturges_bins = int(np.log2(n_data)) + 1
+            sqrt_bins = int(np.sqrt(n_data))
+            
+            # Choose the more conservative (smaller) value but ensure reasonable range
+            suggested_bins = min(sturges_bins, sqrt_bins)
+            bins = max(min(suggested_bins, 50), 10)  # Between 10 and 50 bins
+        elif isinstance(bins, int):
+            # Use provided bins but cap at reasonable limits
+            bins = max(min(bins, 50), 5)  # Between 5 and 50 bins
+        
+        # Create histogram with controlled bar width
+        n, bins_edges, patches = ax.hist(
+            data, 
+            bins=bins, 
+            alpha=0.7, 
+            color='skyblue', 
+            edgecolor='black', 
+            rwidth=bar_width_ratio,  # Use the configurable width ratio
+            linewidth=0.5
+        )
+        
+        ax.set_title(title, fontsize=14, fontweight='bold')
+        ax.set_xlabel(xlabel, fontsize=12)
+        ax.set_ylabel(ylabel, fontsize=12)
+        ax.grid(True, alpha=0.3, axis='y')  # Only show horizontal grid lines
+        
+        # Add statistics text and lines
+        mean_val = np.mean(data)
+        median_val = np.median(data)
+        std_val = np.std(data)
+        
+        # Add mean and median lines
+        ax.axvline(mean_val, color='red', linestyle='--', alpha=0.8, 
+                  linewidth=2, label=f'Mean: {mean_val:.2f}')
+        ax.axvline(median_val, color='orange', linestyle=':', alpha=0.8, 
+                  linewidth=2, label=f'Median: {median_val:.2f}')
+        
+        # Add statistics text box
+        stats_text = f'N = {n_data}\nStd = {std_val:.2f}'
+        ax.text(0.98, 0.98, stats_text, transform=ax.transAxes,
+                verticalalignment='top', horizontalalignment='right',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8),
+                fontsize=9)
+        
+        ax.legend(loc='upper right', bbox_to_anchor=(0.98, 0.85))
+        
+        plt.tight_layout()
+        
+        # Convert to base64
         buffer = io.BytesIO()
         plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
         buffer.seek(0)
-        img_data = buffer.getvalue()
-        buffer.close()
-        b64_string = base64.b64encode(img_data).decode('utf-8')
-        return f"data:image/png;base64,{b64_string}"
+        plot_data = base64.b64encode(buffer.read()).decode()
+        plt.close(fig)
+        
+        return plot_data
+        
     except Exception as e:
-        logger.error(f"Failed to convert plot to base64: {e}")
+        logger.error(f"Error creating histogram: {e}")
+        plt.close(fig)
         return ""
 
-def save_plot_conditionally(output_path: Optional[Path] = None, return_base64: bool = False) -> Optional[str]:
-    """Save plot to file and/or return as base64 string."""
-    base64_data = None
-    if return_base64:
-        base64_data = plot_to_base64()
-    if output_path:
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        logger.info(f"Plot saved to {output_path}")
-    plt.close()
-    return base64_data
 
-def detect_protocol_type(df: pd.DataFrame, protocol: Dict) -> str:
-    """Detect protocol type based on data columns and configuration."""
-    extract_source = protocol.get('extracts', {}).get('target_region', {}).get('source', '')
-    if extract_source == 'exon':
-        return 'RNA'
-    elif extract_source == 'genome':
-        return 'DNA'
+def create_boxplot(
+    data_dict: Dict[str, List[float]],
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    figsize: Tuple[int, int] = (8, 4)
+) -> str:
+    """Create boxplot and return as base64 string.
     
-    # Check column names  
-    rna_indicators = ['transcript', 'exon_rank', 'transcript_name', 'transcript_names']
-    dna_indicators = ['kmerCount', 'NC_']
-    
-    columns = df.columns.tolist()
-    
-    if any(indicator in ' '.join(columns) for indicator in rna_indicators):
-        return 'RNA'
-    elif any(indicator in ' '.join(columns) for indicator in dna_indicators):
-        return 'DNA'
-    
-    return 'Unknown'
-
-def plot_genomic_coverage(df: pd.DataFrame, target_regions: List[str], output_path: Optional[Path] = None, return_base64: bool = False) -> Optional[str]:
-    """Plot genomic coverage for DNA probes."""
-    
-    fig, axes = plt.subplots(len(target_regions), 1, figsize=(12, 4 * len(target_regions)))
-    if len(target_regions) == 1:
-        axes = [axes]
-    
-    for idx, target_region in enumerate(target_regions):
-        target_df = df[df.get('target', df.get('gene', '')) == target_region].copy()
+    Args:
+        data_dict: Dictionary with group names as keys and data lists as values
+        title: Plot title
+        xlabel: X-axis label
+        ylabel: Y-axis label
+        figsize: Figure size tuple
         
-        if target_df.empty:
-            continue
-            
-        # Extract chromosomal positions
-        if 'start' in target_df.columns and 'end' in target_df.columns:
-            positions = target_df[['start', 'end']].copy()
-            positions['center'] = (positions['start'] + positions['end']) / 2
-            positions['length'] = positions['end'] - positions['start']
-            
-            # Create coverage histogram
-            if not positions.empty:
-                axes[idx].hist(positions['center'], bins=50, alpha=0.7, color='steelblue')
-                axes[idx].set_xlabel('Genomic Position')
-                axes[idx].set_ylabel('Probe Density')
-                axes[idx].set_title(f'Probe Coverage Distribution - {target_region}')
-                axes[idx].grid(True, alpha=0.3)
-                
-                # Add statistics
-                mean_pos = positions['center'].mean()
-                axes[idx].axvline(mean_pos, color='red', linestyle='--', 
-                                label=f'Mean Position: {mean_pos:.0f}')
-                axes[idx].legend()
+    Returns:
+        Base64 encoded plot image
+    """
+    if not PLOTTING_AVAILABLE:
+        logger.warning("Matplotlib not available, skipping boxplot generation")
+        return ""
     
-    plt.tight_layout()
-    return save_plot_conditionally(output_path, return_base64)
-
-def plot_transcript_coverage(df: pd.DataFrame, output_path: Optional[Path] = None, return_base64: bool = False) -> Optional[str]:
-    """Plot transcript coverage and probe distribution for RNA probes."""
-    
-    # Prepare transcript data
-    if 'transcript_name' in df.columns:
-        transcript_col = 'transcript_name'
-    elif 'transcript_names' in df.columns:
-        transcript_col = 'transcript_names'
-    elif 'transcript' in df.columns:
-        transcript_col = 'transcript'
-    else:
-        transcript_col = None
-    
-    if not transcript_col:
-        logger.warning("No transcript information found for RNA probe visualization")
-        return None
-    
-    # Handle list-type transcript names
-    df_plot = df.copy()
-    df_plot[transcript_col] = df_plot[transcript_col].apply(
-        lambda x: ', '.join(x) if isinstance(x, list) else str(x)
-    )
-    
-    # Count probes per transcript
-    transcript_counts = df_plot[transcript_col].value_counts()
-    
-    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-    
-    # 1. Transcript probe count distribution
-    axes[0, 0].bar(range(len(transcript_counts)), transcript_counts.values, 
-                   color='lightcoral', alpha=0.7)
-    axes[0, 0].set_xlabel('Transcript Index')
-    axes[0, 0].set_ylabel('Number of Probes')
-    axes[0, 0].set_title('Probes per Transcript')
-    axes[0, 0].grid(True, alpha=0.3)
-    
-    # 2. Probe positions along transcripts (if position data available)
-    if 'start' in df.columns and 'end' in df.columns:
-        for transcript in transcript_counts.head(5).index:  # Top 5 transcripts
-            transcript_df = df_plot[df_plot[transcript_col] == transcript]
-            positions = (transcript_df['start'] + transcript_df['end']) / 2
-            axes[0, 1].scatter(positions, [transcript] * len(positions), 
-                             alpha=0.6, s=20)
-        
-        axes[0, 1].set_xlabel('Position')
-        axes[0, 1].set_ylabel('Transcript')
-        axes[0, 1].set_title('Probe Positions along Transcripts (Top 5)')
-        axes[0, 1].grid(True, alpha=0.3)
-    else:
-        # If no position data, show probe count histogram
-        axes[0, 1].hist(transcript_counts.values, bins=20, alpha=0.7, color='lightgreen')
-        axes[0, 1].set_xlabel('Probes per Transcript')
-        axes[0, 1].set_ylabel('Frequency')
-        axes[0, 1].set_title('Distribution of Probes per Transcript')
-        axes[0, 1].grid(True, alpha=0.3)
-    
-    # 3. Gene-level coverage (if gene info available)
-    gene_col = 'gene' if 'gene' in df.columns else 'target'
-    if gene_col in df.columns:
-        gene_counts = df[gene_col].value_counts()
-        axes[1, 0].bar(range(len(gene_counts)), gene_counts.values, 
-                       color='gold', alpha=0.7)
-        axes[1, 0].set_xlabel('Gene Index')
-        axes[1, 0].set_ylabel('Number of Probes')
-        axes[1, 0].set_title('Probes per Gene')
-        axes[1, 0].grid(True, alpha=0.3)
-    
-    # 4. Exon distribution (if available)
-    if 'exon_rank' in df.columns:
-        exon_counts = df['exon_rank'].value_counts().sort_index()
-        axes[1, 1].bar(exon_counts.index, exon_counts.values, 
-                       color='mediumpurple', alpha=0.7)
-        axes[1, 1].set_xlabel('Exon Number')
-        axes[1, 1].set_ylabel('Number of Probes')
-        axes[1, 1].set_title('Probe Distribution by Exon')
-        axes[1, 1].grid(True, alpha=0.3)
-    else:
-        # Show transcript length distribution if available
-        if len(transcript_counts) > 0:
-            axes[1, 1].pie(transcript_counts.head(10).values, 
-                          labels=transcript_counts.head(10).index,
-                          autopct='%1.1f%%', startangle=90)
-            axes[1, 1].set_title('Top 10 Transcripts by Probe Count')
-    
-    plt.tight_layout()
-    return save_plot_conditionally(output_path, return_base64)
-
-def plot_quality_metrics(df: pd.DataFrame, output_path: Optional[Path] = None, return_base64: bool = False) -> Optional[str]:
-    """Plot quality metrics distribution for all probe types."""
-    
-    # Identify quality metric columns
-    quality_metrics = []
-    metric_patterns = ['gcContent', 'tm', 'foldScore', 'selfMatch', 'mappedGenes', 'mappedSites', 'kmerCount']
-    
-    for col in df.columns:
-        if any(pattern in col for pattern in metric_patterns):
-            if df[col].dtype in ['float64', 'int64'] and not df[col].isna().all():
-                quality_metrics.append(col)
-    
-    if not quality_metrics:
-        logger.warning("No quality metrics found for visualization")
-        return None
-    
-    # Create subplots
-    n_metrics = len(quality_metrics)
-    n_cols = 3
-    n_rows = (n_metrics + n_cols - 1) // n_cols
-    
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, 4 * n_rows))
-    if n_rows == 1:
-        axes = axes.reshape(1, -1)
-    elif n_cols == 1:
-        axes = axes.reshape(-1, 1)
-    
-    for idx, metric in enumerate(quality_metrics):
-        row = idx // n_cols
-        col = idx % n_cols
-        
-        # Skip if data is all NaN
-        if df[metric].isna().all():
-            continue
-            
-        # Plot histogram
-        axes[row, col].hist(df[metric].dropna(), bins=30, alpha=0.7, color='skyblue')
-        axes[row, col].set_xlabel(metric)
-        axes[row, col].set_ylabel('Frequency')
-        axes[row, col].set_title(f'Distribution of {metric}')
-        axes[row, col].grid(True, alpha=0.3)
-        
-        # Add statistics
-        mean_val = df[metric].mean()
-        median_val = df[metric].median()
-        axes[row, col].axvline(mean_val, color='red', linestyle='--', alpha=0.8, label=f'Mean: {mean_val:.2f}')
-        axes[row, col].axvline(median_val, color='orange', linestyle='--', alpha=0.8, label=f'Median: {median_val:.2f}')
-        axes[row, col].legend(fontsize=8)
-    
-    # Hide empty subplots
-    for idx in range(n_metrics, n_rows * n_cols):
-        row = idx // n_cols
-        col = idx % n_cols
-        axes[row, col].set_visible(False)
-    
-    plt.tight_layout()
-    return save_plot_conditionally(output_path, return_base64)
-
-def plot_correlation_matrix(df: pd.DataFrame, output_path: Optional[Path] = None, return_base64: bool = False) -> Optional[str]:
-    """Plot correlation matrix for numeric attributes."""
-    
-    # Get numeric columns
-    numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-    
-    # Filter out columns with too many NaN values
-    numeric_cols = [col for col in numeric_cols if df[col].notna().sum() > len(df) * 0.1]
-    
-    if len(numeric_cols) < 2:
-        logger.warning("Not enough numeric columns for correlation matrix")
-        return None
-    
-    # Calculate correlation matrix
-    correlation_matrix = df[numeric_cols].corr()
-    
-    # Plot heatmap
-    fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(correlation_matrix, annot=True, cmap='RdBu_r', center=0,
-                square=True, linewidths=0.5, cbar_kws={"shrink": .8}, ax=ax)
-    ax.set_title('Correlation Matrix of Probe Attributes')
-    
-    plt.tight_layout()
-    return save_plot_conditionally(output_path, return_base64)
-
-def generate_plot_report(df: pd.DataFrame, protocol: Dict, output_dir: Path, report_suffix: str = "", save_files: bool = True, return_base64: bool = False) -> Dict:
-    """Generate visualization plots for probe results."""
-    if df.empty:
-        logger.warning("Empty dataframe, cannot generate plots")
-        return {"plot_paths": [], "plot_data": {}}
-    
-    # Detect protocol type
-    protocol_type = detect_protocol_type(df, protocol)
-    protocol_name = protocol.get('name', 'probes')
-    
-    # Create output directory if saving files
-    if save_files:
-        output_dir.mkdir(parents=True, exist_ok=True)
-    
-    plot_paths = []
-    plot_data = {}
+    fig, ax = plt.subplots(figsize=figsize)
     
     try:
-        # 1. Quality metrics distribution
-        quality_plot_name = "quality_metrics"
-        quality_plot_path = output_dir / f"{protocol_name}_quality_metrics{report_suffix}.png" if save_files else None
-        quality_base64 = plot_quality_metrics(df, quality_plot_path, return_base64)
-        if quality_plot_path:
-            plot_paths.append(quality_plot_path)
-        if quality_base64:
-            plot_data[quality_plot_name] = quality_base64
+        # Prepare data for boxplot
+        data_list = []
+        labels = []
+        for group_name, values in data_dict.items():
+            if values:  # Only add non-empty groups
+                data_list.append(values)
+                labels.append(group_name)
         
-        # 2. Correlation matrix
-        corr_plot_name = "correlation_matrix"
-        corr_plot_path = output_dir / f"{protocol_name}_correlation_matrix{report_suffix}.png" if save_files else None
-        corr_base64 = plot_correlation_matrix(df, corr_plot_path, return_base64)
-        if corr_plot_path:
-            plot_paths.append(corr_plot_path)
-        if corr_base64:
-            plot_data[corr_plot_name] = corr_base64
+        if not data_list:
+            logger.warning("No data available for boxplot")
+            plt.close(fig)
+            return ""
         
-        # 3. Protocol-specific plots
-        if protocol_type == 'DNA':
-            # DNA: Genomic coverage plots
-            target_regions = protocol.get('targets', [])
-            if target_regions:
-                coverage_plot_name = "genomic_coverage"
-                coverage_plot_path = output_dir / f"{protocol_name}_genomic_coverage{report_suffix}.png" if save_files else None
-                coverage_base64 = plot_genomic_coverage(df, target_regions, coverage_plot_path, return_base64)
-                if coverage_plot_path:
-                    plot_paths.append(coverage_plot_path)
-                if coverage_base64:
-                    plot_data[coverage_plot_name] = coverage_base64
+        bp = ax.boxplot(data_list, labels=labels, patch_artist=True)
         
-        elif protocol_type == 'RNA':
-            # RNA: Transcript coverage plots
-            transcript_plot_name = "transcript_coverage"
-            transcript_plot_path = output_dir / f"{protocol_name}_transcript_coverage{report_suffix}.png" if save_files else None
-            transcript_base64 = plot_transcript_coverage(df, transcript_plot_path, return_base64)
-            if transcript_plot_path:
-                plot_paths.append(transcript_plot_path)
-            if transcript_base64:
-                plot_data[transcript_plot_name] = transcript_base64
+        # Customize colors
+        colors = plt.cm.Set3(np.linspace(0, 1, len(data_list)))
+        for patch, color in zip(bp['boxes'], colors):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.7)
+        
+        ax.set_title(title, fontsize=14, fontweight='bold')
+        ax.set_xlabel(xlabel, fontsize=12)
+        ax.set_ylabel(ylabel, fontsize=12)
+        ax.grid(True, alpha=0.3)
+        
+        # Rotate labels if too many
+        if len(labels) > 5:
+            plt.xticks(rotation=45, ha='right')
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
+        buffer.seek(0)
+        plot_data = base64.b64encode(buffer.read()).decode()
+        plt.close(fig)
+        
+        return plot_data
+        
     except Exception as e:
-        logger.error(f"Error generating plots: {e}")
-        # Continue with available plots
+        logger.error(f"Error creating boxplot: {e}")
+        plt.close(fig)
+        return ""
+
+
+def create_scatter_plot(
+    x_data: List[float],
+    y_data: List[float],
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    figsize: Tuple[int, int] = (6, 4)
+) -> str:
+    """Create scatter plot and return as base64 string.
     
-    return {"plot_paths": plot_paths, "plot_data": plot_data}
+    Args:
+        x_data: X-axis data
+        y_data: Y-axis data
+        title: Plot title
+        xlabel: X-axis label
+        ylabel: Y-axis label
+        figsize: Figure size tuple
+        
+    Returns:
+        Base64 encoded plot image
+    """
+    if not PLOTTING_AVAILABLE:
+        logger.warning("Matplotlib not available, skipping scatter plot generation")
+        return ""
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    try:
+        ax.scatter(x_data, y_data, alpha=0.6, c='steelblue', s=50)
+        ax.set_title(title, fontsize=14, fontweight='bold')
+        ax.set_xlabel(xlabel, fontsize=12)
+        ax.set_ylabel(ylabel, fontsize=12)
+        ax.grid(True, alpha=0.3)
+        
+        # Add correlation coefficient if both datasets have enough points
+        if len(x_data) > 1 and len(y_data) > 1:
+            corr = np.corrcoef(x_data, y_data)[0, 1]
+            if not np.isnan(corr):
+                ax.text(0.05, 0.95, f'Correlation: {corr:.3f}', 
+                       transform=ax.transAxes, fontsize=10,
+                       bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
+        buffer.seek(0)
+        plot_data = base64.b64encode(buffer.read()).decode()
+        plt.close(fig)
+        
+        return plot_data
+        
+    except Exception as e:
+        logger.error(f"Error creating scatter plot: {e}")
+        plt.close(fig)
+        return ""
+
+
+def create_bar_chart(
+    data_dict: Dict[str, float],
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    figsize: Tuple[int, int] = (8, 4)
+) -> str:
+    """Create bar chart and return as base64 string.
+    
+    Args:
+        data_dict: Dictionary with categories as keys and values as values
+        title: Plot title
+        xlabel: X-axis label
+        ylabel: Y-axis label
+        figsize: Figure size tuple
+        
+    Returns:
+        Base64 encoded plot image
+    """
+    if not PLOTTING_AVAILABLE:
+        logger.warning("Matplotlib not available, skipping bar chart generation")
+        return ""
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    try:
+        categories = list(data_dict.keys())
+        values = list(data_dict.values())
+        
+        bars = ax.bar(categories, values, alpha=0.7, color='lightcoral')
+        ax.set_title(title, fontsize=14, fontweight='bold')
+        ax.set_xlabel(xlabel, fontsize=12)
+        ax.set_ylabel(ylabel, fontsize=12)
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # Add value labels on bars
+        for bar, value in zip(bars, values):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                   f'{value:.0f}' if isinstance(value, (int, float)) else str(value),
+                   ha='center', va='bottom', fontsize=10)
+        
+        # Rotate labels if too many
+        if len(categories) > 5:
+            plt.xticks(rotation=45, ha='right')
+        
+        plt.tight_layout()
+        
+        # Convert to base64
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', dpi=300, bbox_inches='tight')
+        buffer.seek(0)
+        plot_data = base64.b64encode(buffer.read()).decode()
+        plt.close(fig)
+        
+        return plot_data
+        
+    except Exception as e:
+        logger.error(f"Error creating bar chart: {e}")
+        plt.close(fig)
+        return ""
+
+
+def generate_summary_plots(
+    df: pd.DataFrame,
+    summary_data: Dict[str, Any],
+    visualization_config: Dict[str, Any]
+) -> Dict[str, str]:
+    """Generate all summary plots based on configuration.
+    
+    Args:
+        df: DataFrame containing probe data
+        summary_data: Summary statistics data
+        visualization_config: Visualization configuration
+        
+    Returns:
+        Dictionary with plot names as keys and base64 plot data as values
+    """
+    if not PLOTTING_AVAILABLE:
+        logger.warning("Matplotlib not available, skipping plot generation")
+        return {}
+    
+    plots = {}
+    
+    try:
+        # Probe count bar chart
+        if summary_data.get('probe_counts'):
+            probe_count_plot = create_bar_chart(
+                summary_data['probe_counts'],
+                "Probe Count by Target",
+                "Target",
+                "Number of Probes"
+            )
+            if probe_count_plot:
+                plots['probe_counts'] = probe_count_plot
+        
+        # Attribute distribution plots
+        visualization_data = summary_data.get('visualization_data', {})
+        for attr_name, attr_data in visualization_data.items():
+            vis_types = attr_data.get('vis_types', [])
+            data = attr_data.get('data', [])
+            
+            if not data:
+                continue
+            
+            # Histogram
+            if 'histogram' in vis_types:
+                hist_plot = create_histogram(
+                    data,
+                    f"{attr_name} Distribution",
+                    attr_name.replace('_', ' ').title(),
+                    "Frequency",
+                    bins='auto',  # Let the function auto-calculate bins
+                    bar_width_ratio=0.8  # Controlled bar width for better appearance
+                )
+                if hist_plot:
+                    plots[f'{attr_name}_histogram'] = hist_plot
+            
+            # Boxplot by target
+            target_col = 'target' if 'target' in df.columns else ('gene' if 'gene' in df.columns else None)
+            if 'boxplot' in vis_types and target_col:
+                grouped_data = {}
+                for target in df[target_col].unique():
+                    target_data = df[df[target_col] == target][attr_name].dropna().tolist()
+                    if target_data:
+                        grouped_data[str(target)] = target_data
+                
+                if grouped_data:
+                    box_plot = create_boxplot(
+                        grouped_data,
+                        f"{attr_name} by Target",
+                        "Target",
+                        attr_name.replace('_', ' ').title()
+                    )
+                    if box_plot:
+                        plots[f'{attr_name}_boxplot'] = box_plot
+        
+        # Correlation scatter plots
+        numeric_attrs = []
+        for attr_name in summary_data.get('attribute_stats', {}):
+            if attr_name in df.columns and df[attr_name].dtype in ['float64', 'int64']:
+                numeric_attrs.append(attr_name)
+        
+        # Create scatter plots for interesting attribute pairs
+        correlation_pairs = visualization_config.get('correlations', [])
+        for pair in correlation_pairs:
+            if len(pair) == 2 and pair[0] in df.columns and pair[1] in df.columns:
+                x_data = df[pair[0]].dropna().tolist()
+                y_data = df[pair[1]].dropna().tolist()
+                
+                # Ensure same length
+                min_len = min(len(x_data), len(y_data))
+                if min_len > 0:
+                    scatter_plot = create_scatter_plot(
+                        x_data[:min_len],
+                        y_data[:min_len],
+                        f"{pair[0]} vs {pair[1]}",
+                        pair[0].replace('_', ' ').title(),
+                        pair[1].replace('_', ' ').title()
+                    )
+                    if scatter_plot:
+                        plots[f'{pair[0]}_vs_{pair[1]}_scatter'] = scatter_plot
+        
+        logger.info(f"Generated {len(plots)} summary plots")
+        
+    except Exception as e:
+        logger.error(f"Error generating summary plots: {e}")
+    
+    return plots
+
+
+def generate_plot_report(
+    df: pd.DataFrame,
+    protocol: Dict[str, Any],
+    output_dir: Path,
+    report_suffix: str = "",
+    save_files: bool = False,
+    return_base64: bool = True
+) -> Dict[str, Any]:
+    if not PLOTTING_AVAILABLE:
+        logger.warning("Matplotlib not available, skipping plot generation")
+        return {"plot_data": {}, "plot_files": []}
+    
+    logger.info("Generating plot report...")
+    
+    # Get summary data
+    summary_data = getattr(df, 'attrs', {}).get('summary_data', {})
+    if not summary_data:
+        # Try to load from temporary file (fallback)
+        try:
+            import tempfile
+            import pickle
+            import os
+            
+            temp_dir = tempfile.gettempdir()
+            summary_file = os.path.join(temp_dir, 'uprobe_summary_data.pkl')
+            if os.path.exists(summary_file):
+                with open(summary_file, 'rb') as f:
+                    summary_data = pickle.load(f)
+                logger.info("Loaded summary data from temporary file")
+        except Exception as e:
+            logger.warning(f"Could not load summary data: {e}")
+            summary_data = {}
+    
+    # Get visualization configuration
+    visualization_config = protocol.get('post_process', {}).get('summary', {}).get('visualizations', {})
+    
+    plot_data = {}
+    plot_files = []
+    
+    if summary_data:
+        plots = generate_summary_plots(df, summary_data, visualization_config)
+        
+        for plot_name, plot_base64 in plots.items():
+            if return_base64:
+                plot_data[plot_name] = plot_base64
+            
+            if save_files and plot_base64:
+                # Save plot to file
+                plot_file = output_dir / f"{plot_name}{report_suffix}.png"
+                try:
+                    plot_binary = base64.b64decode(plot_base64)
+                    with open(plot_file, 'wb') as f:
+                        f.write(plot_binary)
+                    plot_files.append(plot_file)
+                    logger.info(f"Saved plot: {plot_file}")
+                except Exception as e:
+                    logger.error(f"Error saving plot {plot_name}: {e}")
+    
+    return {
+        "plot_data": plot_data,
+        "plot_files": plot_files,
+        "summary_data": summary_data
+    }
