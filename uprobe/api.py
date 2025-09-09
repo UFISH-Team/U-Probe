@@ -9,7 +9,7 @@ import pandas as pd
 import yaml
 
 from .attributes import add_attributes
-from .gen.barcodes import generate_barcodes_from_config
+from .gen.barcodes import quick_generate, generate_pcr_barcodes, generate_sequencing_barcodes
 from .gen.fun import generate_target_seqs, validate_targets
 from .gen.probe import construct_probes
 from .process import post_process
@@ -65,12 +65,24 @@ class UProbeAPI:
         build_genome(self.genome, threads=threads)
         log.info("Genome index building completed.")
 
-    def generate_barcodes(self) -> T.Dict[str, T.List[str]]:
-        log.info("Generating barcodes...")
-        barcode_sets = generate_barcodes_from_config(self.protocol, self.output_dir)
-        log.info(f"Generated {len(barcode_sets)} barcode set(s).")
-        return barcode_sets
-    
+    def quick_generate_barcodes(self, num_barcodes: int, length: int, **kwargs) -> T.List[str]:
+        log.info(f"Quick generating {num_barcodes} barcodes of length {length}...")
+        barcodes = quick_generate(num_barcodes, length, **kwargs)
+        log.info(f"Generated {len(barcodes)} barcodes.")
+        return barcodes
+
+    def generate_pcr_barcodes(self, num_barcodes: int, length: int = 8) -> T.List[str]:
+        log.info(f"Generating {num_barcodes} PCR-optimized barcodes of length {length}...")
+        barcodes = generate_pcr_barcodes(num_barcodes, length)
+        log.info(f"Generated {len(barcodes)} barcodes.")
+        return barcodes
+        
+    def generate_sequencing_barcodes(self, num_barcodes: int, length: int = 12) -> T.List[str]:
+        log.info(f"Generating {num_barcodes} sequencing-optimized barcodes of length {length}...")
+        barcodes = generate_sequencing_barcodes(num_barcodes, length)
+        log.info(f"Generated {len(barcodes)} barcodes.")
+        return barcodes
+
     def validate_targets(self, continue_on_invalid: bool = False) -> bool:
         targets = self.protocol.get("targets", [])
         if not targets:
