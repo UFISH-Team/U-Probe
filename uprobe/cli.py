@@ -291,33 +291,101 @@ def post_process(protocol, genomes, probes, output, raw):
 
 
 @cli.command(name='generate-barcodes')
-@click.option('--protocol', '-p', required=True, type=click.Path(exists=True),
-              help='Path to probe design protocol configuration file (YAML).')
+@click.option('--protocol', '-p', type=click.Path(exists=True),
+              help='Path to protocol config file (YAML). Used if no strategy is specified.')
 @click.option('--output', '-o', default='./barcodes', type=click.Path(),
               help='Output directory for barcode files. [default: ./barcodes]')
-def generate_barcodes(protocol, output):
+@click.option('--strategy', '-s', type=click.Choice(['max_orthogonality', 'max_size', 'precomputed', 'pcr', 'sequencing']),
+              help='Generation strategy to use.')
+@click.option('--name', default='barcodes', help='Name for the generated barcode set.')
+@click.option('--num-barcodes', type=int, help='Number of barcodes to generate.')
+@click.option('--length', type=int, help='Length of each barcode.')
+@click.option('--k-constraint', type=int, help='K-mer constraint for max_size strategy.')
+@click.option('--library-name', help='Name of precomputed library (e.g., "kishi2018").')
+@click.option('--alphabet', default='ACT', help='Nucleotide alphabet to use.')
+@click.option('--gc-limits', help='GC content limits (min,max), e.g., "25,75".')
+@click.option('--prevent-patterns', help='Comma-separated patterns to prevent, e.g., "AAAA,TTTT".')
+@click.option('--save/--no-save', default=True, help='Save barcodes to a CSV file.')
+@click.option('--analyze/--no-analyze', default=False, help='Analyze and save quality metrics.')
+def generate_barcodes(protocol, output, strategy, name, num_barcodes, length, k_constraint,
+                      library_name, alphabet, gc_limits, prevent_patterns, save, analyze):
     """
     Generate DNA barcode sequences.
-    
-    Creates barcode sequences based on the encoding configuration in the protocol.
+
+    Can generate from a protocol file or from command-line arguments.
     """
     try:
-        log.info("Generating barcodes...")
+        output_dir = Path(output)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize UProbeAPI. Genomes config is not needed.
         uprobe = UProbeAPI(
-            protocol_config=Path(protocol),
-            genomes_config={},  # Not needed for barcode generation
-            output_dir=Path(output)
+            protocol_config=Path(protocol) if protocol else {},
+            genomes_config={},
+            output_dir=output_dir
         )
-        
-        barcode_sets = uprobe.generate_barcodes()
-        
+
+        if protocol:
+            log.info("Generating barcodes from protocol file...")
+            barcode_sets = uprobe.generate_barcodes()
+        elif strategy:
+            log.info(f"Generating barcodes using '{strategy}' strategy...")
+            
+            # Build barcode config from CLI options
+            params = {'strategy': strategy}
+            if length:
+                params['length'] = length
+            if alphabet:
+                params['alphabet'] = alphabet
+            if gc_limits:
+                params['gc_limits'] = [int(x.strip()) for x in gc_limits.split(',')]
+            if prevent_patterns:
+                params['prevent_patterns'] = [x.strip() for x in prevent_patterns.split(',')]
+            
+            if strategy in ['max_orthogonality', 'pcr', 'sequencing']:
+                if not num_barcodes:
+                    raise click.UsageError("Option '--num-barcodes' is required for this strategy.")
+                params['num_barcodes'] = num_barcodes
+                if strategy == 'pcr':
+                    params.setdefault('length', 8)
+                    params.setdefault('alphabet', 'ACGT')
+                    params.setdefault('gc_limits', (params['length']//4, 3*params['length']//4))
+                    params.setdefault('prevent_patterns', ["AAAA", "TTTT", "CCCC", "GGGG"])
+                elif strategy == 'sequencing':
+                    params.setdefault('length', 12)
+                    params.setdefault('alphabet', 'ACGT')
+                    params.setdefault('gc_limits', (params['length']//3, 2*params['length']//3))
+                    params.setdefault('prevent_patterns', ["AAA", "TTT", "CCC", "GGG"])
+
+            elif strategy == 'max_size':
+                if not k_constraint or not length:
+                    raise click.UsageError("Options '--k-constraint' and '--length' are required for max_size strategy.")
+                params['k_constraint'] = k_constraint
+
+            elif strategy == 'precomputed':
+                if not library_name:
+                    raise click.UsageError("Option '--library-name' is required for precomputed strategy.")
+                params['library_name'] = library_name
+
+            if save:
+                params['save_file'] = f"{name}.csv"
+            
+            if analyze:
+                params['analyze_quality'] = True
+
+            barcode_config = {name: params}
+            barcode_sets = uprobe.run_barcode_generation(barcode_config)
+            
+        else:
+            raise click.UsageError("Either '--protocol' or '--strategy' must be provided.")
+
         if not barcode_sets:
-            log.warning("No barcodes generated!")
+            log.warning("No barcodes were generated.")
         else:
             log.info(f"Generated {len(barcode_sets)} barcode set(s) successfully!")
-            
+
     except Exception as e:
-        log.error(f"Barcode generation failed: {e}")
+        log.error(f"Barcode generation failed: {e}", exc_info=log.getEffectiveLevel() == logging.DEBUG)
         sys.exit(1)
 
 
