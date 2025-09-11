@@ -322,7 +322,8 @@ def generate_barcodes(protocol, output, strategy, name, num_barcodes, length, k_
         uprobe = UProbeAPI(
             protocol_config=Path(protocol) if protocol else {},
             genomes_config={},
-            output_dir=output_dir
+            output_dir=output_dir,
+            require_genome=False
         )
 
         if protocol:
