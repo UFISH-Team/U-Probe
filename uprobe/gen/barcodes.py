@@ -48,8 +48,19 @@ class BarcodeGenerator:
             List of generated barcode sequences
         """
         logger.info(f"Generating {num_barcodes} barcodes of length {length} with max orthogonality")
-        logger.info(f"Parameters: alphabet={alphabet}, RC-free={rc_free}, GC limits={gc_limits}")
         
+        # Convert GC limits from percentage to absolute counts if necessary
+        gclims_abs = None
+        if gc_limits:
+            min_gc_pct, max_gc_pct = gc_limits
+            gclims_abs = (
+                int(np.floor(min_gc_pct / 100 * length)),
+                int(np.ceil(max_gc_pct / 100 * length))
+            )
+            logger.info(f"Parameters: alphabet={alphabet}, RC-free={rc_free}, GC limits={gc_limits}% -> {gclims_abs}")
+        else:
+            logger.info(f"Parameters: alphabet={alphabet}, RC-free={rc_free}, GC limits=None")
+
         try:
             # Generate barcodes using seqwalk
             barcodes = design.max_orthogonality(
@@ -57,9 +68,13 @@ class BarcodeGenerator:
                 length,
                 alphabet=alphabet,
                 RCfree=rc_free,
-                GClims=gc_limits
+                GClims=gclims_abs
             )
-            
+
+            # Ensure only the requested number of barcodes is returned
+            if len(barcodes) > num_barcodes:
+                barcodes = barcodes[:num_barcodes]
+
             # Apply additional pattern filters if specified
             if prevent_patterns:
                 barcodes = self._filter_patterns(barcodes, prevent_patterns)
