@@ -96,30 +96,12 @@ post_process:
       - probe1_part2_selfMatch
       - probe1_part2_foldScore
       - probe1_part2_kmerCount
-      
-  # Summary statistics configuration
-  summary:
-    attributes:
-      # Probe part2 statistics (main sequence)
-      probe1_part2_gcContent:
-        stats: ["count", "mean", "std", "min", "max", "median"]
-        visualizations: ["histogram", "boxplot"]
-      probe1_part2_tm:
-        stats: ["count", "mean", "std", "min", "max"]
-        visualizations: ["histogram", "boxplot"]
-      probe1_part2_selfMatch:
-        stats: ["count", "mean", "std", "min", "max"]
-        visualizations: ["histogram", "boxplot"]
-      probe1_part2_foldScore:
-        stats: ["count", "mean", "std", "min", "max"]
-        visualizations: ["histogram", "boxplot"]
-      probe1_part2_kmerCount:
-        stats: ["count", "mean", "median", "max"]
-        visualizations: ["histogram", "boxplot"]
-        
 
-report:
-  types:
-    - base_info
-    - plot
-  template: "scientific"  # Options: basic, detailed, scientific
+
+summary:
+  report_name: dna_report  # template name  # class: template1 or template2
+  attributes:
+    - probe1_part2_gcContent
+    - probe1_part2_tm
+    - probe1_part2_kmerCount
+
