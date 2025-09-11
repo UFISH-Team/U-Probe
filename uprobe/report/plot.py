@@ -321,112 +321,54 @@ def create_bar_chart(
         return ""
 
 
-def generate_summary_plots(
-    df: pd.DataFrame,
-    summary_data: Dict[str, Any],
-    visualization_config: Dict[str, Any]
-) -> Dict[str, str]:
-    """Generate all summary plots based on configuration.
+def _get_plot_config_for_attribute(attribute_name: str) -> Optional[Dict]:
+    """Get plot type and parameters based on attribute name."""
+    name_lower = attribute_name.lower()
     
-    Args:
-        df: DataFrame containing probe data
-        summary_data: Summary statistics data
-        visualization_config: Visualization configuration
-        
-    Returns:
-        Dictionary with plot names as keys and base64 plot data as values
-    """
-    if not PLOTTING_AVAILABLE:
-        logger.warning("Matplotlib not available, skipping plot generation")
-        return {}
+    if 'tm' in name_lower or 'temperature' in name_lower:
+        return {
+            "plot_type": "boxplot",
+            "title": f"Distribution of {attribute_name}",
+            "ylabel": "Temperature (°C)"
+        }
+    if 'gc' in name_lower or 'gc_content' in name_lower:
+        return {
+            "plot_type": "histogram",
+            "title": f"Distribution of {attribute_name}",
+            "xlabel": "GC Content (%)"
+        }
+    if 'kmer' in name_lower:
+        return {
+            "plot_type": "boxplot",
+            "title": f"Distribution of {attribute_name}",
+            "xlabel": "K-mer Count"
+        }
+    if 'fold' in name_lower:
+        return {
+            "plot_type": "histogram",
+            "title": f"Distribution of {attribute_name}",
+            "xlabel": "Folding Score"
+        }
+    if 'selfmatch' in name_lower:
+        return {
+            "plot_type": "bar",
+            "title": f"Distribution of {attribute_name}",
+            "xlabel": "Self Match Score"
+        }
+    if 'mappedsites' in name_lower:
+        return {
+            "plot_type": "scatter",
+            "title": f"Distribution of {attribute_name}",
+            "xlabel": "Mapped Sites"
+        }
+    if 'mappedgenes' in name_lower:
+        return {
+            "plot_type": "scatter",
+            "title": f"Distribution of {attribute_name}",
+            "xlabel": "Mapped Genes"
+        }
     
-    plots = {}
-    
-    try:
-        # Probe count bar chart
-        if summary_data.get('probe_counts'):
-            probe_count_plot = create_bar_chart(
-                summary_data['probe_counts'],
-                "Probe Count by Target",
-                "Target",
-                "Number of Probes"
-            )
-            if probe_count_plot:
-                plots['probe_counts'] = probe_count_plot
-        
-        # Attribute distribution plots
-        visualization_data = summary_data.get('visualization_data', {})
-        for attr_name, attr_data in visualization_data.items():
-            vis_types = attr_data.get('vis_types', [])
-            data = attr_data.get('data', [])
-            
-            if not data:
-                continue
-            
-            # Histogram
-            if 'histogram' in vis_types:
-                hist_plot = create_histogram(
-                    data,
-                    f"{attr_name} Distribution",
-                    attr_name.replace('_', ' ').title(),
-                    "Frequency",
-                    bins='auto',  # Let the function auto-calculate bins
-                    bar_width_ratio=0.8  # Controlled bar width for better appearance
-                )
-                if hist_plot:
-                    plots[f'{attr_name}_histogram'] = hist_plot
-            
-            # Boxplot by target
-            target_col = 'target' if 'target' in df.columns else ('gene' if 'gene' in df.columns else None)
-            if 'boxplot' in vis_types and target_col:
-                grouped_data = {}
-                for target in df[target_col].unique():
-                    target_data = df[df[target_col] == target][attr_name].dropna().tolist()
-                    if target_data:
-                        grouped_data[str(target)] = target_data
-                
-                if grouped_data:
-                    box_plot = create_boxplot(
-                        grouped_data,
-                        f"{attr_name} by Target",
-                        "Target",
-                        attr_name.replace('_', ' ').title()
-                    )
-                    if box_plot:
-                        plots[f'{attr_name}_boxplot'] = box_plot
-        
-        # Correlation scatter plots
-        numeric_attrs = []
-        for attr_name in summary_data.get('attribute_stats', {}):
-            if attr_name in df.columns and df[attr_name].dtype in ['float64', 'int64']:
-                numeric_attrs.append(attr_name)
-        
-        # Create scatter plots for interesting attribute pairs
-        correlation_pairs = visualization_config.get('correlations', [])
-        for pair in correlation_pairs:
-            if len(pair) == 2 and pair[0] in df.columns and pair[1] in df.columns:
-                x_data = df[pair[0]].dropna().tolist()
-                y_data = df[pair[1]].dropna().tolist()
-                
-                # Ensure same length
-                min_len = min(len(x_data), len(y_data))
-                if min_len > 0:
-                    scatter_plot = create_scatter_plot(
-                        x_data[:min_len],
-                        y_data[:min_len],
-                        f"{pair[0]} vs {pair[1]}",
-                        pair[0].replace('_', ' ').title(),
-                        pair[1].replace('_', ' ').title()
-                    )
-                    if scatter_plot:
-                        plots[f'{pair[0]}_vs_{pair[1]}_scatter'] = scatter_plot
-        
-        logger.info(f"Generated {len(plots)} summary plots")
-        
-    except Exception as e:
-        logger.error(f"Error generating summary plots: {e}")
-    
-    return plots
+    return None
 
 
 def generate_plot_report(
@@ -443,40 +385,113 @@ def generate_plot_report(
     
     logger.info("Generating plot report...")
     
-    # Get summary data
-    summary_data = getattr(df, 'attrs', {}).get('summary_data', {})
-    if not summary_data:
-        # Try to load from temporary file (fallback)
-        try:
-            import tempfile
-            import pickle
-            import os
-            
-            temp_dir = tempfile.gettempdir()
-            summary_file = os.path.join(temp_dir, 'uprobe_summary_data.pkl')
-            if os.path.exists(summary_file):
-                with open(summary_file, 'rb') as f:
-                    summary_data = pickle.load(f)
-                logger.info("Loaded summary data from temporary file")
-        except Exception as e:
-            logger.warning(f"Could not load summary data: {e}")
-            summary_data = {}
-    
-    # Get visualization configuration
-    visualization_config = protocol.get('post_process', {}).get('summary', {}).get('visualizations', {})
-    
+    summary_config = protocol.get('summary', {})
+    attributes_to_plot = summary_config.get('attributes', [])
+
+    if isinstance(attributes_to_plot, dict):
+        attributes_to_plot = list(attributes_to_plot.keys())
+
     plot_data = {}
     plot_files = []
     
-    if summary_data:
-        plots = generate_summary_plots(df, summary_data, visualization_config)
+    target_col = 'target' if 'target' in df.columns else ('gene' if 'gene' in df.columns else None)
+    
+    for attr_name in attributes_to_plot:
+        if attr_name not in df.columns:
+            logger.warning(f"Attribute '{attr_name}' for plotting not found in data.")
+            continue
         
-        for plot_name, plot_base64 in plots.items():
-            if return_base64:
-                plot_data[plot_name] = plot_base64
+        plot_config = _get_plot_config_for_attribute(attr_name)
+        if not plot_config:
+            logger.info(f"No standard plot configuration for attribute '{attr_name}', skipping.")
+            continue
+
+        plot_base64 = ""
+        plot_type = plot_config['plot_type']
+        
+        try:
+            if plot_type == 'histogram':
+                if target_col and df[target_col].nunique() > 1:
+                    for target in df[target_col].unique():
+                        target_data = df[df[target_col] == target][attr_name].dropna()
+                        if target_data.empty:
+                            continue
+                        plot_base64 = create_histogram(
+                            data=target_data.tolist(),
+                            title=f"{plot_config['title']} ({target})",
+                            xlabel=plot_config['xlabel']
+                        )
+                        if plot_base64:
+                            plot_name = f'{attr_name}_{target}_histogram'
+                            if return_base64:
+                                plot_data[plot_name] = plot_base64
+                            # File saving logic can be added here if needed
+                else:
+                    plot_base64 = create_histogram(
+                        data=df[attr_name].dropna().tolist(),
+                        title=plot_config['title'],
+                        xlabel=plot_config['xlabel']
+                    )
+                    if plot_base64:
+                        plot_name = f'{attr_name}_histogram'
+                        if return_base64:
+                            plot_data[plot_name] = plot_base64
+                        # File saving logic can be added here if needed
+            elif plot_type == 'boxplot':
+                if target_col:
+                    grouped_data = {
+                        str(target): df[df[target_col] == target][attr_name].dropna().tolist()
+                        for target in df[target_col].unique()
+                    }
+                    grouped_data = {k: v for k, v in grouped_data.items() if v}
+                    
+                    if grouped_data:
+                        plot_base64 = create_boxplot(
+                            data_dict=grouped_data,
+                            title=plot_config['title'],
+                            xlabel='Target',
+                            ylabel=plot_config['ylabel']
+                        )
+                    if plot_base64:
+                        plot_name = f'{attr_name}_boxplot'
+                        if return_base64:
+                            plot_data[plot_name] = plot_base64
             
-            if save_files and plot_base64:
-                # Save plot to file
+            elif plot_type == 'bar':
+                data = df[attr_name].dropna()
+                if not data.empty:
+                    data_dict = data.value_counts().to_dict()
+                    plot_base64 = create_bar_chart(
+                        data_dict=data_dict,
+                        title=plot_config['title'],
+                        xlabel=plot_config.get('xlabel', attr_name),
+                        ylabel="Count"
+                    )
+                    if plot_base64:
+                        plot_name = f'{attr_name}_barchart'
+                        if return_base64:
+                            plot_data[plot_name] = plot_base64
+
+            elif plot_type == 'scatter':
+                y_data = df[attr_name].dropna()
+                if not y_data.empty:
+                    x_data = y_data.index.tolist()
+                    plot_base64 = create_scatter_plot(
+                        x_data=x_data,
+                        y_data=y_data.tolist(),
+                        title=plot_config['title'],
+                        xlabel="Probe Index",
+                        ylabel=plot_config.get('xlabel', attr_name)
+                    )
+                    if plot_base64:
+                        plot_name = f'{attr_name}_scatter'
+                        if return_base64:
+                            plot_data[plot_name] = plot_base64
+            
+            # This part for saving files is now mostly handled inside the loops for histograms
+            # Boxplot saving can be done here.
+            if plot_base64 and save_files:
+                plot_name = f'{attr_name}_{plot_type}' # Generic name, might need adjustment
                 plot_file = output_dir / f"{plot_name}{report_suffix}.png"
                 try:
                     plot_binary = base64.b64decode(plot_base64)
@@ -486,9 +501,11 @@ def generate_plot_report(
                     logger.info(f"Saved plot: {plot_file}")
                 except Exception as e:
                     logger.error(f"Error saving plot {plot_name}: {e}")
-    
+
+        except Exception as e:
+            logger.error(f"Failed to generate plot for '{attr_name}': {e}")
+            
     return {
         "plot_data": plot_data,
-        "plot_files": plot_files,
-        "summary_data": summary_data
+        "plot_files": plot_files
     }
