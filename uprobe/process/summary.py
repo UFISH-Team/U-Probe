@@ -140,6 +140,9 @@ def generate_summary_data(
     
     # Process attribute statistics
     attributes = summary_config.get('attributes', {})
+    if isinstance(attributes, list):
+        attributes = {attr: {} for attr in attributes}
+    
     logger.info(f"Processing {len(attributes)} attributes: {list(attributes.keys())}")
     for attr_name, attr_config in attributes.items():
         if attr_name not in df.columns:
