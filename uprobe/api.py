@@ -9,7 +9,7 @@ import pandas as pd
 import yaml
 
 from .attributes import add_attributes
-from .gen.barcodes import quick_generate, generate_pcr_barcodes, generate_sequencing_barcodes
+from .gen.barcodes import quick_generate
 from .gen.fun import generate_target_seqs, validate_targets
 from .gen.probe import construct_probes
 from .process import post_process
@@ -68,18 +68,6 @@ class UProbeAPI:
     def quick_generate_barcodes(self, num_barcodes: int, length: int, **kwargs) -> T.List[str]:
         log.info(f"Quick generating {num_barcodes} barcodes of length {length}...")
         barcodes = quick_generate(num_barcodes, length, **kwargs)
-        log.info(f"Generated {len(barcodes)} barcodes.")
-        return barcodes
-
-    def generate_pcr_barcodes(self, num_barcodes: int, length: int = 8) -> T.List[str]:
-        log.info(f"Generating {num_barcodes} PCR-optimized barcodes of length {length}...")
-        barcodes = generate_pcr_barcodes(num_barcodes, length)
-        log.info(f"Generated {len(barcodes)} barcodes.")
-        return barcodes
-        
-    def generate_sequencing_barcodes(self, num_barcodes: int, length: int = 12) -> T.List[str]:
-        log.info(f"Generating {num_barcodes} sequencing-optimized barcodes of length {length}...")
-        barcodes = generate_sequencing_barcodes(num_barcodes, length)
         log.info(f"Generated {len(barcodes)} barcodes.")
         return barcodes
 
@@ -149,7 +137,7 @@ class UProbeAPI:
         # Check if post-processing is configured
         post_process_config = self.protocol.get('post_process', {})
         has_post_processing = any(post_process_config.get(key) for key in 
-                                ['filters', 'sorts', 'remove_overlap', 'equal_space', 'avoid_otp', 'summary'])
+                                ['filters', 'sorts', 'remove_overlap', 'equal_space', 'avoid_otp'])
         
         if has_post_processing:
             log.info("Post-processing probes...")
@@ -198,8 +186,9 @@ class UProbeAPI:
         # 5. Post-process
         df_combined = pd.concat([df_targets.reset_index(drop=True), df_probes.reset_index(drop=True)], axis=1)
         df_processed = self.post_process_probes(df_combined, raw_csv=raw_csv)
-        # 6. Generate Report (if configured) - always generate for final results
-        if self.protocol.get('report') and not df_processed.empty:
+        # 6. Generate Report (if configured)
+        summary_config = self.protocol.get('summary', {})
+        if summary_config.get('report_name') and not df_processed.empty:
             log.info("Generating final report with summary statistics...")
             self.generate_report(df_processed, 
                                include_plots=self._include_plots,
@@ -223,82 +212,68 @@ class UProbeAPI:
         
         html_paths = []
         
-        # Get report configuration
-        report_config = self.protocol.get('report', [])
-        
-        # Handle both old list format and new dict format
-        if isinstance(report_config, dict):
-            report_types = report_config.get('types', [])
-        else:
-            report_types = report_config
-        
-        if 'base_info' in report_types:
-            try:
-                # Generate summary data first (if configured)
-                from .process.summary import generate_summary_data
-                summary_config = self.protocol.get('post_process', {}).get('summary', {})
-                if summary_config:
-                    log.info("Generating summary statistics for report...")
-                    summary_data = generate_summary_data(df_processed, summary_config)
-                    # Store summary data in DataFrame attrs
-                    if hasattr(df_processed, 'attrs'):
-                        df_processed.attrs['summary_data'] = summary_data
-                    else:
-                        # Fallback for older pandas versions
-                        import tempfile
-                        import pickle
-                        import os
-                        temp_dir = tempfile.gettempdir()
-                        summary_file = os.path.join(temp_dir, 'uprobe_summary_data.pkl')
-                        with open(summary_file, 'wb') as f:
-                            pickle.dump(summary_data, f)
-                        log.info(f"Summary data saved to temporary file: {summary_file}")
-                
-                # Handle plots
-                plot_data = {}
-                if 'plot' in report_types and include_plots:
-                    try:
-                        # Generate plots as base64 data for embedding
-                        plot_result = generate_plot_report(
-                            df_processed, 
-                            self.protocol, 
-                            self.output_dir, 
-                            report_suffix,
-                            save_files=False,  # Don't save plot files
-                            return_base64=True # Return base64 data for embedding
-                        )
-                        
-                        plot_data = plot_result.get("plot_data", {}) 
-                    except Exception as e:
-                        log.error(f"Failed to generate plots: {e}")
-                
-                # Generate HTML report with embedded plots
-                protocol_name = self.protocol.get('name', 'probes')
-                time_str = time.strftime("%Y%m%d_%H%M%S")
-                html_output_path = self.output_dir / f"{protocol_name}_report{report_suffix}_{time_str}.html"
-                
-                # Get template type from report configuration
-                report_config = self.protocol.get('report', {})
-                if isinstance(report_config, dict):
-                    template_type = report_config.get('template', 'detailed')
+        try:
+            # Generate summary data first (if configured)
+            from .process.summary import generate_summary_data
+            summary_config = self.protocol.get('summary', {})
+            if summary_config:
+                log.info("Generating summary statistics for report...")
+                summary_data = generate_summary_data(df_processed, summary_config)
+                # Store summary data in DataFrame attrs
+                if hasattr(df_processed, 'attrs'):
+                    df_processed.attrs['summary_data'] = summary_data
                 else:
-                    # Handle legacy list format
-                    template_type = 'detailed'
-                
-                html_path = save_html_report(
-                    df_processed, 
-                    self.protocol, 
-                    html_output_path,
-                    template_type=template_type,
-                    plot_data=plot_data
-                )
-                
-                if html_path:
-                    html_paths.append(html_path)
-                    log.info(f"HTML report generated: {html_path}")
-                        
-            except Exception as e:
-                log.error(f"Failed to generate HTML report: {e}")
+                    # Fallback for older pandas versions
+                    import tempfile
+                    import pickle
+                    import os
+                    temp_dir = tempfile.gettempdir()
+                    summary_file = os.path.join(temp_dir, 'uprobe_summary_data.pkl')
+                    with open(summary_file, 'wb') as f:
+                        pickle.dump(summary_data, f)
+                    log.info(f"Summary data saved to temporary file: {summary_file}")
+            
+            # Handle plots
+            plot_data = {}
+            if include_plots:
+                try:
+                    # Generate plots as base64 data for embedding
+                    plot_result = generate_plot_report(
+                        df_processed, 
+                        self.protocol, 
+                        self.output_dir, 
+                        report_suffix,
+                        save_files=False,  # Don't save plot files
+                        return_base64=True # Return base64 data for embedding
+                    )
+                    
+                    plot_data = plot_result.get("plot_data", {}) 
+                except Exception as e:
+                    log.error(f"Failed to generate plots: {e}")
+            
+            # Generate HTML report with embedded plots
+            protocol_name = self.protocol.get('name', 'probes')
+            time_str = time.strftime("%Y%m%d_%H%M%S")
+            html_output_path = self.output_dir / f"{protocol_name}_report{report_suffix}_{time_str}.html"
+            
+            # Get template type from report configuration
+            summary_config = self.protocol.get('summary', {})
+            template_type = summary_config.get('report_name', 'scientific_report')
+            
+            html_path = save_html_report(
+                df_processed, 
+                self.protocol, 
+                html_output_path,
+                template_type=template_type,
+                plot_data=plot_data
+            )
+            
+            if html_path:
+                html_paths.append(html_path)
+                log.info(f"HTML report generated: {html_path}")
+                    
+        except Exception as e:
+            log.error(f"Failed to generate HTML report: {e}")
         
         log.info(f"Report generation completed: {len(html_paths)} HTML reports")
         return {"html_reports": html_paths}
