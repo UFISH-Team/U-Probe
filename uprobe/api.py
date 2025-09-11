@@ -28,13 +28,17 @@ class UProbeAPI:
         protocol_config: T.Union[Path, dict],
         genomes_config: T.Union[Path, dict],
         output_dir: Path,
+        require_genome: bool = True
     ):
 
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.protocol = self._load_config(protocol_config)
         self.genomes = self._load_config(genomes_config)
-        self.genome = self._validate_and_get_genome()
+        if require_genome:
+            self.genome = self._validate_and_get_genome()
+        else:
+            self.genome = None
         # Report generation preferences (根据用户要求默认改为HTML)
         self._generate_pdf = False  # 默认不生成PDF
         self._generate_html = True  # 默认生成HTML 
