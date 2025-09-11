@@ -140,48 +140,6 @@ class BarcodeGenerator:
         
         return filtered_barcodes
     
-    def analyze_quality(self, barcodes: T.Optional[T.List[str]] = None) -> dict:
-
-        if barcodes is None:
-            barcodes = self.generated_barcodes
-        
-        if not barcodes:
-            logger.warning("No barcodes to analyze")
-            return {}
-        
-        logger.info(f"Analyzing quality of {len(barcodes)} barcodes")
-        
-        # Calculate Hamming distance matrix
-        hamming_matrix = analysis.hamming_matrix(barcodes)
-        
-        # Calculate statistics
-        min_hamming = np.min(hamming_matrix[hamming_matrix > 0])
-        max_hamming = np.max(hamming_matrix)
-        mean_hamming = np.mean(hamming_matrix[hamming_matrix > 0])
-        
-        # Calculate GC content statistics
-        gc_contents = [self._calculate_gc_content(barcode) for barcode in barcodes]
-        
-        quality_metrics = {
-            "num_barcodes": len(barcodes),
-            "barcode_length": len(barcodes[0]) if barcodes else 0,
-            "min_hamming_distance": min_hamming,
-            "max_hamming_distance": max_hamming,
-            "mean_hamming_distance": mean_hamming,
-            "min_gc_content": min(gc_contents),
-            "max_gc_content": max(gc_contents),
-            "mean_gc_content": np.mean(gc_contents),
-            "hamming_matrix": hamming_matrix.tolist()
-        }
-        
-        logger.info(f"Quality analysis complete. Min Hamming distance: {min_hamming}")
-        return quality_metrics
-    
-    def _calculate_gc_content(self, sequence: str) -> float:
-        """Calculate GC content of a sequence."""
-        gc_count = sequence.count('G') + sequence.count('C')
-        return gc_count / len(sequence) if sequence else 0.0
-    
     def save_barcodes(self, filepath: Path, barcodes: T.Optional[T.List[str]] = None) -> None:
         if barcodes is None:
             barcodes = self.generated_barcodes
@@ -204,49 +162,3 @@ def quick_generate(num_barcodes: int, length: int, **kwargs) -> T.List[str]:
     """
     generator = BarcodeGenerator()
     return generator.generate_max_orthogonality(num_barcodes, length, **kwargs)
-
-
-def generate_pcr_barcodes(num_barcodes: int, length: int = 8) -> T.List[str]:
-    """
-    Generate barcodes optimized for PCR amplification.
-    
-    Args:
-        num_barcodes: Number of barcodes to generate
-        length: Length of each barcode (default: 8)
-        
-    Returns:
-        List of PCR-optimized barcode sequences
-    """
-    # PCR-optimized parameters: 4-letter alphabet, RC-free, balanced GC content
-    generator = BarcodeGenerator()
-    return generator.generate_max_orthogonality(
-        num_barcodes=num_barcodes,
-        length=length,
-        alphabet="ACGT",
-        rc_free=True,
-        gc_limits=(length//4, 3*length//4),  # 25-75% GC content
-        prevent_patterns=["AAAA", "TTTT", "CCCC", "GGGG"]  # Prevent homopolymers
-    )
-
-
-def generate_sequencing_barcodes(num_barcodes: int, length: int = 12) -> T.List[str]:
-    """
-    Generate barcodes optimized for sequencing applications.
-    
-    Args:
-        num_barcodes: Number of barcodes to generate
-        length: Length of each barcode (default: 12)
-        
-    Returns:
-        List of sequencing-optimized barcode sequences
-    """
-    # Sequencing-optimized parameters: longer length, strict constraints
-    generator = BarcodeGenerator()
-    return generator.generate_max_orthogonality(
-        num_barcodes=num_barcodes,
-        length=length,
-        alphabet="ACGT",
-        rc_free=True,
-        gc_limits=(length//3, 2*length//3),  # 33-67% GC content
-        prevent_patterns=["AAA", "TTT", "CCC", "GGG"]  # Prevent short homopolymers
-    )
