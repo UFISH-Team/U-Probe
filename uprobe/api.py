@@ -44,6 +44,8 @@ class UProbeAPI:
         self._generate_html = True  # 默认生成HTML 
         self._include_plots = True  # 默认包含图表
         self._embed_plots = True  # 默认将图表嵌入HTML而不单独保存
+        # Track the CSV filename for consistent naming
+        self._csv_filename = None
 
     def _load_config(self, config: T.Union[Path, dict]) -> dict:
         if isinstance(config, Path):
@@ -131,6 +133,9 @@ class UProbeAPI:
         df_final = add_attributes(df_probes, self.protocol, self.genome)
         time_str = time.strftime("%Y%m%d_%H%M%S")
         name = self.protocol.get("name", "probes")
+        
+        # Store the CSV filename for later use in HTML report
+        self._csv_filename = f"{name}_{time_str}.csv"
         
         # Always save raw CSV if requested
         if raw_csv:
@@ -269,7 +274,8 @@ class UProbeAPI:
                 self.protocol, 
                 html_output_path,
                 template_type=template_type,
-                plot_data=plot_data
+                plot_data=plot_data,
+                csv_filename=self._csv_filename
             )
             
             if html_path:
