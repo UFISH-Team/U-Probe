@@ -218,8 +218,15 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
             try:
                 seq = fa[chrom][exons[i][0]:exons[i][1]].seq
             except KeyError:
-                #import ipdb; ipdb.set_trace()
-                #chrom = change_chrom_name(chrom)
+                log.warning(f"Sequence {chrom} not found in FASTA index, rebuilding index...")
+                # Rebuild the FASTA index
+                fa.close()
+                import os
+                fai_file = str(fa_path) + '.fai'
+                if os.path.exists(fai_file):
+                    os.remove(fai_file)
+                    log.info(f"Removed corrupted index file: {fai_file}")
+                fa = Fasta(str(fa_path))  # This will rebuild the index
                 seq = fa[chrom][exons[i][0]:exons[i][1]].seq
             if strand == '-':
                 seq = reverse_complement(seq)
