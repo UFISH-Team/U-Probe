@@ -39,13 +39,25 @@ class UProbeAPI:
             self.genome = self._validate_and_get_genome()
         else:
             self.genome = None
-        # Report generation preferences (根据用户要求默认改为HTML)
-        self._generate_pdf = False  # 默认不生成PDF
-        self._generate_html = True  # 默认生成HTML 
-        self._include_plots = True  # 默认包含图表
-        self._embed_plots = True  # 默认将图表嵌入HTML而不单独保存
-        # Track the CSV filename for consistent naming
+        self._generate_pdf = False  
+        self._generate_html = True 
+        self._include_plots = True 
+        self._embed_plots = True  
         self._csv_filename = None
+
+    def _is_name_sequence_format(self) -> bool:
+        """
+        Check if targets are in 'name:sequence' format.
+        Supports two formats:
+        1. dict: {'name1': 'sequence1', 'name2': 'sequence2'}
+        2. dict of dicts: {'name1': {'sequence1'}, 'name2': {'sequence2'}}
+        """
+        targets = self.protocol.get("targets", [])
+        if isinstance(targets, dict):
+            return all(isinstance(v, str) for v in targets.values())
+        if isinstance(targets, list) and targets:
+            return all(isinstance(i, dict) for i in targets)
+        return False
 
     def _load_config(self, config: T.Union[Path, dict]) -> dict:
         if isinstance(config, Path):
@@ -98,18 +110,53 @@ class UProbeAPI:
 
     def generate_target_seqs(self) -> pd.DataFrame:
         log.info("Generating target region sequences...")
-        extract_params = self.protocol['extracts']['target_region']      
-        df_targets = generate_target_seqs(
-            source=extract_params['source'],
-            targets=self.protocol["targets"],
-            fasta_path=self.genome['fasta'],
-            gtf_path=self.genome['gtf'],
-            min_length=extract_params['length'],
-            overlap=extract_params['overlap']
-        )
-        if df_targets.empty:
-            log.error("No target sequences generated. Check target definitions and extraction parameters.")
-        return df_targets
+        extract_params = self.protocol['extracts']['target_region']
+
+        if self._is_name_sequence_format():
+            log.info("Detected 'name:sequence' format for targets. Generating sequences from provided sequences.")
+            min_length = extract_params['length']
+            overlap = extract_params['overlap']
+
+            targets = self.protocol["targets"]
+            flat_targets = {}
+            if isinstance(targets, dict):
+                flat_targets = targets
+            else:  # list of dicts
+                for item in targets:
+                    flat_targets.update(item)
+
+            data_list = []
+            for target_name, seq in flat_targets.items():
+                n = 1
+                for i in range(0, len(seq) - min_length + 1, min_length - overlap):
+                    tem = seq[i:i + min_length]
+                    if len(tem) == min_length:
+                        start = i + 1
+                        end = i + min_length
+                        probe_id = f"{target_name}_{n}"
+                        n += 1
+                        sub_region = f"{start}-{end}"
+                        data_list.append([probe_id, target_name, sub_region, tem])
+
+            df_targets = pd.DataFrame(data_list, columns=['probe_id', 'target', 'sub_region','target_region'])
+            if df_targets.empty:
+                log.warning("No target sequences generated from provided sequences. Check sequence lengths and extraction parameters.")
+            else:
+                log.info(f"Generated {len(df_targets)} target sequences from provided sequences.")
+            return df_targets
+        else:
+            log.info("Using standard target extraction from genome.")
+            df_targets = generate_target_seqs(
+                source=extract_params['source'],
+                targets=self.protocol["targets"],
+                fasta_path=self.genome['fasta'],
+                gtf_path=self.genome['gtf'],
+                min_length=extract_params['length'],
+                overlap=extract_params['overlap']
+            )
+            if df_targets.empty:
+                log.error("No target sequences generated. Check target definitions and extraction parameters.")
+            return df_targets
 
     def construct_probes(self, df_targets: pd.DataFrame) -> pd.DataFrame:
         log.info("Constructing probes...")
@@ -133,17 +180,12 @@ class UProbeAPI:
         df_final = add_attributes(df_probes, self.protocol, self.genome)
         time_str = time.strftime("%Y%m%d_%H%M%S")
         name = self.protocol.get("name", "probes")
-        
-        # Store the CSV filename for later use in HTML report
         self._csv_filename = f"{name}_{time_str}.csv"
-        
-        # Always save raw CSV if requested
         if raw_csv:
             raw_path = self.output_dir / f"{name}_{time_str}_raw.csv"
             log.info(f"Saving raw results to {raw_path}")
             df_final.to_csv(raw_path, index=False)
-        
-        # Check if post-processing is configured
+
         post_process_config = self.protocol.get('post_process', {})
         has_post_processing = any(post_process_config.get(key) for key in 
                                 ['filters', 'sorts', 'remove_overlap', 'equal_space', 'avoid_otp'])
@@ -154,20 +196,17 @@ class UProbeAPI:
             
             if df_processed.empty:
                 log.warning("No probes remaining after post-processing filters. Using raw data for final result.")
-                # Save raw data as final result when post-processing filters everything out
                 output_path = self.output_dir / f"{name}_{time_str}.csv"
                 log.info(f"Saving {df_final.shape[0]} raw probes to {output_path} (post-processing resulted in empty dataset)")
                 df_final.to_csv(output_path, index=False)
                 return df_final
             else:
-                # Save processed results
                 output_path = self.output_dir / f"{name}_{time_str}.csv"
                 log.info(f"Saving {df_processed.shape[0]} processed probes to {output_path}")
                 df_processed.to_csv(output_path, index=False)
                 return df_processed
         else:
             log.info("No post-processing steps configured, using raw data as final result")
-            # Save as final result (without "_raw" suffix since it's the final output)
             output_path = self.output_dir / f"{name}_{time_str}.csv"
             log.info(f"Saving {df_final.shape[0]} probes to {output_path}")
             df_final.to_csv(output_path, index=False)
@@ -178,12 +217,13 @@ class UProbeAPI:
         # 1. Build Genome Index (if needed)
         self.build_genome_index(threads=threads)
         # 2. Validate Targets(RNA)
-        if self.protocol['extracts']['target_region']['source'] == 'genome':
-            pass
-        else:
+        is_name_seq_format = self._is_name_sequence_format()
+        if self.protocol['extracts']['target_region']['source'] != 'genome' and not is_name_seq_format:
             if not self.validate_targets(continue_on_invalid=continue_on_invalid_targets):
                 log.error("Workflow halted due to target validation failure.")
-                return pd.DataFrame()        
+                return pd.DataFrame()
+        elif is_name_seq_format:
+            log.info("Detected 'name:sequence' target format, skipping target validation against GTF.")
         # 3. Generate Target Region Sequences
         df_targets = self.generate_target_seqs()
         if df_targets.empty:
@@ -222,17 +262,14 @@ class UProbeAPI:
         html_paths = []
         
         try:
-            # Generate summary data first (if configured)
             from .process.summary import generate_summary_data
             summary_config = self.protocol.get('summary', {})
             if summary_config:
                 log.info("Generating summary statistics for report...")
                 summary_data = generate_summary_data(df_processed, summary_config)
-                # Store summary data in DataFrame attrs
                 if hasattr(df_processed, 'attrs'):
                     df_processed.attrs['summary_data'] = summary_data
                 else:
-                    # Fallback for older pandas versions
                     import tempfile
                     import pickle
                     import os
@@ -241,31 +278,24 @@ class UProbeAPI:
                     with open(summary_file, 'wb') as f:
                         pickle.dump(summary_data, f)
                     log.info(f"Summary data saved to temporary file: {summary_file}")
-            
-            # Handle plots
             plot_data = {}
             if include_plots:
                 try:
-                    # Generate plots as base64 data for embedding
                     plot_result = generate_plot_report(
                         df_processed, 
                         self.protocol, 
                         self.output_dir, 
                         report_suffix,
-                        save_files=False,  # Don't save plot files
-                        return_base64=True # Return base64 data for embedding
+                        save_files=False, 
+                        return_base64=True 
                     )
                     
                     plot_data = plot_result.get("plot_data", {}) 
                 except Exception as e:
                     log.error(f"Failed to generate plots: {e}")
-            
-            # Generate HTML report with embedded plots
             protocol_name = self.protocol.get('name', 'probes')
             time_str = time.strftime("%Y%m%d_%H%M%S")
             html_output_path = self.output_dir / f"{protocol_name}_report{report_suffix}_{time_str}.html"
-            
-            # Get template type from report configuration
             summary_config = self.protocol.get('summary', {})
             template_type = summary_config.get('report_name', 'scientific_report')
             
