@@ -1,16 +1,19 @@
 name: double_hyb_iss
 description: Protocol for designing double hybrid ISS probes from species Mus musculus
 
-genome: mm39
+genome: test
 
 targets:
-  - Rb1cc1
+  - xxx: 'ATCGATCGATCGATCGATCGATCGATCGA'
+  - ccc: 'TTGGAAACCCCCCCCTTGGAAACCCCCCCCTTG'
 
 encoding:
-  Rb1cc1:
+  xxx:
     BC1: ACT
     BC2: GGA
-
+  ccc:
+    BC1: ACT
+    BC2: GGA
 
 extracts:
   target_region:
@@ -23,7 +26,6 @@ probes:
     template: "{part1}{part2}{part3}"
     parts:
       part1:
-        length: 13
         expr: "rc(target_region[0:13])"
       part2:
         template: "CC{barcode1}TGCGTCTATTT{barcode2}TAGTGGAGCCT"
@@ -33,7 +35,6 @@ probes:
           barcode2:
             expr: "encoding[target]['BC2']"
       part3:
-        length: 13
         expr: "rc(target_region[13:26])"
   probe_2:
     template: "{part1}{part2}AGGCTCCACTA"
