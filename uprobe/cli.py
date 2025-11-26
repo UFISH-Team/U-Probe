@@ -35,15 +35,12 @@ def cli(ctx, verbose, quiet):
     A powerful and flexible Python-based tool for designing custom DNA or RNA probes
     for various molecular biology applications.
     """
-    # Configure logging
     if quiet:
         logging.getLogger().setLevel(logging.ERROR)
     elif verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     else:
         logging.getLogger().setLevel(logging.INFO)
-    
-    # Ensure context is passed to subcommands
     ctx.ensure_object(dict)
 
 
@@ -73,16 +70,13 @@ def run(protocol, genomes, output, raw, continue_invalid, threads):
             genomes_config=Path(genomes),
             output_dir=Path(output)
         )
-        
         result_df = uprobe.run_workflow(
             raw_csv=raw,
             continue_on_invalid_targets=continue_invalid,
             threads=threads
         )
-        
         if not result_df.empty:
             log.info(f"Workflow completed successfully with {len(result_df)} final probes!")
-    
     except Exception as e:
         log.error(f"Workflow failed: {e}")
         sys.exit(1)
@@ -107,12 +101,11 @@ def build_index(protocol, genomes, threads):
         uprobe = UProbeAPI(
             protocol_config=Path(protocol),
             genomes_config=Path(genomes),
-            output_dir=Path('./temp')  # Temporary output dir for index building only
+            output_dir=Path('./temp') 
         )
         
         uprobe.build_genome_index(threads=threads)
         log.info("Genome index building completed successfully!")
-        
     except Exception as e:
         log.error(f"Index building failed: {e}")
         sys.exit(1)
@@ -136,19 +129,16 @@ def validate_targets(protocol, genomes, continue_invalid):
         uprobe = UProbeAPI(
             protocol_config=Path(protocol),
             genomes_config=Path(genomes),
-            output_dir=Path('./temp')  # Temporary output dir for validation only
+            output_dir=Path('./temp')  
         )
-        
-        valid = uprobe.validate_targets(continue_on_invalid=continue_invalid)
-        
+        valid = uprobe.validate_targets(continue_on_invalid=continue_invalid)       
         if valid:
             log.info("All target genes are valid!")
         elif continue_invalid:
             log.warning("Some targets are invalid but continuing as requested.")
         else:
             log.error("Target validation failed!")
-            sys.exit(1)
-            
+            sys.exit(1)          
     except Exception as e:
         log.error(f"Target validation failed: {e}")
         sys.exit(1)
@@ -176,8 +166,6 @@ def generate_targets(protocol, genomes, output, continue_invalid):
             genomes_config=Path(genomes),
             output_dir=Path(output)
         )
-        
-        # Validate targets first
         if not uprobe.validate_targets(continue_on_invalid=continue_invalid):
             log.error("Target validation failed!")
             sys.exit(1)
@@ -189,12 +177,10 @@ def generate_targets(protocol, genomes, output, continue_invalid):
             sys.exit(1)
         else:
             log.info(f"Generated {len(df_targets)} target sequences successfully!")
-            # Save targets to file
             targets_file = Path(output) / "target_sequences.csv"
             Path(output).mkdir(parents=True, exist_ok=True)
             df_targets.to_csv(targets_file, index=False)
-            log.info(f"Target sequences saved to {targets_file}")
-            
+            log.info(f"Target sequences saved to {targets_file}")           
     except Exception as e:
         log.error(f"Target generation failed: {e}")
         sys.exit(1)
@@ -225,12 +211,8 @@ def construct_probes(protocol, genomes, targets, output):
             genomes_config=Path(genomes),
             output_dir=Path(output)
         )
-        
-        # Load target sequences
-        df_targets = pd.read_csv(targets)
-        
-        df_probes = uprobe.construct_probes(df_targets)
-        
+        df_targets = pd.read_csv(targets)        
+        df_probes = uprobe.construct_probes(df_targets)       
         if df_probes.empty:
             log.error("No probes constructed!")
             sys.exit(1)
@@ -240,8 +222,7 @@ def construct_probes(protocol, genomes, targets, output):
             probes_file = Path(output) / "constructed_probes.csv"
             Path(output).mkdir(parents=True, exist_ok=True)
             df_probes.to_csv(probes_file, index=False)
-            log.info(f"Constructed probes saved to {probes_file}")
-            
+            log.info(f"Constructed probes saved to {probes_file}")            
     except Exception as e:
         log.error(f"Probe construction failed: {e}")
         sys.exit(1)
@@ -266,25 +247,18 @@ def post_process(protocol, genomes, probes, output, raw):
     as specified in the protocol.
     """
     try:
-        import pandas as pd
-        
         log.info("Post-processing probes...")
         uprobe = UProbeAPI(
             protocol_config=Path(protocol),
             genomes_config=Path(genomes),
             output_dir=Path(output)
         )
-        
-        # Load probe data
-        df_probes = pd.read_csv(probes)
-        
-        df_processed = uprobe.post_process_probes(df_probes, raw_csv=raw)
-        
+        df_probes = pd.read_csv(probes)       
+        df_processed = uprobe.post_process_probes(df_probes, raw_csv=raw)  
         if df_processed.empty:
             log.warning("No probes remaining after post-processing!")
         else:
-            log.info(f"Post-processing completed! {len(df_processed)} probes passed filters.")
-            
+            log.info(f"Post-processing completed! {len(df_processed)} probes passed filters.")           
     except Exception as e:
         log.error(f"Post-processing failed: {e}")
         sys.exit(1)
@@ -317,22 +291,17 @@ def generate_barcodes(protocol, output, strategy, name, num_barcodes, length, k_
     try:
         output_dir = Path(output)
         output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Initialize UProbeAPI. Genomes config is not needed.
         uprobe = UProbeAPI(
             protocol_config=Path(protocol) if protocol else {},
             genomes_config={},
             output_dir=output_dir,
             require_genome=False
         )
-
         if protocol:
             log.info("Generating barcodes from protocol file...")
             barcode_sets = uprobe.generate_barcodes()
         elif strategy:
-            log.info(f"Generating barcodes using '{strategy}' strategy...")
-            
-            # Build barcode config from CLI options
+            log.info(f"Generating barcodes using '{strategy}' strategy...")            
             params = {'strategy': strategy}
             if length:
                 params['length'] = length
@@ -341,8 +310,7 @@ def generate_barcodes(protocol, output, strategy, name, num_barcodes, length, k_
             if gc_limits:
                 params['gc_limits'] = [int(x.strip()) for x in gc_limits.split(',')]
             if prevent_patterns:
-                params['prevent_patterns'] = [x.strip() for x in prevent_patterns.split(',')]
-            
+                params['prevent_patterns'] = [x.strip() for x in prevent_patterns.split(',')]            
             if strategy in ['max_orthogonality', 'pcr', 'sequencing']:
                 if not num_barcodes:
                     raise click.UsageError("Option '--num-barcodes' is required for this strategy.")
@@ -357,34 +325,26 @@ def generate_barcodes(protocol, output, strategy, name, num_barcodes, length, k_
                     params.setdefault('alphabet', 'ACGT')
                     params.setdefault('gc_limits', (params['length']//3, 2*params['length']//3))
                     params.setdefault('prevent_patterns', ["AAA", "TTT", "CCC", "GGG"])
-
             elif strategy == 'max_size':
                 if not k_constraint or not length:
                     raise click.UsageError("Options '--k-constraint' and '--length' are required for max_size strategy.")
                 params['k_constraint'] = k_constraint
-
             elif strategy == 'precomputed':
                 if not library_name:
                     raise click.UsageError("Option '--library-name' is required for precomputed strategy.")
                 params['library_name'] = library_name
-
             if save:
-                params['save_file'] = f"{name}.csv"
-            
+                params['save_file'] = f"{name}.csv"           
             if analyze:
                 params['analyze_quality'] = True
-
             barcode_config = {name: params}
-            barcode_sets = uprobe.run_barcode_generation(barcode_config)
-            
+            barcode_sets = uprobe.run_barcode_generation(barcode_config)            
         else:
             raise click.UsageError("Either '--protocol' or '--strategy' must be provided.")
-
         if not barcode_sets:
             log.warning("No barcodes were generated.")
         else:
             log.info(f"Generated {len(barcode_sets)} barcode set(s) successfully!")
-
     except Exception as e:
         log.error(f"Barcode generation failed: {e}", exc_info=log.getEffectiveLevel() == logging.DEBUG)
         sys.exit(1)
@@ -421,25 +381,15 @@ def generate_report(protocol, genomes, probes, output, no_plots, pdf, no_pdf):
             genomes_config=Path(genomes),
             output_dir=Path(output)
         )
-        
-        # Load probe results
-        df_probes = pd.read_csv(probes)
-        
+        df_probes = pd.read_csv(probes)       
         if df_probes.empty:
             log.error("No probe data found in the input file!")
             sys.exit(1)
-        
-        # Determine PDF generation preference (--no-pdf overrides --pdf)
         generate_pdf = pdf and not no_pdf
-        
-        # Generate report
         results = uprobe.generate_report(df_probes, include_plots=not no_plots, generate_pdf=generate_pdf)
-        
-        # Log results
         n_reports = len(results.get('reports', []))
         n_plots = len(results.get('plots', []))
-        n_pdfs = len(results.get('pdfs', []))
-        
+        n_pdfs = len(results.get('pdfs', []))        
         if n_reports + n_plots + n_pdfs == 0:
             log.warning("No reports or plots were generated. Check your protocol configuration.")
         else:
@@ -449,11 +399,25 @@ def generate_report(protocol, genomes, probes, output, no_plots, pdf, no_pdf):
             if n_pdfs > 0:
                 log.info(f"Generated {n_pdfs} PDF report(s)")
             if n_plots > 0:
-                log.info(f"Generated {n_plots} visualization plot(s)")
-        
+                log.info(f"Generated {n_plots} visualization plot(s)")        
     except Exception as e:
         log.error(f"Report generation failed: {e}")
         sys.exit(1)
+
+
+@cli.command()
+def agent():
+    """Start an interactive session with the U-Probe Agent."""
+    import asyncio
+    try:
+        from uprobe.agent.uprobe_agent import run_interactive_session
+    except ImportError as e:
+        log.error(f"Failed to import U-Probe Agent modules: {e}")
+        log.error("Please ensure all agent dependencies are installed.")
+        sys.exit(1)
+    log.info("Starting U-Probe Agent interactive session...")
+    log.info("This will launch a conversational agent to help you design probes.")
+    asyncio.run(run_interactive_session())
 
 
 @cli.command()
