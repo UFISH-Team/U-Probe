@@ -7,7 +7,7 @@ log = get_logger(__name__)
 
 def build_bowtie2_index(fasta_path: Path, 
                         index_prefix: Path, 
-                        threads: int
+                        threads: int=10
                         ) -> None:
     cmd = ["bowtie2-build", "--threads", 
            str(threads), 
