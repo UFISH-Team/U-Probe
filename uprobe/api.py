@@ -45,19 +45,34 @@ class UProbeAPI:
         self._embed_plots = True  
         self._csv_filename = None
 
-    def _is_name_sequence_format(self) -> bool:
+    def _parse_targets(self) -> T.Tuple[T.List[str], T.Dict[str, str]]:
         """
-        Check if targets are in 'name:sequence' format.
-        Supports two formats:
-        1. dict: {'name1': 'sequence1', 'name2': 'sequence2'}
-        2. dict of dicts: {'name1': {'sequence1'}, 'name2': {'sequence2'}}
+        Parse targets into genome targets (names only) and direct targets (name: sequence).
         """
         targets = self.protocol.get("targets", [])
+        genome_targets = []
+        direct_targets = {}
+
         if isinstance(targets, dict):
-            return all(isinstance(v, str) for v in targets.values())
-        if isinstance(targets, list) and targets:
-            return all(isinstance(i, dict) for i in targets)
-        return False
+            for name, seq in targets.items():
+                if seq and isinstance(seq, str):
+                    direct_targets[name] = seq
+                else:
+                    genome_targets.append(name)
+        elif isinstance(targets, list):
+            for item in targets:
+                if isinstance(item, str):
+                    genome_targets.append(item)
+                elif isinstance(item, dict):
+                    for name, seq in item.items():
+                        if seq and isinstance(seq, str):
+                            direct_targets[name] = seq
+                        else:
+                            genome_targets.append(name)
+        
+        # Remove duplicates
+        genome_targets = list(dict.fromkeys(genome_targets))
+        return genome_targets, direct_targets
 
     def _load_config(self, config: T.Union[Path, dict]) -> dict:
         if isinstance(config, Path):
@@ -89,44 +104,76 @@ class UProbeAPI:
         log.info(f"Generated {len(barcodes)} barcodes.")
         return barcodes
 
-    def validate_targets(self, continue_on_invalid: bool = False) -> bool:
-        targets = self.protocol.get("targets", [])
-        if not targets:
+    def validate_targets(self, continue_on_invalid: bool = True) -> bool:
+        genome_targets, direct_targets = self._parse_targets()
+        
+        if not genome_targets and not direct_targets:
             raise ValueError("No targets specified in the protocol.")
+            
         log.info("Validating targets...")
-        gtf_path = Path(self.genome['gtf'])
-        valid, valid_targets, invalid_targets = validate_targets(targets, gtf_path, DTF_NAME_FIX=True)
-        if not valid:
-            error_msg = f"Invalid targets found: {invalid_targets}"
+        
+        valid_genome_targets = []
+        if genome_targets:
+            gtf_path = Path(self.genome['gtf'])
+            _, valid_list, invalid_list = validate_targets(genome_targets, gtf_path, DTF_NAME_FIX=True)
+            
+            if invalid_list:
+                log.warning(f"Invalid targets found (not in genome): {invalid_list}")
+                
+            valid_genome_targets = valid_list
+        
+        # Reconstruct targets for protocol
+        new_targets = []
+        new_targets.extend(valid_genome_targets)
+        for name, seq in direct_targets.items():
+            new_targets.append({name: seq})
+            
+        self.protocol["targets"] = new_targets
+        
+        if not new_targets:
+            log.error("No valid targets remaining after validation.")
             if not continue_on_invalid:
-                raise ValueError(error_msg)
-            log.warning(f"{error_msg}. Continuing with valid targets as requested.")
-            self.protocol["targets"] = valid_targets
-            if not valid_targets:
-                log.error("No valid targets remaining after validation.")
-                return False
-        log.info("Target validation successful.")
+                raise ValueError("No valid targets remaining.")
+            return False
+            
+        log.info(f"Target validation successful. Valid: {len(valid_genome_targets)} genome targets, {len(direct_targets)} custom sequences.")
         return True
 
     def generate_target_seqs(self) -> pd.DataFrame:
         log.info("Generating target region sequences...")
         extract_params = self.protocol['extracts']['target_region']
-
-        if self._is_name_sequence_format():
-            log.info("Detected 'name:sequence' format for targets. Generating sequences from provided sequences.")
+        
+        genome_targets, direct_targets = self._parse_targets()
+        
+        dfs = []
+        
+        # 1. Process Genome Targets
+        if genome_targets:
+            log.info(f"Extracting {len(genome_targets)} targets from genome using source '{extract_params['source']}'...")
+            try:
+                df_genome = generate_target_seqs(
+                    source=extract_params['source'],
+                    targets=genome_targets,
+                    fasta_path=self.genome['fasta'],
+                    gtf_path=self.genome['gtf'],
+                    min_length=extract_params['length'],
+                    overlap=extract_params['overlap']
+                )
+                if not df_genome.empty:
+                    dfs.append(df_genome)
+                else:
+                    log.warning("No sequences generated for genome targets.")
+            except Exception as e:
+                log.error(f"Failed to generate sequences for genome targets: {e}")
+                
+        # 2. Process Direct Targets
+        if direct_targets:
+            log.info(f"Processing {len(direct_targets)} custom sequence targets...")
             min_length = extract_params['length']
             overlap = extract_params['overlap']
-
-            targets = self.protocol["targets"]
-            flat_targets = {}
-            if isinstance(targets, dict):
-                flat_targets = targets
-            else:  # list of dicts
-                for item in targets:
-                    flat_targets.update(item)
-
+            
             data_list = []
-            for target_name, seq in flat_targets.items():
+            for target_name, seq in direct_targets.items():
                 n = 1
                 for i in range(0, len(seq) - min_length + 1, min_length - overlap):
                     tem = seq[i:i + min_length]
@@ -137,26 +184,28 @@ class UProbeAPI:
                         n += 1
                         sub_region = f"{start}-{end}"
                         data_list.append([probe_id, target_name, sub_region, tem])
-
-            df_targets = pd.DataFrame(data_list, columns=['probe_id', 'target', 'sub_region','target_region'])
-            if df_targets.empty:
-                log.warning("No target sequences generated from provided sequences. Check sequence lengths and extraction parameters.")
+            
+            df_direct = pd.DataFrame(data_list, columns=['probe_id', 'target', 'sub_region','target_region'])
+            if not df_direct.empty:
+                dfs.append(df_direct)
             else:
-                log.info(f"Generated {len(df_targets)} target sequences from provided sequences.")
-            return df_targets
-        else:
-            log.info("Using standard target extraction from genome.")
-            df_targets = generate_target_seqs(
-                source=extract_params['source'],
-                targets=self.protocol["targets"],
-                fasta_path=self.genome['fasta'],
-                gtf_path=self.genome['gtf'],
-                min_length=extract_params['length'],
-                overlap=extract_params['overlap']
-            )
-            if df_targets.empty:
-                log.error("No target sequences generated. Check target definitions and extraction parameters.")
-            return df_targets
+                log.warning("No sequences generated from provided custom sequences (check length vs min_length).")
+
+        if not dfs:
+            log.error("No target sequences generated from any source.")
+            return pd.DataFrame()
+            
+        df_final = pd.concat(dfs, ignore_index=True)
+        
+        # Unify 'gene' column to 'target' if present (some extractors return 'gene')
+        if 'gene' in df_final.columns:
+            if 'target' not in df_final.columns:
+                 df_final['target'] = df_final['gene']
+            else:
+                 df_final['target'] = df_final['target'].fillna(df_final['gene'])
+        
+        log.info(f"Total generated target sequences: {len(df_final)}")
+        return df_final
 
     def construct_probes(self, df_targets: pd.DataFrame) -> pd.DataFrame:
         log.info("Constructing probes...")
@@ -217,13 +266,11 @@ class UProbeAPI:
         # 1. Build Genome Index (if needed)
         self.build_genome_index(threads=threads)
         # 2. Validate Targets(RNA)
-        is_name_seq_format = self._is_name_sequence_format()
-        if self.protocol['extracts']['target_region']['source'] != 'genome' and not is_name_seq_format:
+        source = self.protocol['extracts']['target_region']['source']
+        if source != 'genome':
             if not self.validate_targets(continue_on_invalid=continue_on_invalid_targets):
                 log.error("Workflow halted due to target validation failure.")
                 return pd.DataFrame()
-        elif is_name_seq_format:
-            log.info("Detected 'name:sequence' target format, skipping target validation against GTF.")
         # 3. Generate Target Region Sequences
         df_targets = self.generate_target_seqs()
         if df_targets.empty:

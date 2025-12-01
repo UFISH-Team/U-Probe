@@ -112,7 +112,6 @@ def generate_summary_data(
         Dictionary containing all summary data
     """
     logger.info(f"Generating summary statistics for DataFrame with shape: {df.shape}")
-    logger.info(f"DataFrame columns: {list(df.columns)}")
     
     # Detect target column name (could be 'target' or 'gene')
     target_col = None
