@@ -254,9 +254,10 @@ def generate_target_seqs(
                         start = i + 1  
                         end = i + min_length
                         gene_id = f"{gene_name}_{n}"
+                        sub_region = f"{start}_{end}"
                         n += 1
-                        data_list.append([gene_id, gene_name, exon_name, trans_name, start, end, tem, n_trans])
-        data = pd.DataFrame(data_list, columns=['probe_id', 'target', 'exon_name', 'transcript_names','start', 
+                        data_list.append([gene_id, gene_name, sub_region, exon_name, trans_name, start, end, tem, n_trans])
+        data = pd.DataFrame(data_list, columns=['probe_id', 'target', 'sub_region','exon_name', 'transcript_names','start', 
                                                 'end', 'target_region', 'n_trans'])
         return data
     elif source == 'UTR':
@@ -273,9 +274,10 @@ def generate_target_seqs(
                         start = i + 1  
                         end = i + min_length
                         gene_id = f"{gene_name}_{n}"
+                        sub_region = f"{start}_{end}"
                         n += 1
-                        data_list.append([gene_id, gene_name, utr_name, trans_name, start, end, tem, n_trans])
-        data = pd.DataFrame(data_list, columns=['probe_id', 'target', 'utr_name', 'transcript_names','start', 
+                        data_list.append([gene_id, gene_name, sub_region, utr_name, trans_name, start, end, tem, n_trans])
+        data = pd.DataFrame(data_list, columns=['probe_id', 'target', 'sub_region', 'utr_name', 'transcript_names','start', 
                                                 'end', 'target_region', 'n_trans'])
         return data
     elif source == 'genome':
