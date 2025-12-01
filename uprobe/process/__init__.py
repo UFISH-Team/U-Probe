@@ -18,7 +18,6 @@ def parse_condition(condition: str) -> list:
     for cond in conditions:
         match = re.match(pattern, cond)
         if not match:
-            logger.error(f"Invalid condition format: {cond}")
             raise ValueError(f"Invalid condition format: {cond}")
         column, operator, value = match.groups()
         try:
@@ -26,18 +25,14 @@ def parse_condition(condition: str) -> list:
         except ValueError:
             value = float(value)
         result.append((column, operator, value))
-    
     return result
 
 def apply_condition(df: pd.DataFrame,
                     conditions: list
                     ) -> pd.DataFrame:
-    """Apply multiple conditions to a DataFrame
-    """
     for column, operator, value in conditions:
         if column not in df.columns:
             continue
-        # Normal numeric comparison for other columns
         if operator == '<=':
             df = df[df[column] <= value]
         elif operator == '>=':
@@ -49,15 +44,12 @@ def apply_condition(df: pd.DataFrame,
         elif operator == '==':
             df = df[df[column] == value]
         else:
-            logger.error(f"Unsupported operator: {operator}")
             raise ValueError(f"Unsupported operator: {operator}")
     return df
 
 def filter_table(df: pd.DataFrame,
                   filters: dict
                   ) -> pd.DataFrame:
-    """Filter the table by the specified columns in the protocol.
-    """
     for filter_name, filter_config in filters.items():
         if isinstance(filter_config, dict) and 'condition' in filter_config:
             condition = filter_config['condition']
@@ -65,7 +57,6 @@ def filter_table(df: pd.DataFrame,
                 conditions = parse_condition(condition)
                 df = apply_condition(df, conditions)
             elif isinstance(condition, list):
-                # Handle multiple conditions
                 for cond in condition:
                     conditions = parse_condition(cond)
                     df = apply_condition(df, conditions)
@@ -75,29 +66,21 @@ def sort_table(df: pd.DataFrame,
                keys: list, 
                ascending: list
                ) -> pd.DataFrame:
-    """
-    Sort the table by the specified columns in the protocol.
-    
-    """
     valid_keys = [key for key in keys if key in df.columns]
     valid_ascending = ascending[:len(valid_keys)]
-    
     if not valid_keys:
-        return df
-        
+        return df  
     return df.sort_values(by=valid_keys, ascending=valid_ascending)
 
 def remove_overlap(df: pd.DataFrame, 
                    config: dict,
                    location_interval: int
                    ) -> pd.DataFrame:
-    # Check for RNA probes (transcript_name or transcript_names columns)
     transcript_col = None
     if 'transcript_name' in df.columns:
         transcript_col = 'transcript_name'
     elif 'transcript_names' in df.columns:
         transcript_col = 'transcript_names'
-    
     if transcript_col:
         df[transcript_col] = df[transcript_col].apply(lambda x: 
                                                      ', '.join(x) if isinstance(x, list) else x)
@@ -125,16 +108,11 @@ def remove_overlap(df: pd.DataFrame,
                     current_end = end
         return pd.DataFrame(non_overlapping).reset_index(drop=True)
     else:
-        # Fallback: return original DataFrame if no recognized grouping columns
-        logger.warning("No recognized grouping columns (transcript_name/transcript_names/target) found for overlap removal. Returning original DataFrame.")
         return df
 
 def post_process(df: pd.DataFrame, 
                  config: dict
                  ) -> pd.DataFrame:
-    """
-    Post-process the data frame according to the protocol.
-    """
     processes = config.get('post_process', {})
     if 'filters' in processes and processes['filters']:
         logger.info("Filtering the table")
@@ -146,7 +124,6 @@ def post_process(df: pd.DataFrame,
         mapped_sites_cols = []
         for col in df.columns:
             if not col.endswith('_num') and f"{col}_num" in df.columns:
-                # find the first non-empty list of samples
                 sample_val = None
                 non_na_series = df[col].dropna()
                 for val in non_na_series:
@@ -162,23 +139,19 @@ def post_process(df: pd.DataFrame,
                             break
                     except Exception:
                         continue
-                
                 if sample_val is not None:
                     if isinstance(sample_val[0], (tuple, list)) and len(sample_val[0]) == 3:
                         mapped_sites_cols.append(col)
-        
         if mapped_sites_cols:
             for target, target_config in config.items():
                 target_regions = target_config.get('target_regions', [])
                 density_thresh = float(target_config.get('density_thresh', 1e-4))
                 search_range = tuple(map(float, target_config.get('search_range', [-1000000, 1000000])))
                 avoid_target_overlap = target_config.get('avoid_target_overlap', True)
-                
                 target_df = df[df['target'] == target] if 'target' in df.columns else df
                 if target_df.empty:
                     logger.warning(f"No probes found for target {target}, skipping OTP filtering")
                     continue
-                
                 blocks = []
                 for _, row in target_df.iterrows():
                     probe_id = row.get('probe_id', f"probe_{row.name}")
@@ -197,7 +170,6 @@ def post_process(df: pd.DataFrame,
                             pass
                     if all_alns:
                         blocks.append((probe_id, seq, all_alns))
-                
                 if not blocks:
                     logger.warning(f"No alignment data found for target {target}, skipping OTP filtering")
                     continue
@@ -247,8 +219,6 @@ def post_process(df: pd.DataFrame,
         sort_keys = pos_fields + neg_fields
         is_ascending = [True] * len(pos_fields) + [False] * len(neg_fields)
         df = sort_table(df, sort_keys, is_ascending)
-    # Note: Summary is now handled in report generation, not here
-    # This avoids duplicate summary generation and ensures it's always fresh
     if 'summary' in processes and processes['summary']:
         logger.info("Summary configuration found - will be processed during report generation")
     return df

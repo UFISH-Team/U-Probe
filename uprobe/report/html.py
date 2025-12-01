@@ -382,14 +382,11 @@ def _get_details_section(df: pd.DataFrame) -> str:
     ''')
     
     content.append('<div class="table-container">')
-    # Convert column names to lowercase for display
     preview_df_display = _prepare_df_for_display(preview_df)
     content.append(preview_df_display.to_html(index=False, classes='table table-striped', border=0))
     content.append('</div>')
-    
     if total_rows > 5:
         content.append(f'<p style="text-align: center; color: #7f8c8d; font-style: italic;">... and {total_rows - 5} more rows</p>')
-    
     content.append('</div>')
     return '\n'.join(content)
 
@@ -416,42 +413,26 @@ def save_html_report(
     """Save HTML report to file."""
     try:
         logger.info(f"Generating {template_type} HTML report...")
-        
         if not plot_data:
             plot_data = {}
-        
-        # Define content builders for different templates
         content_builders = {
-            'dna_report': _build_scientific_report_content, # Using scientific as base for now
-            'rna_report': _build_scientific_report_content, # Using scientific as base for now
+            'dna_report': _build_scientific_report_content, 
+            'rna_report': _build_scientific_report_content,
             'scientific_report': _build_scientific_report_content,
         }
-
-        # Get the appropriate content builder, defaulting to the scientific one
         builder = content_builders.get(template_type, _build_scientific_report_content)
-        
-        # Generate the HTML content using the selected builder
         content = builder(df, protocol, plot_data)
-        
-        # Get the base HTML template
         template = _get_base_template()
-        
-        # Fill template
         protocol_name = protocol.get('name', 'Unknown Protocol')
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Use provided CSV filename or generate one matching the CSV naming convention
         if csv_filename:
             download_filename = csv_filename
         else:
-            # Generate download filename with same format as CSV generation: {Protocol}_{YYYYMMDD}_{HHMMSS}.csv
+            # {Protocol}_{YYYYMMDD}_{HHMMSS}.csv
             import time
             time_str = time.strftime("%Y%m%d_%H%M%S")
             download_filename = f"{protocol_name}_{time_str}.csv"
-        
-        # Convert DataFrame to JSON for download functionality
         complete_data_json = df.to_json(orient='records')
-        
         html_content = template.format(
             protocol_name=protocol_name,
             timestamp=timestamp,
@@ -459,15 +440,11 @@ def save_html_report(
             complete_data_json=complete_data_json,
             download_filename=download_filename
         )
-        
-        # Save to file
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
-        
         logger.info(f"HTML report saved to: {output_path}")
         return output_path
-        
     except Exception as e:
         logger.error(f"Error generating HTML report: {e}")
         return None

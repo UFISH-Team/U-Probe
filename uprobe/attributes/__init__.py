@@ -16,8 +16,6 @@ def add_attributes(
         if target is None:
             print(f"Warning: 'target' key is missing in attribute '{attr_name}'")
             continue
-        
-        # Handle naming inconsistency: try both colon and dot formats
         actual_target = target
         if target not in df_probes.columns:
             # Try replacing colon with dot
@@ -25,20 +23,16 @@ def add_attributes(
             if dot_target in df_probes.columns:
                 actual_target = dot_target
             else:
-                print(f"Warning: '{target}' not found in DataFrame columns.")
-                print(f"Available columns: {list(df_probes.columns)}")
+                print(f"Warning: '{target}' not found in csv columns.")
                 continue
-        
         attr_type: str = attr.get('type', '').lower() 
-
         if attr_type == "mapped_sites":
             if attr.get('aligner') == "bowtie2":
-                assert 'bowtie2' in genome.get('align_index', []), "bowtie2 must be enabled in genome align_index" 
+                assert 'bowtie2' in genome.get('align_index', []), "Bowtie2 must be enabled in genome align_index" 
                 fasta_path = Path(genome['fasta'])
                 index_prefix = fasta_path.parent / 'bowtie2_genome' / fasta_path.stem
                 tmp_dir = Path("tmp")
                 tmp_dir.mkdir(exist_ok=True, parents=True)
-                # Handle different DataFrame structures for different source types
                 if 'probe_id' in df_probes.columns and 'target' in df_probes.columns:
                     # DNA format (source: genome)
                     recname2seq = {f"{row['probe_id']}": row[actual_target] for _, row in df_probes.iterrows()}
@@ -59,7 +53,6 @@ def add_attributes(
                 raise NotImplementedError(
                     f"Aligner {attr['aligner']} is not implemented."
                 )
-
         elif attr_type == "kmer_count":
             if attr.get('aligner') == "jellyfish":
                 assert genome.get('jellyfish', False) is True, "Jellyfish must be enabled in genome configuration" 
@@ -88,8 +81,6 @@ def add_attributes(
                 shutil.rmtree(tmp_dir)
             else:
                 raise NotImplementedError(f"Aligner {attr['aligner']} is not implemented.")
-
-                
         elif attr_type == "n_mapped_genes":
             if attr.get('aligner') == "bowtie2":
                 assert 'bowtie2' in genome.get('align_index', []), "bowtie2 must be enabled in genome align_index" 
@@ -97,7 +88,6 @@ def add_attributes(
                 index_prefix = fasta_path.parent / 'bowtie2_genome' / fasta_path.stem
                 tmp_dir = Path("tmp")
                 tmp_dir.mkdir(exist_ok=True, parents=True)
-                # Handle different DataFrame structures for different source types
                 if 'exon_name' in df_probes.columns and 'start' in df_probes.columns:
                     # RNA format (source: exon)
                     recname2seq = {f"{row['exon_name']}_{row['start']}": row[actual_target] for _, row in df_probes.iterrows()}

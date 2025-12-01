@@ -12,8 +12,6 @@ def build_transcripts_index(gtf: Path,
                              outdir: Path, 
                              threads: int = 10
                             ) -> str:
-    """Build the transcripts index using the provided GTF and FASTA files."""
-    
     trans_fasta_path = outdir.parent / "transcript.fa"
     index_prefix = outdir / fasta.stem
     if trans_fasta_path.exists():

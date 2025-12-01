@@ -12,10 +12,7 @@ Block = t.Tuple[str, str, t.List[Aln]]  # query_name, query_seq, alignments
 
 def read_sam_align_blocks(
         sam_path: str,
-        min_mapq: int = 30  # MAPQ 是通过比对得分和输入序列的错配情况计算的，值越高表示比对质量越好
-                            # MAPQ > 30: 比对质量相对可靠（唯一比对或高匹配度）。
-                            # MAPQ > 20: 允许某些中质量比对。
-                            # MAPQ = 0: 通常会被完全过滤掉，因为这些序列可能无法唯一比对
+        min_mapq: int = 30,  # minimum mapping quality
         ) -> t.Iterable[Block]:
     import pysam
     def yield_cond(old, rec, block, end=False):
@@ -36,7 +33,6 @@ def read_sam_align_blocks(
                 alns = []
             if aln[0] is not None:
                 alns.append(aln)
-            #print(aln)
             old = rec
         if (rec is not None) and yield_cond(old, rec, alns, end=True):
             yield old.query_name, old.query_sequence, alns
@@ -131,9 +127,6 @@ def cal_kmer_count(outdir: str,
                    kmer_len: int = 35,
                    threads: int = 10,
                 ) -> t.Dict[str, int]:
-    """
-    calculate kmer count for each sequence
-    """
     import numpy as np
     randomInt = np.random.randint(0, 1000000)
     temp_fasta = f"{outdir}/{target}_{kmer_len}_{randomInt}_temp.fa"
@@ -219,23 +212,17 @@ def cal_temp(seq: str): # Tm
 def cal_fold(seq: str): # RNA fold
     return -RNA.fold_compound(seq).mfe()[1]
 
-def cal_gc_content(seq: str): #target gc content
+def cal_gc_content(seq: str):
     return (seq.count('G') + seq.count('C')) / len(seq)
 
 def cal_target_fold_score(seq: str):
     if not seq or seq is None:
         return float('nan')
-    
-    # Replace any invalid characters with A (ViennaRNA only accepts AUGC)
-    # Convert T to U for RNA folding
     clean_seq = seq.upper().replace('T', 'U')
-    # Replace any other invalid characters with A
     valid_chars = set('AUGC')
     clean_seq = ''.join(c if c in valid_chars else 'A' for c in clean_seq)
-    
     if not clean_seq:
         return float('nan')
-    
     try:
         return -RNA.fold_compound(clean_seq).mfe()[1]
     except Exception as e:

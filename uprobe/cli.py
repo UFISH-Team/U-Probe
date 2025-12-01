@@ -1,21 +1,13 @@
 import sys
 from pathlib import Path
 import logging
+import click
 
-try:
-    import click
-except ImportError:
-    print("Error: click package is required. Install it with: pip install click")
-    sys.exit(1)
 
-try:
-    from .api import UProbeAPI
-    from .utils import get_logger
-    from . import __version__
-except ImportError as e:
-    print(f"Error: Failed to import U-Probe modules: {e}")
-    print("Please ensure U-Probe is properly installed: pip install -e .")
-    sys.exit(1)
+from .api import UProbeAPI
+from .utils import get_logger
+from . import __version__
+
 
 log = get_logger(__name__)
 

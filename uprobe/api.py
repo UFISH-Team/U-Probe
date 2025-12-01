@@ -36,7 +36,6 @@ class UProbeAPI:
             self.genome = self._validate_and_get_genome()
         else:
             self.genome = None
-        self._generate_pdf = False  
         self._generate_html = True 
         self._include_plots = True 
         self._embed_plots = True  

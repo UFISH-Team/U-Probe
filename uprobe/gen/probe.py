@@ -8,6 +8,7 @@ from collections import deque
 log = get_logger(__name__)
 
 class DAG():
+
     def __init__(self) -> None:
         self.nodes: T.List[Node] = []
 
@@ -22,7 +23,6 @@ class DAG():
         for node in self.nodes:
             if isinstance(node, ExprProbe):
                 node.parse_expr()
-        #import ipdb; ipdb.set_trace()
 
     def get_downstream_nodes(self, node: "Node") -> T.List["Node"]:
         downstream = []
@@ -41,7 +41,7 @@ class DAG():
         return [probe for probe in self.nodes if len(probe.deps) == 0]
 
     def run(self, context: dict):
-        """Run the DAG for a given context, building nodes in dependency order."""     
+        """Run the DAG for a given context."""     
         for node in self.nodes:
             node.done = False
         queue = deque(self.get_all_0_deps())     
@@ -69,14 +69,13 @@ class Node:
         self.config = config
         self.deps: T.List[Probe] = []
         self.done = False
-        self.result = None  # Store result in memory only
+        self.result = None 
 
     def build(self, context: dict):
         pass
 
 class Probe(Node):
     pass
-
 
 class ExprProbe(Probe):
     def __init__(self, dag: DAG, name: str, config: dict):
@@ -86,7 +85,6 @@ class ExprProbe(Probe):
         self.external_deps: T.List[str] = []
 
     def parse_expr(self):
-        """Parse the dependency from the expression"""
         deps = parse_expression(self.expr)
         for dep in deps:
             node = self.dag.get_node_by_name(dep)
@@ -125,9 +123,6 @@ class ExprProbe(Probe):
             #log.info(f"successfully built {self.name}")
         except Exception as e:
             log.error(f"error evaluating {self.name}: {e}")
-            log.error(f"expression evaluated: {modified_expr}")
-            log.error(f"evaluation context (locals): {{k: (v[:50] + '...' if isinstance(v, str) and len(v) > 50 else v) for k, v in eval_locals.items()}}") 
-            self.done = False
             raise
 
 class TemplateProbe(Probe):
@@ -160,7 +155,6 @@ class TemplateProbe(Probe):
         if not all(part.done for part in self.parts):
              missing_deps = [p.name for p in self.parts if not p.done]
              raise RuntimeError(f"cannot build {self.name}, missing dependencies: {missing_deps}")
-        
         part_results = {}
         for part in self.parts:
             part_name = part.name.split('.')[-1]
@@ -168,7 +162,6 @@ class TemplateProbe(Probe):
                 part_results[part_name] = part.result
             else:
                 raise RuntimeError(f"part {part.name} has no result in memory")
-        
         try:
             result = self.template.format(**part_results)
             self.result = result  # Store only in memory
@@ -183,18 +176,16 @@ class TemplateProbe(Probe):
             if part.name == item:
                 return part
 
-
 def construct_probes(config, contexts):
     """
-    Construct probes for each target context in memory.
+    Construct probes for each target context.
     """
     if not isinstance(contexts, list):
         context = contexts
         dag = DAG()
         dag.from_config(config)
         dag.run(context)
-        return pd.DataFrame()  # Return empty DataFrame for single context
-    
+        return pd.DataFrame() 
     probe_results = []
     for context in contexts:
         try:
@@ -208,7 +199,6 @@ def construct_probes(config, contexts):
                 else:
                     log.warning(f"node {node.name} not completed or result missing")
                     probe_data[node.name] = None
-            
             probe_results.append(probe_data)
         except Exception as e:
             log.error(f"error processing target {context}: {e}")
@@ -221,7 +211,6 @@ def construct_probes(config, contexts):
         probe_df = probe_df.fillna('')
     else:
         probe_df = pd.DataFrame()
-    
     return probe_df 
 
 
