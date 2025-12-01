@@ -1,6 +1,3 @@
-"""
-Command Line Interface for U-Probe.
-"""
 import sys
 from pathlib import Path
 import logging

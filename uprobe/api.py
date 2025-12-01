@@ -1,6 +1,3 @@
-"""
-API for U-Probe.
-"""
 import time
 import typing as T
 from pathlib import Path
@@ -69,8 +66,6 @@ class UProbeAPI:
                             direct_targets[name] = seq
                         else:
                             genome_targets.append(name)
-        
-        # Remove duplicates
         genome_targets = list(dict.fromkeys(genome_targets))
         return genome_targets, direct_targets
 
@@ -127,26 +122,20 @@ class UProbeAPI:
         new_targets.extend(valid_genome_targets)
         for name, seq in direct_targets.items():
             new_targets.append({name: seq})
-            
         self.protocol["targets"] = new_targets
-        
         if not new_targets:
             log.error("No valid targets remaining after validation.")
             if not continue_on_invalid:
                 raise ValueError("No valid targets remaining.")
             return False
-            
         log.info(f"Target validation successful. Valid: {len(valid_genome_targets)} genome targets, {len(direct_targets)} custom sequences.")
         return True
 
     def generate_target_seqs(self) -> pd.DataFrame:
         log.info("Generating target region sequences...")
         extract_params = self.protocol['extracts']['target_region']
-        
         genome_targets, direct_targets = self._parse_targets()
-        
         dfs = []
-        
         # 1. Process Genome Targets
         if genome_targets:
             log.info(f"Extracting {len(genome_targets)} targets from genome using source '{extract_params['source']}'...")
@@ -164,14 +153,12 @@ class UProbeAPI:
                 else:
                     log.warning("No sequences generated for genome targets.")
             except Exception as e:
-                log.error(f"Failed to generate sequences for genome targets: {e}")
-                
+                log.error(f"Failed to generate sequences for genome targets: {e}")  
         # 2. Process Direct Targets
         if direct_targets:
             log.info(f"Processing {len(direct_targets)} custom sequence targets...")
             min_length = extract_params['length']
             overlap = extract_params['overlap']
-            
             data_list = []
             for target_name, seq in direct_targets.items():
                 n = 1
@@ -187,6 +174,13 @@ class UProbeAPI:
             
             df_direct = pd.DataFrame(data_list, columns=['probe_id', 'target', 'sub_region','target_region'])
             if not df_direct.empty:
+                 df_direct['start'] = df_direct['sub_region'].apply(lambda x: int(x.split('-')[0]))
+                 df_direct['end'] = df_direct['sub_region'].apply(lambda x: int(x.split('-')[1]))
+                 # Add placeholders for genome-specific columns
+                 df_direct['transcript_names'] = 'custom'
+                 df_direct['n_trans'] = 1
+                 df_direct['exon_name'] = '.' 
+            if not df_direct.empty:
                 dfs.append(df_direct)
             else:
                 log.warning("No sequences generated from provided custom sequences (check length vs min_length).")
@@ -196,14 +190,13 @@ class UProbeAPI:
             return pd.DataFrame()
             
         df_final = pd.concat(dfs, ignore_index=True)
-        
-        # Unify 'gene' column to 'target' if present (some extractors return 'gene')
-        if 'gene' in df_final.columns:
-            if 'target' not in df_final.columns:
-                 df_final['target'] = df_final['gene']
-            else:
-                 df_final['target'] = df_final['target'].fillna(df_final['gene'])
-        
+        if 'sub_region' not in df_final.columns or df_final['sub_region'].isnull().any():
+            if 'start' in df_final.columns and 'end' in df_final.columns:
+                mask = df_final['sub_region'].isna()
+                df_final.loc[mask, 'sub_region'] = df_final.loc[mask].apply(
+                    lambda row: f"{int(row['start'])}-{int(row['end'])}" if pd.notnull(row['start']) else None, 
+                    axis=1
+                )
         log.info(f"Total generated target sequences: {len(df_final)}")
         return df_final
 
