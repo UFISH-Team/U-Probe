@@ -35,7 +35,7 @@ def read_gtf(
             chr_new.append(chr_)
         else:
             #chr_new.append(f'chr{chr_}')
-            chr_new.append(f'{chr_}')
+            chr_new.append(f'chr{chr_}')
     df.chr = chr_new
     return df
 
@@ -107,7 +107,7 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
             chr_, start, end, strand, trans_name = str(row['chr']), row['start'], row['end'], row['strand'], row['transcript_name']
             exon_name = '_'.join([chr_, str(start), str(end), strand])
             n_trans = row['count']
-            chr_ = chr_.replace('chr', '')
+            #chr_ = chr_.replace('chr', '')
             seq = fa[chr_][start:end].seq.upper()
             if strand == '-':
                 seq = reverse_complement(seq)
