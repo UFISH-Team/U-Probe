@@ -264,7 +264,7 @@ def _get_summary_section(df: pd.DataFrame, protocol: Dict[str, Any], plot_data: 
             content.append('<div class="table-container" style="max-width: 500px; margin-left: 0;">')
             count_df = target_counts.reset_index()
             count_df.columns = ['Target', 'Probe Number']
-            content.append(count_df.to_html(index=False, classes='table table-striped', border=0))
+            content.append(count_df.to_html(index=True, classes='table table-striped', border=0))
             content.append('</div>')
     
     summary_config = protocol.get('summary', {})
@@ -289,7 +289,7 @@ def _get_summary_section(df: pd.DataFrame, protocol: Dict[str, Any], plot_data: 
             # Convert column names to lowercase
             stats_df_display = _prepare_df_for_display(stats_df)
             content.append('<div class="table-container">')
-            content.append(stats_df_display.to_html(index=False, classes='table table-striped', border=0))
+            content.append(stats_df_display.to_html(index=True, classes='table table-striped', border=0))
             content.append('</div>')
         else:
             # Overall stats
@@ -383,7 +383,7 @@ def _get_details_section(df: pd.DataFrame) -> str:
     
     content.append('<div class="table-container">')
     preview_df_display = _prepare_df_for_display(preview_df)
-    content.append(preview_df_display.to_html(index=False, classes='table table-striped', border=0))
+    content.append(preview_df_display.to_html(index=True, classes='table table-striped', border=0))
     content.append('</div>')
     if total_rows > 5:
         content.append(f'<p style="text-align: center; color: #7f8c8d; font-style: italic;">... and {total_rows - 5} more rows</p>')
@@ -443,7 +443,6 @@ def save_html_report(
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
-        logger.info(f"HTML report saved to: {output_path}")
         return output_path
     except Exception as e:
         logger.error(f"Error generating HTML report: {e}")
