@@ -1,351 +1,199 @@
 import asyncio
 import os
-import re
-from rich.console import Console
+import sys
 from pathlib import Path
+from typing import Dict, List, Optional, Union
+import loguru
+import os.path as osp
 import yaml
-from typing import Optional, Dict, Any, List, Union
+from rich.console import Console
 
 from pantheon.agent import Agent
 from pantheon.toolset import ToolSet, tool
+from pantheon.team.aat import AgentAsToolTeam
+from pantheon.toolsets.python import PythonInterpreterToolSet
+from pantheon.toolsets.file_manager import FileManagerToolSet
+from pantheon.toolsets.scraper import ScraperToolSet  
+from pantheon.toolsets.shell import ShellToolSet     
 from pantheon.utils.display import print_agent_message
 
-from uprobe.api import UProbeAPI
-from uprobe.gen.barcodes import quick_generate
+from uprobe.agent.probeset import UProbeToolSet
 
 os.environ["http_proxy"] = "http://localhost:7890"
 os.environ["https_proxy"] = "http://localhost:7890"
 
-instructions = """
-You are U-Probe Agent, an expert and friendly agent specializing in designing probes. Your goal is to guide users through a sophisticated, step-by-step process to define potentially complex and nested probe structures without needing to write YAML.
+# --- Configuration ---
+WORK_DIR = Path("/home/qzhang/new/U-Probe/tests/workdir")
+OUTPUT_DIR = WORK_DIR / "output"
+GENOMES_CONFIG_PATH = Path("/home/qzhang/new/U-Probe/tests/data/genomes.yaml")
+WORK_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-**Phase 1: Initial Interaction & Core Information**
-1.  Do NOT introduce yourself proactively. Only introduce who you are if the user explicitly asks about your identity (e.g., "who are you?", "who is the assistant?").
-2.  If the user asks for help designing probes, initiate the workflow. First, ask for the most essential information:
-    *   **Gene names** (e.g., `SOX2`, `POU5F1`)
-    *   **Target species** (e.g., `human`, `mouse`)
-3.  Wait for the user to provide this information before proceeding.
+async def main(workdir: str, prompt: str | None = None, log_level: str = "WARNING"):
+    loguru.logger.remove()
+    loguru.logger.add(sys.stdout, level=log_level)
+    workpath = osp.abspath(workdir)
 
-**Phase 2: Probe Structure Definition**
+    # ==============================================================================
+    # Leader
+    # ==============================================================================
+    LEADER_INSTRUCTIONS = """
+    You are the leader agent for the U-Probe System.
 
-**Step 2.1: Choose Design Mode**
-- After gathering core info, you must ask the user to explicitly choose between a guided mode and an advanced mode.
-- Example Question: "Next, how would you like to define the probe's structure?
-  A) **Guided Mode**: I'll ask you a series of questions to build the design step-by-step. (Recommended for new users)
-  B) **Advanced Mode**: You can provide the complete `probes` configuration directly in YAML or a similar format."
+    ### Capabilities
+    - You can manage a `Panel_Designer` (Analyst/Researcher) and `Probe_Designer` (Builder).
+    - You can also check files in the workdir.
 
-**Step 2.2: Execute Design Mode**
-- **If the user chooses Advanced Mode (B)**:
-  - Ask the user to provide the full `probes` structure.
-  - You will treat their input as the `probes_yaml`.
-  - **Crucially, this only completes the structure definition. You MUST still proceed to Phase 3 to gather the remaining essential information (like barcode and extraction settings) before you can call the tool.**
-- **If the user chooses Guided Mode (A)**:
-  - You must proceed with the step-by-step guided construction below.
+    ### Workflow
+    1.  Understand Goal: Does the user have data? Or just a biological question?
+    2.  Research/Analyze: 
+        - If user has data -> ask `Panel_Designer` to analyze it.
+        - If user has NO data (e.g., "Design a panel for Lung Cancer") -> ask `Panel_Designer` to **search the web** and propose a gene list based on literature.
+    3.  Validate: Ask user to confirm the gene list.
+    4.  Execute: Command `Probe_Designer` to design the probes.
+        - CRITICAL: When asking `Probe_Designer`, you MUST provide information:
+            - Species (Genome)
+            - Target List (Genes or Regions, optional sequence input)
+            - Type of Probe (DNA or RNA). This helps them generate the correct YAML.
+            - Probes constructions. Expected to yaml format.
+            - Any other information that is needed to design the probes(attributes, post_process, etc).
+    """
 
-**Step 2.3: Guided Construction**
-- First, ask for the number of distinct probe units (e.g., 1 for a single probe, 2 for a pair).
-- For each probe unit, ask for its **template** using symbolic names (e.g., `{part1}`) and fixed sequences.
-- From the template, identify all symbolic parts. For each part, recursively ask for its definition (source, slicing, rc, etc.) until all parts are fully defined.
+    leader = Agent(
+        name="Leader",
+        model="gpt-5",
+        instructions=LEADER_INSTRUCTIONS
+    )
 
-**Phase 3: Review and Finalization**
+    await leader.toolset(FileManagerToolSet("file_manager", path=workpath))
 
-**Step 3.1: Structure Visualization and Confirmation (MANDATORY)**
-- After the structure is obtained (either from Advanced or Guided mode), you MUST generate a summary of it using a clear, structured Markdown table.
-- This summary must show the hierarchy of probes, parts, templates, and their final definitions.
-- You must present this to the user and ask: "**Does this structure look correct?**"
-- **You must wait for the user's explicit confirmation before moving to the next step.**
+    # ==============================================================================
+    # Panel Designer
+    # ==============================================================================
+    PANEL_DESIGNER_INSTRUCTIONS = """
+    You are an analysis expert in Single-Cell and Spatial Omics data analysis.
+    You will receive the instruction from the leader agent for different kinds of analysis tasks.
 
-**Step 3.2: Barcode Generation**
-- After confirmation, if any barcodes were included in the design, ask the user if they want to provide the sequences or auto-generate them.
+    ### Capabilities
+    - You can analyze the data using PythonInterpreterToolSet.
+    - You can search the web using ScraperToolSet.
+    - You can manage files using FileManagerToolSet.
 
-**Step 3.3: Other Customizations**
-- Ask about **Extraction Settings**.
+    # Workflow
+    Here is some typical workflows you should follow for some specific analysis tasks.
 
-**Step 3.4: Execution**
-- Once all information is gathered and confirmed, synthesize the complete `probes_yaml`.
-- **YAML Syntax Rule:** When synthesizing the `probes_yaml` string, you must ensure it is valid YAML. Specifically, if an `expr` value contains single quotes (e.g., `encoding[target]['BC1']`), the entire string for that value MUST be enclosed in double quotes. For example: `expr: "encoding[target]['BC1']"`. This is critical for preventing parsing errors.
-- Call the `design_probe` tool with all arguments.
+    ## Workflow for dataset understanding:
+    When you get a dataset, you should first check the dataset structure and the metadata by running some python code.
+    For single-cell and spatial data:
 
-**Phase 4: Results Interpretation and Recommendation**
-- After the `design_probe` tool returns a result, you must interpret it for the user.
-- If the tool call was successful AND it was for an RNA probe design (meaning the `source` in `extracts` was something other than `'genome'`):
-  - You must analyze the CSV data provided in the successful result message.
-  - Based on this data, you must provide a recommendation for the "best" probe candidate.
-  - Your recommendation should be based on finding a probe with a good balance of properties. A good RNA probe is generally one with low off-target binding potential (low `mappedGenes`), low probability of forming secondary structures (low `foldScore`), and good binding affinity (a reasonably high `tm`).
-  - Example of a recommendation statement: "The probe design was successful. Based on the results, I recommend `[Probe_ID_Here]` as the best candidate, as it shows the lowest potential for off-target binding and a strong predicted binding affinity."
+    1. Understand the basic structure, get the basic information, including:
+    - File format: h5ad, mtx, loom, spatialdata, ...etc
+    - The number of cell/gene
+    - The number of batch/condition ...
+    - If the dataset is a spatial data / multi-modal data or not
+    - Whether the dataset is already processed or not
+    + If yes, what analysis has been performed, for example, PCA, UMAP, clustering, ...etc
+    + If yes, the value in the expression matrix is already normalized or not
+    - The .obs, .var, .obsm, .uns ... in adata or other equivalent variables in other data formats,
+    Try to understand the meaning of each column, and variables by printing the head of the dataframe.
 
-**General Conversation**
-- If the user's request is not about designing probes, do not start the workflow. Instead, engage in a helpful, normal conversation. Only provide a self-introduction when explicitly asked about your identity.
-"""
+    2. Understand the data quality, and perform the basic preprocessing:
+    Check the data quality by running some python code, try to produce some figures to check:
+    + The distribution of the total UMI count per cell, gene number detected per cell.
+    + The percentage of Mitochondrial genes per cell.
+    + ...
+    Based on the figures, and the structure of the dataset,
+    If the dataset is not already processed, you should perform the basic preprocessing:
+    + Filtering out cells with low UMI count, low gene number, high mitochondrial genes percentage, ...etc
+    + Normalization: log1p, scale, ...etc
+    + Dimensionality reduction: PCA, UMAP, ...etc
+    + If the dataset contain different batches:
+        - Plot the UMAP of different batches, and observe the differences to see whether there are any batch effects.
+        - If there are batch effects, try to use the `harmonypy` package to perform the batch correction.
+    + Clustering:
+    - Do leiden clustering with different resolutions and draw the UMAP for each resolution
+    - observe the umaps, and decide the best resolution
+    + Marker gene identification:
+    - Identify the differentially expressed genes between different clusters
+    + Cell type annotation:
+    - Based on the DEGs for each cluster, guess the cell type of each cluster,
+        and generate a table for the cell type annotation, including the cell type, confidence score, and the reason.
+    - If the dataset is a spatial data, try also combine the spatial distribution of the cells to help with the cell type annotation.
+    - Draw the cell type labels on the umap plot.
+    + Check marker gene specificity:
+    - Draw dotplot/heatmap
+    - Observe the figure, and summarize whether the marker gene is specific to the cell type.
 
-# Configuration
-GENOMES_CONFIG_PATH = Path("/home/qzhang/U-Probe/tests/data/genomes.yaml")
-OUTPUT_DIR = Path("uprobe_agent_output")
+    3. Understand different condition / samples
+    + If the dataset contains different condition / samples,
+    you should perform the analysis for each condition / sample separately.
+    + Then you should produce the figures for comparison between different condition / samples.
+    For example, a dataset contains 3 timepoints, you should produce:
+    - UMAP of different timepoints
+    - Barplot showing the number of cells in each timepoint
+    - ...
+    """
+    panel_designer = Agent(
+        name="Panel Designer",
+        model="gpt-5",
+        instructions=PANEL_DESIGNER_INSTRUCTIONS
+    )
 
-# A default protocol configuration that can be updated dynamically
-DEFAULT_PROTOCOL = {
-    "name": "",
-    "description": "Protocol for designing probes with U-Probe Agent",
-    "genome": "",  # This will be updated by the agent
-    "extracts": {
-        "target_region": {
-            "source": "",
-            "length": int,
-            "overlap": int,
-        }
-    },
-    "targets": [],  # This will be filled by the agent
-    "encoding": {},  # This will be filled by the agent
-    "probes": {
-    },
-    "attributes": {},  # This will be filled by the agent
-    "post_process": {
-        "filters": {}
-    },
-    "summary": {
-        "report_name": "rna_report", # or dna_report
-        "attributes": ['']
-    }
-}
+    await panel_designer.toolset(PythonInterpreterToolSet("python"))
+    await panel_designer.toolset(ShellToolSet("shell"))
+    await panel_designer.toolset(ScraperToolSet("scraper"))
+    await panel_designer.toolset(FileManagerToolSet("file_manager", path=workpath))
 
+    # ==============================================================================
+    # Probe Designer
+    # ==============================================================================
+    PROBE_DESIGNER_INSTRUCTIONS = """
+    You are an expert in probe design for all kinds of FISH probe design tasks.
+    You will receive the instruction from the leader agent for different kinds of probe design tasks.
+    Here is the typical workflow you should follow for probe design tasks.
 
-class UProbeToolSet(ToolSet):
-    @tool
-    async def design_probe(self, 
-                           gene_names: List[str], 
-                           species: str, 
-                           encoding: Optional[Dict[str, Dict[str, str]]] = None, 
-                           barcode_length: Optional[int] = None, 
-                           extracts: Optional[Dict[str, Union[str, int, float]]] = None,
-                           probes_yaml: Optional[str] = None):
-        """
-        Designs probes for a list of target genes in a specific species, with optional customizations.
-        
-        Args:
-            gene_names: A list of gene names to design probes for.
-            species: The name of the target species (e.g., 'human', 'mouse').
-            encoding: An optional dictionary specifying barcodes for each gene. e.g. {"gene1": {"BC1": "ACTG"}, "gene2": {"BC1": "GTCA"}}
-            barcode_length: If encoding is not provided, specify a length to auto-generate barcodes.
-            extracts: An optional dictionary to customize extraction parameters.
+    ### Workflow for probe design:
+    1. extract the information from the goal:
+     - get the species or genome, it corresponds to the genomes.yaml file. Such as hg19, mouse
+     - target list, it can be a list of genes(RNA) or regions(DNA), or a sequence.
+     - type of probe, it can be DNA or RNA.
+     - extracts: An dictionary to customize extraction parameters.
                       For example: {"source": "genome", "length": 80, "overlap": 10}.
                       'source' can be one of ['genome', 'exon', 'CDS', 'UTR'].
-            probes_yaml: An optional YAML string to define a custom probe structure.
-        """
-        print(f"Starting probe design for genes {gene_names} in species {species}.")
-        
-        try:
-            # Create a protocol for this specific run
-            run_protocol = DEFAULT_PROTOCOL.copy()
-            run_protocol["targets"] = gene_names
-            run_protocol["genome"] = species
-            run_protocol["name"] = f"{'_'.join(gene_names)}_{species}_probes"
+        if source is 'genome', the probe type is DNA, otherwise it is RNA.
+     - probes constructions. Expected to yaml format.
+     - attributes, optional. It is the attributes of the probes, such as gc content, melting temperature, etc.
+     - post_process, optional. It is the post_process of the probes, such as filter the probes based on the attributes.
+     - summary, optional. It is the summary of the probes, such as the report name, the attributes to report.
+    2. design the probes:
+    - call the `design_probe` tool to design the probes.
+    - the `design_probe` tool will return html report (contain csv data) and the probes yaml file.
+    """
+    probe_designer = Agent(
+        name="Probe Designer",
+        model="gpt-5",
+        instructions=PROBE_DESIGNER_INSTRUCTIONS
+    )
 
-            # Dynamically set the report name based on the extract source
-            if extracts and extracts.get('source') == 'genome':
-                run_protocol['summary']['report_name'] = 'dna_report'
-            else:
-                run_protocol['summary']['report_name'] = 'rna_report'
+    await probe_designer.toolset(UProbeToolSet("design_probe"))
+    await probe_designer.toolset(FileManagerToolSet("file_manager", path=workpath))
 
-            # Handle custom probe structure from YAML
-            if probes_yaml:
-                try:
-                    custom_probes = yaml.safe_load(probes_yaml)
-                    if 'probes' in custom_probes:
-                        run_protocol['probes'] = custom_probes['probes']
-                        print("Using custom probe structure from user input.")
-                    else:
-                        return {"success": False, "message": "YAML for probe structure is missing the root 'probes' key."}
-                except yaml.YAMLError as e:
-                    return {"success": False, "message": f"Error parsing probes_yaml: {e}"}
-
-            # Dynamically generate attributes based on probe type (DNA/RNA)
-            if 'probes' in run_protocol:
-                is_dna_probe = extracts and extracts.get('source') == 'genome'
-                
-                if is_dna_probe:
-                    # DNA-specific attributes
-                    attributes_to_calc = {
-                        "gcContent": "gc_content", "tm": "annealing_temperature",
-                        "selfMatch": "self_match", "foldScore": "fold_score",
-                        "mappedSites": "mapped_sites", "kmerCount": "kmer_count"
-                    }
-                else:
-                    # RNA-specific attributes
-                    attributes_to_calc = {
-                        "gcContent": "gc_content", "tm": "annealing_temperature",
-                        "selfMatch": "self_match", "foldScore": "fold_score",
-                        "mappedGenes": "n_mapped_genes"
-                    }
-                
-                new_attributes = {}
-                summary_attributes = []
-
-                for probe_name, probe_details in run_protocol['probes'].items():
-                    if 'parts' in probe_details:
-                        for part_name, part_details in probe_details['parts'].items():
-                            if 'expr' in part_details and 'target_region' in part_details['expr']:
-                                for attr_suffix, attr_type in attributes_to_calc.items():
-                                    attr_name = f"{probe_name}_{part_name}_{attr_suffix}"
-                                    new_attributes[attr_name] = {
-                                        'target': f"{probe_name}.{part_name}",
-                                        'type': attr_type
-                                    }
-                                    # For DNA kmerCount, add some defaults if not present
-                                    if is_dna_probe and attr_type == "kmer_count":
-                                        new_attributes[attr_name].update({'kmer_len': 35, 'threads': 10, 'size': '1G', 'aligner': 'jellyfish'})
-                                    # For DNA mappedSites, add some defaults if not present
-                                    if is_dna_probe and attr_type == "mapped_sites":
-                                         new_attributes[attr_name].update({'aligner': 'bowtie2'})
-                                    # For RNA mappedGenes, add some defaults if not present
-                                    if not is_dna_probe and attr_type == "n_mapped_genes":
-                                         new_attributes[attr_name].update({'aligner': 'bowtie2', 'min_mapq': 30})
-                                    summary_attributes.append(attr_name)
-                
-                run_protocol['attributes'] = new_attributes
-                run_protocol['summary']['attributes'] = list(set(summary_attributes)) # Ensure unique
-                print(f"Dynamically generated {len(new_attributes)} attributes for {'DNA' if is_dna_probe else 'RNA'} probe type.")
-
-            # Handle custom extracts
-            if extracts:
-                valid_sources = ['genome', 'exon', 'CDS', 'UTR']
-                if 'source' in extracts and extracts['source'] not in valid_sources:
-                    return {"success": False, "message": f"Invalid extracts source: '{extracts['source']}'. Must be one of {valid_sources}."}
-                run_protocol['extracts']['target_region'].update(extracts)
-
-            # Handle encoding
-            if encoding:
-                run_protocol['encoding'] = encoding
-                print("Using user-provided encoding.")
-            elif barcode_length and probes_yaml:
-                # Dynamically find all unique barcode names (e.g., BC1, BC2) from the probes_yaml
-                barcode_names = sorted(list(set(re.findall(r"encoding\[target\]\['(.*?)'\]", probes_yaml))))
-
-                if not barcode_names:
-                    print("Barcode length was provided, but no barcode expressions (e.g., \"encoding[target]['BC1']\") were found in the probe structure. No barcodes generated.")
-                else:
-                    print(f"Found barcode names in probe structure: {barcode_names}. Generating barcodes of length {barcode_length}.")
-                    num_barcodes_to_generate = len(gene_names) * len(barcode_names)
-                    all_barcodes = quick_generate(num_barcodes_to_generate, barcode_length)
-
-                    if len(all_barcodes) < num_barcodes_to_generate:
-                        return {"success": False, "message": f"Failed to generate enough unique barcodes. Requested {num_barcodes_to_generate}, got {len(all_barcodes)}."}
-
-                    barcode_iterator = iter(all_barcodes)
-                    generated_encoding = {}
-                    for gene in gene_names:
-                        generated_encoding[gene] = {
-                            bc_name: next(barcode_iterator) for bc_name in barcode_names
-                        }
-                    
-                    run_protocol['encoding'] = generated_encoding
-                    print("Successfully generated and assigned dynamic barcodes.")
-            elif barcode_length:
-                print("Warning: `barcode_length` was provided, but no `probes_yaml` was given to parse for barcode names. No barcodes were generated.")
-
-            # Ensure output directory exists
-            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-            # Initialize U-Probe API
-            uprobe = UProbeAPI(
-                protocol_config=run_protocol,
-                genomes_config=GENOMES_CONFIG_PATH,
-                output_dir=OUTPUT_DIR
-            )
-
-            # Run the workflow
-            result_df = await asyncio.to_thread(
-                uprobe.run_workflow,
-                continue_on_invalid_targets=True
-            )
-
-            if not result_df.empty:
-                csv_output = ""
-                # Try to find and read the output CSV file to display to the user
-                if hasattr(uprobe, '_csv_filename') and uprobe._csv_filename:
-                    csv_path = OUTPUT_DIR / uprobe._csv_filename
-                    if csv_path.is_file():
-                        try:
-                            csv_content = csv_path.read_text(encoding="utf-8", errors="replace")
-                            csv_output = f"Here are the results:\n\n```csv\n{csv_content}```\n\n"
-                        except Exception as e:
-                            csv_output = f"Could not read the result file: {e}\n"
-
-                # Build convenient links to CSV and HTML report for frontend
-                csv_url = ""
-                if hasattr(uprobe, '_csv_filename') and uprobe._csv_filename:
-                    csv_url = f"/agent/files/{uprobe._csv_filename}"
-
-                html_url = ""
-                try:
-                    # Find the most recent HTML report for this run
-                    pattern_prefix = run_protocol.get("name", "probes") + "_report_"
-                    html_candidates = sorted(
-                        [p for p in OUTPUT_DIR.glob("*.html") if p.name.startswith(pattern_prefix)],
-                        key=lambda p: p.stat().st_mtime,
-                        reverse=True
-                    )
-                    if html_candidates:
-                        html_url = f"/agent/files/{html_candidates[0].name}"
-                except Exception:
-                    pass
-
-                links_text = ""
-                if html_url or csv_url:
-                    links_text = "\n" + (f"Open HTML report: {html_url}\n" if html_url else "") + (f"Download CSV: {csv_url}\n" if csv_url else "")
-
-                message = f"Successfully designed {len(result_df)} probes. {csv_output}The full results are available.{links_text}"
-                return {"success": True, "message": message, "output_dir": str(OUTPUT_DIR)}
-            else:
-                message = "Workflow completed, but no probes were generated. This could be due to invalid targets or strict filters."
-                return {"success": False, "message": message}
-
-        except FileNotFoundError as e:
-            error_message = f"Configuration file not found: {e}. Please ensure '{GENOMES_CONFIG_PATH}' exists."
-            print(error_message)
-            return {"success": False, "message": error_message}
-        except ValueError as e:
-            error_message = f"A value error occurred: {e}. This might be due to an invalid species name or target."
-            print(error_message)
-            return {"success": False, "message": error_message}
-        except Exception as e:
-            error_message = f"An unexpected error occurred during the probe design workflow: {e}"
-            print(error_message)
-            return {"success": False, "message": error_message}
-
-
-agent = Agent(
-    name="U-Probe Agent",
-    model="gpt-5",
-    instructions=instructions,
-)
-
-
-async def main():
-    uprobe_toolset = UProbeToolSet("u-probe")
-    await agent.toolset(uprobe_toolset)
+    # ==============================================================================
+    # Team
+    # ==============================================================================
+    team = AgentAsToolTeam(leader, [panel_designer, probe_designer])
 
     console = Console()
 
-    def print_step_message(message):
-        print_agent_message(agent.name, message, console=console)
+    if prompt is None:
+        prompt_path = osp.join(workpath, "prompt.md")
+        try:
+            with open(prompt_path, "r") as f:
+                prompt = f.read()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
 
-    # --- Start an interactive conversation ---
-    console.print("\n[bold yellow]--- Starting interactive session with U-Probe Agent ---[/bold yellow]")
-    console.print("Say 'quit' or 'exit' to end the conversation.")
-    
-    # Do not auto-introduce; wait for user input in CLI mode
-
-    while True:
-        user_message = console.input("\n[bold green]User:[/bold green] ")
-        if user_message.lower() in ["quit", "exit"]:
-            console.print("[bold yellow]Ending conversation.[/bold yellow]")
-            break
-            
-        if not user_message.strip():
-            continue
-
-        await agent.run(user_message, process_step_message=print_step_message)
-
-
+    await team.run(prompt)
+  
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(workdir=WORK_DIR, prompt=None, log_level="WARNING"))
