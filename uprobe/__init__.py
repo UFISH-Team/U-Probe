@@ -1,7 +1,26 @@
-from .api import UProbeAPI
+"""
+U-Probe package.
 
-__version__ = '1.0.0'
+Note:
+This package exposes `UProbeAPI`, but we avoid importing it eagerly to keep
+lightweight entry points (e.g. `python -m uprobe.agent.repl_bootstrap`) working
+even in environments where optional runtime dependencies are not installed yet.
+"""
 
-__all__ = [
-    "UProbeAPI"
-]
+from __future__ import annotations
+
+from typing import Any
+
+__version__ = "1.0.0"
+
+__all__ = ["UProbeAPI"]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy attribute access for optional heavy imports."""
+    if name == "UProbeAPI":
+        from .api import UProbeAPI  # Local import to avoid import-time deps
+
+        return UProbeAPI
+    raise AttributeError(f"module 'uprobe' has no attribute {name!r}")
+

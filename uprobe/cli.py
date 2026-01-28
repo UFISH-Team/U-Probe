@@ -2,6 +2,8 @@ import sys
 from pathlib import Path
 import logging
 import click
+import yaml
+import copy
 
 
 from .api import UProbeAPI
@@ -10,6 +12,118 @@ from . import __version__
 
 
 log = get_logger(__name__)
+
+
+def _validate_and_normalize_protocol(protocol_config: dict) -> dict:
+    """
+    Validate protocol configuration and inject defaults for optional fields.
+    """
+    # 1. Check required top-level keys
+    required_keys = ['genome', 'targets', 'extracts', 'encoding', 'probes']
+    missing_keys = [k for k in required_keys if k not in protocol_config]
+    if missing_keys:
+        raise ValueError(f"Protocol is missing required keys: {', '.join(missing_keys)}")
+    
+    # Check extracts.target_region
+    if 'target_region' not in protocol_config.get('extracts', {}):
+        raise ValueError("Protocol must define 'extracts.target_region'")
+    
+    # 2. Determine mode (DNA vs RNA)
+    # If source is 'genome', we treat it as DNA mode (like DNA_format.yaml)
+    # Otherwise (exon, CDS, UTR), we treat it as RNA mode (like RNA_format.yaml)
+    source = protocol_config['extracts']['target_region'].get('source', 'genome')
+    is_dna_mode = (source == 'genome')
+    
+    # 3. Auto-complete attributes if missing
+    if 'attributes' not in protocol_config or not protocol_config['attributes']:
+        log.info(f"Attributes missing or empty. Auto-generating defaults for mode: {'DNA' if is_dna_mode else 'RNA'}")
+        attributes = {}
+        
+        # Common attributes for target_region
+        attributes['target_gc'] = {
+            'target': 'target_region',
+            'type': 'gc_content'
+        }
+        attributes['target_tm'] = {
+            'target': 'target_region',
+            'type': 'annealing_temperature'
+        }
+        attributes['target_fold'] = {
+            'target': 'target_region',
+            'type': 'fold_score'
+        }
+        attributes['target_self_match'] = {
+            'target': 'target_region',
+            'type': 'self_match'
+        }
+        
+        if is_dna_mode:
+            # DNA specific defaults
+            attributes['target_mapped_sites'] = {
+                'target': 'target_region',
+                'type': 'mapped_sites',
+                'aligner': 'bowtie2'
+            }
+            attributes['target_kmer_count'] = {
+                'target': 'target_region',
+                'type': 'kmer_count',
+                'kmer_len': 35,
+                'threads': 10,
+                'size': '1G',
+                'aligner': 'jellyfish'
+            }
+        else:
+            # RNA specific defaults
+            attributes['target_mapped_genes'] = {
+                'target': 'target_region',
+                'type': 'n_mapped_genes',
+                'aligner': 'bowtie2',
+                'min_mapq': 30
+            }
+            
+        protocol_config['attributes'] = attributes
+        
+    # 4. Auto-complete post_process if missing
+    if 'post_process' not in protocol_config or not protocol_config['post_process']:
+        log.info("Post-process configuration missing or empty. Auto-generating defaults.")
+        post_process = {
+            'filters': {},
+            'sorts': {
+                'is_ascending': [],
+                'is_descending': []
+            }
+        }
+        
+        # Default Filters
+        post_process['filters']['target_gc'] = {
+            'condition': 'target_gc >= 20 & target_gc <= 80'
+        }
+        post_process['filters']['target_tm'] = {
+            'condition': 'target_tm >= 50 & target_tm <= 90'
+        }
+        
+        # Mode specific filters
+        if is_dna_mode:
+             post_process['filters']['target_kmer_count'] = {
+                'condition': 'target_kmer_count <= 100'
+            }
+        else:
+             post_process['filters']['target_mapped_genes'] = {
+                'condition': 'target_mapped_genes <= 10'
+            }
+            
+        # Default Sorts
+        post_process['sorts']['is_ascending'].extend(['target_gc', 'target_tm'])
+        post_process['sorts']['is_descending'].extend(['target_fold', 'target_self_match'])
+        
+        if is_dna_mode:
+             post_process['sorts']['is_descending'].append('target_kmer_count')
+        else:
+             post_process['sorts']['is_descending'].append('target_mapped_genes')
+             
+        protocol_config['post_process'] = post_process
+        
+    return protocol_config
 
 
 @click.group()
@@ -54,8 +168,20 @@ def run(protocol, genomes, output, raw, continue_invalid, threads):
     """
     try:
         log.info("Starting U-Probe complete workflow...")
+        
+        # Load and validate protocol
+        protocol_path = Path(protocol)
+        with open(protocol_path, 'r', encoding='utf-8') as f:
+            protocol_config = yaml.safe_load(f) or {}
+            
+        if not isinstance(protocol_config, dict):
+            raise ValueError("Protocol YAML must be a mapping (dict)")
+            
+        # Normalize protocol (inject defaults)
+        protocol_config = _validate_and_normalize_protocol(protocol_config)
+        
         uprobe = UProbeAPI(
-            protocol_config=Path(protocol),
+            protocol_config=protocol_config,
             genomes_config=Path(genomes),
             output_dir=Path(output)
         )

@@ -4,7 +4,9 @@ __pycache__/
 *$py.class
 **/*.env
 **/team_instructions
-**/workdir
+**/test_workdir
+**/pantheon
+
 
 # C extensions
 *.so

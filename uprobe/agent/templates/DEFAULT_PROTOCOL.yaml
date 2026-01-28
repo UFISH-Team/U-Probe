@@ -1,0 +1,55 @@
+name: # protocol name
+
+description: Protocol for designing probe type xxx from species xxx
+
+genome:   # genome name
+
+extracts:
+  target_region:
+    source:   # genome | exon | CDS | UTR
+    length:   # int
+    overlap:   # int
+
+targets:
+  - xxx1: # chr:start-end | gene_name | name: string
+  - xxx2: # chr:start-end | gene_name | name: string
+
+encoding:
+  xxx1:
+    BC1: xxx
+    BC2: xxx
+  xxx2:
+    BC1: xxx
+    BC2: xxx
+
+probes:
+
+# NOTE:
+# - `attributes` and `post_process` can be omitted.
+# - If they are missing or empty, the CLI will auto-generate defaults
+#   based on DNA (source=genome) vs RNA (source=exon/CDS/UTR) mode.
+attributes:
+
+
+post_process:
+  filters:
+
+  # clean
+  avoid_otp:
+
+  # equal_space
+  equal_space:
+
+  # remove overlap
+  remove_overlap:
+    location_interval: 0
+
+  sorts:
+
+
+
+summary:
+  report_name: dna_report  # template name  # class: template1 or template2
+  attributes:
+
+

@@ -4,6 +4,8 @@ import os
 from os.path import exists
 import typing as t
 from pyfaidx import Fasta
+import shutil
+import subprocess
 
 def get_logger(name):
     log = logging.getLogger(name)
@@ -109,6 +111,51 @@ def gene_barcode(config: dict) -> dict:
                 barcode_values.append(barcode_value)
             gene_barcode_dict[target] = tuple(barcode_values)
     return gene_barcode_dict
+
+def check_and_install_tools(tools_list: t.List[str]) -> None:
+    """
+    Check if tools are available in PATH. If not, try to install via conda.
+    """
+    missing_tools = []
+    for tool in tools_list:
+        if not shutil.which(tool):
+            missing_tools.append(tool)
+    
+    if not missing_tools:
+        return
+
+    log = get_logger(__name__)
+    log.info(f"Missing tools: {', '.join(missing_tools)}. Attempting auto-installation via conda...")
+    
+    # Try installing all missing tools at once
+    # Mapping tool names to package names if they differ
+    # bowtie2 -> bowtie2
+    # jellyfish -> jellyfish
+    # blast -> blast
+    # mmseqs -> mmseqs2
+    package_map = {
+        'mmseqs': 'mmseqs2'
+    }
+    
+    packages = [package_map.get(tool, tool) for tool in missing_tools]
+    
+    cmd = ["conda", "install", "-y", "-c", "bioconda"] + packages
+    
+    try:
+        # Check if conda is available
+        if not shutil.which("conda"):
+            raise EnvironmentError("Conda is not available in PATH. Cannot auto-install tools.")
+            
+        log.info(f"Running command: {' '.join(cmd)}")
+        subprocess.check_call(cmd)
+        log.info("Tools installed successfully.")
+    except subprocess.CalledProcessError as e:
+        log.error(f"Failed to install tools via conda: {e}")
+        log.error("Please install the following tools manually: " + ", ".join(missing_tools))
+        sys.exit(1)
+    except Exception as e:
+        log.error(f"Error during tool installation: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     fasta_path = "/data/zhangqian/genomes/hg38/hg38.fa"

@@ -54,6 +54,25 @@ pip install .
 
 U-Probe provides two ways to use: Command Line Interface (CLI) and Python API.
 
+### Pantheon REPL (interactive multi-agent)
+
+If you want to use Pantheon directly (without the current U-Probe CLI and without
+`uprobe.agent.api.UProbeAgentAPI`), you can bootstrap a workspace and start the
+REPL with the U-Probe team loaded by default:
+
+```bash
+# Run in any work directory (this will install the team template into .pantheon/)
+python -m uprobe.agent.repl_bootstrap
+```
+
+This will copy the team template to:
+
+- `<workdir>/.pantheon/teams/uprobe_team.md`
+
+And then launch:
+
+- `python -m pantheon.repl --template <workdir>/.pantheon/teams/uprobe_team.md`
+
 ### Configuration Files
 
 Before using U-Probe, you need to prepare two YAML configuration files:
