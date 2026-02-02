@@ -27,7 +27,7 @@ URL = "https://github.com/UFISH-Team/U-Probe"
 def get_version():
     with open("uprobe/__init__.py") as f:
         for line in f.readlines():
-            m = re.match("__version__ = '([^']+)'", line)
+            m = re.match(r"__version__ = ['\"]([^'\"]+)['\"]", line)
             if m:
                 return m.group(1)
         raise IOError("Version information can not found.")
