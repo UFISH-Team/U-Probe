@@ -256,6 +256,11 @@ class UProbeAPI:
     def run_workflow(self, raw_csv: bool = False, continue_on_invalid_targets: bool = False, threads: int = 10) -> pd.DataFrame:      
         log.info("--- Starting U-Probe Workflow ---")
         
+        # Normalize protocol (inject attributes/post_process/summary defaults if missing)
+        # This ensures DNA/RNA-specific attributes are auto-generated
+        from uprobe.cli import _validate_and_normalize_protocol
+        self.protocol = _validate_and_normalize_protocol(self.protocol)
+        
         # Check and install tools if needed
         from .utils import check_and_install_tools
         tools_to_check = set()

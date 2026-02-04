@@ -4,6 +4,7 @@ import logging
 import click
 import yaml
 import copy
+import pandas as pd
 
 
 from .api import UProbeAPI
@@ -14,32 +15,60 @@ from . import __version__
 log = get_logger(__name__)
 
 
-def _validate_and_normalize_protocol(protocol_config: dict) -> dict:
+def _extract_probe_targets(probes_config: dict) -> list:
     """
-    Validate protocol configuration and inject defaults for optional fields.
+    Extract all probe and part targets from probes configuration.
+    Returns list of (target_name, is_probe_level) tuples.
+    Examples: [('probe_1', True), ('probe_1.part1', False), ('probe_1.part2', False)]
     """
-    # 1. Check required top-level keys
-    required_keys = ['genome', 'targets', 'extracts', 'encoding', 'probes']
-    missing_keys = [k for k in required_keys if k not in protocol_config]
-    if missing_keys:
-        raise ValueError(f"Protocol is missing required keys: {', '.join(missing_keys)}")
+    if not isinstance(probes_config, dict):
+        raise ValueError(
+            "Invalid protocol: `probes` must be a YAML mapping (dict) like "
+            "`probes: { probe_1: {template: ..., parts: {...}} }`. "
+            "Do NOT use list-style probes."
+        )
+
+    targets = []
     
-    # Check extracts.target_region
-    if 'target_region' not in protocol_config.get('extracts', {}):
-        raise ValueError("Protocol must define 'extracts.target_region'")
+    def traverse_parts(prefix: str, config: dict, is_top_level: bool = False):
+        """Recursively traverse probe parts."""
+        if is_top_level:
+            targets.append((prefix, True))  # probe level
+        
+        if 'parts' in config:
+            if not isinstance(config['parts'], dict):
+                raise ValueError(
+                    f"Invalid protocol: `{prefix}.parts` must be a mapping (dict). "
+                    "Do NOT use list-style parts; use `parts: {part1: {...}, part2: {...}}`."
+                )
+            for part_name, part_config in config['parts'].items():
+                part_full_name = f"{prefix}.{part_name}"
+                targets.append((part_full_name, False))  # part level
+                # Recursively handle nested parts
+                if 'parts' in part_config:
+                    traverse_parts(part_full_name, part_config, is_top_level=False)
     
-    # 2. Determine mode (DNA vs RNA)
-    # If source is 'genome', we treat it as DNA mode (like DNA_format.yaml)
-    # Otherwise (exon, CDS, UTR), we treat it as RNA mode (like RNA_format.yaml)
+    for probe_name, probe_config in probes_config.items():
+        traverse_parts(probe_name, probe_config, is_top_level=True)
+    
+    return targets
+
+
+def _generate_default_attributes(protocol_config: dict) -> dict:
+    """
+    Generate default attributes based on probes structure and mode (DNA/RNA).
+    DNA mode focuses on probe parts; RNA mode includes target_region + all probes/parts.
+    """
     source = protocol_config['extracts']['target_region'].get('source', 'genome')
     is_dna_mode = (source == 'genome')
+    probes_config = protocol_config.get('probes', {})
     
-    # 3. Auto-complete attributes if missing
-    if 'attributes' not in protocol_config or not protocol_config['attributes']:
-        log.info(f"Attributes missing or empty. Auto-generating defaults for mode: {'DNA' if is_dna_mode else 'RNA'}")
-        attributes = {}
-        
-        # Common attributes for target_region
+    attributes = {}
+    
+    # DNA mode: minimal or no target_region attributes (focus on probe parts)
+    # RNA mode: comprehensive target_region attributes
+    if not is_dna_mode:
+        # RNA mode: add full target_region attributes
         attributes['target_gc'] = {
             'target': 'target_region',
             'type': 'gc_content'
@@ -56,73 +85,228 @@ def _validate_and_normalize_protocol(protocol_config: dict) -> dict:
             'target': 'target_region',
             'type': 'self_match'
         }
+        attributes['target_mapped_genes'] = {
+            'target': 'target_region',
+            'type': 'n_mapped_genes',
+            'aligner': 'bowtie2',
+            'min_mapq': 30
+        }
+    
+    # Extract probe targets and generate attributes
+    probe_targets = _extract_probe_targets(probes_config)
+    
+    for target_name, is_probe_level in probe_targets:
+        # Generate safe attribute name (replace dots with underscores)
+        safe_name = target_name.replace('.', '_')
         
-        if is_dna_mode:
-            # DNA specific defaults
-            attributes['target_mapped_sites'] = {
-                'target': 'target_region',
+        # DNA mode: focus on probe parts only
+        # RNA mode: include both probe-level and part-level
+        if is_dna_mode and is_probe_level:
+            # DNA: skip probe-level attributes, only process parts
+            continue
+        
+        # Common attributes for probes/parts
+        attributes[f'{safe_name}_gc'] = {
+            'target': target_name,
+            'type': 'gc_content'
+        }
+        attributes[f'{safe_name}_tm'] = {
+            'target': target_name,
+            'type': 'annealing_temperature'
+        }
+        attributes[f'{safe_name}_fold'] = {
+            'target': target_name,
+            'type': 'fold_score'
+        }
+        attributes[f'{safe_name}_self_match'] = {
+            'target': target_name,
+            'type': 'self_match'
+        }
+        
+        # DNA mode: add specificity attributes to probe parts
+        if is_dna_mode and not is_probe_level:
+            # Add mapped_sites and kmer_count for DNA probe parts
+            attributes[f'{safe_name}_mapped_sites'] = {
+                'target': target_name,
                 'type': 'mapped_sites',
                 'aligner': 'bowtie2'
             }
-            attributes['target_kmer_count'] = {
-                'target': 'target_region',
+            attributes[f'{safe_name}_kmer_count'] = {
+                'target': target_name,
                 'type': 'kmer_count',
                 'kmer_len': 35,
                 'threads': 10,
                 'size': '1G',
                 'aligner': 'jellyfish'
             }
-        else:
-            # RNA specific defaults
-            attributes['target_mapped_genes'] = {
-                'target': 'target_region',
-                'type': 'n_mapped_genes',
-                'aligner': 'bowtie2',
-                'min_mapq': 30
-            }
-            
-        protocol_config['attributes'] = attributes
-        
-    # 4. Auto-complete post_process if missing
-    if 'post_process' not in protocol_config or not protocol_config['post_process']:
-        log.info("Post-process configuration missing or empty. Auto-generating defaults.")
-        post_process = {
-            'filters': {},
-            'sorts': {
-                'is_ascending': [],
-                'is_descending': []
-            }
-        }
-        
-        # Default Filters
-        post_process['filters']['target_gc'] = {
-            'condition': 'target_gc >= 20 & target_gc <= 80'
-        }
-        post_process['filters']['target_tm'] = {
-            'condition': 'target_tm >= 50 & target_tm <= 90'
-        }
-        
-        # Mode specific filters
+    
+    return attributes
+
+
+def _generate_default_summary(protocol_config: dict, attributes: dict) -> dict:
+    """
+    Generate default summary configuration based on mode (DNA/RNA) and attributes.
+    DNA: report_name=dna_report, includes probe part attributes
+    RNA: report_name=rna_report, includes target + probe-level attributes
+    """
+    source = protocol_config['extracts']['target_region'].get('source', 'genome')
+    is_dna_mode = (source == 'genome')
+    
+    summary = {
+        'report_name': 'dna_report' if is_dna_mode else 'rna_report',
+        'attributes': []
+    }
+    
+    # Select attributes for summary based on mode
+    for attr_name in attributes.keys():
         if is_dna_mode:
-             post_process['filters']['target_kmer_count'] = {
+            # DNA: include part-level attributes (gc, tm, kmer_count)
+            if '_part' in attr_name and any(attr_name.endswith(x) for x in ['_gc', '_tm', '_kmer_count']):
+                summary['attributes'].append(attr_name)
+        else:
+            # RNA: include target + probe-level attributes (not parts)
+            if attr_name.startswith('target_'):
+                # Include target attributes
+                if any(attr_name.endswith(x) for x in ['_gc', '_tm', '_fold', '_self_match', '_mapped_genes']):
+                    summary['attributes'].append(attr_name)
+            elif '_part' not in attr_name:
+                # Include probe-level attributes (not parts)
+                if any(attr_name.endswith(x) for x in ['_gc', '_tm', '_fold']):
+                    summary['attributes'].append(attr_name)
+            else:
+                # Include key part attributes for RNA as well
+                if any(attr_name.endswith(x) for x in ['_tm']):
+                    summary['attributes'].append(attr_name)
+    
+    return summary
+
+
+def _generate_default_post_process(protocol_config: dict, attributes: dict) -> dict:
+    """
+    Generate default post_process configuration based on attributes.
+    """
+    source = protocol_config['extracts']['target_region'].get('source', 'genome')
+    is_dna_mode = (source == 'genome')
+    
+    post_process = {
+        'filters': {},
+        'sorts': {
+            'is_ascending': [],
+            'is_descending': []
+        }
+    }
+    
+    # Generate filters for target_region attributes
+    if 'target_gc' in attributes:
+        post_process['filters']['target_gc'] = {
+            'condition': 'target_gc >= 0.2 & target_gc <= 0.8'  # GC is 0-1 fraction
+        }
+    
+    if 'target_tm' in attributes:
+        post_process['filters']['target_tm'] = {
+            'condition': 'target_tm >= 50 & target_tm <= 90'  # Tm in Celsius
+        }
+    
+    # Mode-specific filters
+    if is_dna_mode:
+        if 'target_kmer_count' in attributes:
+            post_process['filters']['target_kmer_count'] = {
                 'condition': 'target_kmer_count <= 100'
             }
-        else:
-             post_process['filters']['target_mapped_genes'] = {
+    else:
+        if 'target_mapped_genes' in attributes:
+            post_process['filters']['target_mapped_genes'] = {
                 'condition': 'target_mapped_genes <= 10'
             }
-            
-        # Default Sorts
-        post_process['sorts']['is_ascending'].extend(['target_gc', 'target_tm'])
-        post_process['sorts']['is_descending'].extend(['target_fold', 'target_self_match'])
+    
+    # Generate filters for probe/part attributes (only Tm filters for parts)
+    for attr_name in attributes.keys():
+        if attr_name.startswith('target_'):
+            continue
         
-        if is_dna_mode:
-             post_process['sorts']['is_descending'].append('target_kmer_count')
-        else:
-             post_process['sorts']['is_descending'].append('target_mapped_genes')
-             
-        protocol_config['post_process'] = post_process
+        # Add Tm filters for all probes/parts
+        if attr_name.endswith('_tm'):
+            post_process['filters'][attr_name] = {
+                'condition': f'{attr_name} >= 50 & {attr_name} <= 90'
+            }
         
+        # Add GC filters for probe-level only (not parts)
+        if attr_name.endswith('_gc') and '.' not in attributes[attr_name]['target']:
+            post_process['filters'][attr_name] = {
+                'condition': f'{attr_name} >= 0.2 & {attr_name} <= 0.8'
+            }
+    
+    # Generate sorts
+    # Ascending: GC and Tm (prefer moderate values)
+    for attr_name in attributes.keys():
+        if attr_name.endswith('_gc') or attr_name.endswith('_tm'):
+            post_process['sorts']['is_ascending'].append(attr_name)
+    
+    # Descending: fold_score, self_match, mapped_genes, kmer_count (prefer lower values = better)
+    for attr_name in attributes.keys():
+        if any(attr_name.endswith(suffix) for suffix in ['_fold', '_self_match', '_mapped_genes', '_kmer_count']):
+            post_process['sorts']['is_descending'].append(attr_name)
+    
+    return post_process
+
+
+def _validate_and_normalize_protocol(protocol_config: dict) -> dict:
+    """
+    Validate protocol configuration and inject defaults for optional fields.
+    Dynamically generates attributes and post_process based on probes structure.
+    """
+    # 1. Check required top-level keys
+    required_keys = ['genome', 'targets', 'extracts', 'encoding', 'probes']
+    missing_keys = [k for k in required_keys if k not in protocol_config]
+    if missing_keys:
+        raise ValueError(f"Protocol is missing required keys: {', '.join(missing_keys)}")
+    
+    # Check extracts.target_region
+    if 'target_region' not in protocol_config.get('extracts', {}):
+        raise ValueError("Protocol must define 'extracts.target_region'")
+    
+    # 2. Determine mode (DNA vs RNA)
+    source = protocol_config['extracts']['target_region'].get('source', 'genome')
+    is_dna_mode = (source == 'genome')
+
+    # 2.1 Clean up user-provided post_process (remove empty stubs and DNA-only keys in RNA mode)
+    # Agents/users sometimes write placeholders like:
+    #   post_process:
+    #     filters: {}
+    #     avoid_otp: {}
+    #     equal_space: {}
+    # These should be treated as "missing" so defaults can be generated, and RNA mode
+    # must not carry DNA-only steps.
+    pp = protocol_config.get('post_process')
+    if isinstance(pp, dict):
+        if not is_dna_mode:
+            pp.pop('avoid_otp', None)
+            pp.pop('equal_space', None)
+        # Drop empty/None/list stubs at top-level
+        pp = {k: v for k, v in pp.items() if v not in ({}, [], None)}
+        protocol_config['post_process'] = pp
+    
+    # 3. Auto-complete attributes if missing (dynamic generation based on probes structure)
+    if 'attributes' not in protocol_config or not protocol_config['attributes']:
+        log.info(f"Attributes missing or empty. Auto-generating from probes structure for mode: {'DNA' if is_dna_mode else 'RNA'}")
+        protocol_config['attributes'] = _generate_default_attributes(protocol_config)
+    
+    # 4. Auto-complete post_process if missing (dynamic generation based on attributes)
+    if 'post_process' not in protocol_config or not protocol_config['post_process']:
+        log.info("Post-process configuration missing or empty. Auto-generating from attributes.")
+        protocol_config['post_process'] = _generate_default_post_process(
+            protocol_config, 
+            protocol_config['attributes']
+        )
+    
+    # 5. Auto-complete summary if missing (dynamic generation based on mode and attributes)
+    if 'summary' not in protocol_config or not protocol_config['summary']:
+        log.info(f"Summary configuration missing or empty. Auto-generating with report_name: {'dna_report' if is_dna_mode else 'rna_report'}")
+        protocol_config['summary'] = _generate_default_summary(
+            protocol_config,
+            protocol_config['attributes']
+        )
+    
     return protocol_config
 
 
