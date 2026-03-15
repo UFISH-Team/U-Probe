@@ -4,9 +4,18 @@ __pycache__/
 *$py.class
 **/*.env
 **/team_instructions
-**/test_workdir
 **/pantheon
+**/.pantheon
 
+# Windows Alternate Data Streams (Zone.Identifier files)
+*:Zone.Identifier
+*:Zone.Identifier:Zone.Identifier
+
+**/results
+**/static
+**/outputs
+**/.executor
+**/data
 
 # C extensions
 *.so

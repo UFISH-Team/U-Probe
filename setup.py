@@ -81,7 +81,7 @@ requires_dev = packages_for_dev + packages_for_docs
 
 setup(
     name='uprobe',
-    author='Qian Zhang, Weize Xu, Huaiyuan Cai, Yu Chen',
+    author='Qian Zhang, Weize Xu, Huaiyuan Cai',
     author_email='jshn2022@163.com',
     version=get_version(),
     license='MIT',
