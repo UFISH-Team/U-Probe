@@ -6,6 +6,7 @@ __pycache__/
 **/team_instructions
 **/pantheon
 **/.pantheon
+**/.endpoint-logs
 
 # Windows Alternate Data Streams (Zone.Identifier files)
 *:Zone.Identifier

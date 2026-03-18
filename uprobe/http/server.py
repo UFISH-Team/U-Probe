@@ -37,6 +37,7 @@ from uprobe.http.routers.task import router as task
 from uprobe.http.routers.auth import router as auth_router
 from uprobe.http.routers.user import router as user_router
 from uprobe.http.routers.agent import agent_router
+from uprobe.http.routers.custom_probes import router as custom_probes_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -65,6 +66,7 @@ app.include_router(task)
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(agent_router)
+app.include_router(custom_probes_router)
 
 def start_server():
     uvicorn.run(app, host="127.0.0.1")  #port=8123

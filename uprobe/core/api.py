@@ -260,28 +260,7 @@ class UProbeAPI:
         # This ensures DNA/RNA-specific attributes are auto-generated
         from uprobe.core.cli import _validate_and_normalize_protocol
         self.protocol = _validate_and_normalize_protocol(self.protocol)
-        
-        # Check and install tools if needed
-        from .utils import check_and_install_tools
-        tools_to_check = set()
-        
-        # From genome config
-        if self.genome:
-            aligners = self.genome.get('align_index', [])
-            for aligner in aligners:
-                tools_to_check.add(aligner)
-            if self.genome.get('jellyfish', False):
-                tools_to_check.add('jellyfish')
-                
-        # From attributes
-        if 'attributes' in self.protocol:
-            for attr_name, attr_config in self.protocol['attributes'].items():
-                if 'aligner' in attr_config:
-                    tools_to_check.add(attr_config['aligner'])
-        
-        if tools_to_check:
-            check_and_install_tools(list(tools_to_check))
-            
+    
         # 1. Build Genome Index (if needed)
         self.build_genome_index(threads=threads)
         # 2. Validate Targets(RNA)

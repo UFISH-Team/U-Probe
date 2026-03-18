@@ -1,6 +1,5 @@
 from setuptools import setup, find_packages
 import re
-import os
 
 
 classifiers = [
@@ -11,6 +10,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
     "Intended Audience :: Science/Research",
 ]
@@ -21,13 +21,13 @@ keywords = [
 ]
 
 
-URL = "https://github.com/UFISH-Team/U-Probe"
+URL = "https://github.com/UFISH-Team/uprobe-http"
 
 
 def get_version():
-    with open("uprobe/__init__.py") as f:
+    with open("uprobe/http/__init__.py") as f:
         for line in f.readlines():
-            m = re.match(r"__version__ = ['\"]([^'\"]+)['\"]", line)
+            m = re.match("__version__ = '([^']+)'", line)
             if m:
                 return m.group(1)
         raise IOError("Version information can not found.")
@@ -49,43 +49,22 @@ def get_requirements_from_file(filename):
     return requirements
 
 
-posix_requires = [
-    "pysam"
-]
-
-
 def get_install_requires():
     reqs = get_requirements_from_file('requirements.txt')
-    # Add posix_requires if the OS is posix(Linux, MacOS, etc.)
-    if os.name == 'posix':
-        reqs += posix_requires
     return reqs
 
 
 packages_for_dev = get_requirements_from_file("requirements-dev.txt")
-
-# Try to get docs requirements, fallback to empty list if file doesn't exist
-try:
-    packages_for_docs = get_requirements_from_file("requirements-doc.txt")
-except FileNotFoundError:
-    packages_for_docs = [
-        'sphinx',
-        'sphinx_rtd_theme',
-        'myst-parser',
-        'sphinx-copybutton',
-        'sphinx-click',
-    ]
-
-requires_dev = packages_for_dev + packages_for_docs
+requires_dev = packages_for_dev
 
 
 setup(
     name='uprobe',
-    author='Qian Zhang, Weize Xu, Huaiyuan Cai',
+    author='Qian Zhang, Weize Xu',
     author_email='jshn2022@163.com',
     version=get_version(),
     license='MIT',
-    description='Universal oligo probe design tools.',
+    description='Web server for U-Probe',
     long_description=get_long_description(),
     keywords=keywords,
     url=URL,
@@ -96,14 +75,11 @@ setup(
     install_requires=get_install_requires(),
     extras_require={
         'dev': requires_dev,
-        'docs': packages_for_docs,
     },
     python_requires='>=3.8, <4',
     entry_points={
         'console_scripts': [
-            'uprobe = uprobe.__main__:main',
+            'uprobe = uprobe.http.server:start_server',
         ],
     },
 )
-
-

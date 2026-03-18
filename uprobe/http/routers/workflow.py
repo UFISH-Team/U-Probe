@@ -1,4 +1,4 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException, Body
+from fastapi import APIRouter, File, UploadFile, HTTPException, Body, Depends
 from fastapi.responses import StreamingResponse
 import yaml
 from pathlib import Path
@@ -12,12 +12,13 @@ import os
 import uuid
 import json
 from datetime import datetime
-from .task import tasks_db, TaskRead, TaskParameters
+from uprobe.http.routers.task import TaskRead, TaskParameters, update_task_in_db
+from uprobe.http.routers.auth import get_current_active_user, User
 from uprobe.core.api import UProbeAPI
 
 # This path is based on your command-line example.
 # Consider making it a configurable environment variable.
-GENOMES_YAML_PATH = '/home/zhangqian/u-probe/tests/data/genomes.yaml'
+GENOMES_YAML_PATH = '/home/zhangqian/new/U-Probe/data/genomes.yaml'
 CSV_FILE_PATH = Path('D:/repos/testdata/barcodes/KYRCA 2-2-12.csv')
 
 logging.basicConfig(level=logging.INFO)
@@ -119,9 +120,24 @@ async def get_barcodes_dict(barcode: str):
     barcodes = load_barcodes_from_csv(CSV_FILE_PATH)
     if barcode in barcodes:
         return {barcode: barcodes[barcode]}
+        
+@workflow.get("/builtin_probes")
+async def get_builtin_probes():
+    try:
+        probe_json_path = Path("data/probe.json")
+        if not probe_json_path.exists():
+            return {}
+        with open(probe_json_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logging.error(f"Failed to load built-in probes: {e}")
+        raise HTTPException(status_code=500, detail="Failed to load built-in probes")
     
 @workflow.post("/submit_task")
-async def submit_task(file: UploadFile = File(...)):
+async def submit_task(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user)
+):
     try:
         contents = await file.read()
         yaml_content = yaml.safe_load(contents)
@@ -172,7 +188,7 @@ async def submit_task(file: UploadFile = File(...)):
         new_task.yaml_content = yaml.dump(yaml_content, default_style='"', allow_unicode=True)
         
         # 保存任务到数据库
-        tasks_db.append(new_task)
+        update_task_in_db(current_user.username, new_task)
         
         return {
             "status": "success", 

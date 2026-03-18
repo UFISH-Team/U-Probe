@@ -12,6 +12,9 @@ import logging
 import shutil
 import zipfile
 import os
+import json
+from uprobe.http.routers.auth import get_current_active_user, User
+from uprobe.http.paths import get_data_dir
 
 router = APIRouter(
     prefix="/task",
@@ -22,6 +25,30 @@ router = APIRouter(
 # 结果文件存储目录
 RESULTS_DIR = Path("results")
 RESULTS_DIR.mkdir(exist_ok=True)
+
+def get_user_tasks_file(username: str) -> Path:
+    user_dir = get_data_dir() / "user_tasks" / username
+    user_dir.mkdir(parents=True, exist_ok=True)
+    return user_dir / "tasks.json"
+
+def load_user_tasks(username: str) -> List[Dict[str, Any]]:
+    file_path = get_user_tasks_file(username)
+    if not file_path.exists():
+        return []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        logging.error(f"Error loading tasks for {username}: {e}")
+        return []
+
+def save_user_tasks(username: str, tasks: List[Dict[str, Any]]):
+    file_path = get_user_tasks_file(username)
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(tasks, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Error saving tasks for {username}: {e}")
 
 # --- Pydantic Models ---
 
@@ -59,28 +86,48 @@ class TaskRead(TaskBase):
     result_url: Optional[str] = None
     yaml_content: Optional[str] = None
 
-tasks_db: List[TaskRead] = []
-
 # --- Helper Function ---
-def find_task_by_id(task_id: str) -> Optional[TaskRead]:
-    """Finds a task in the in-memory list by its ID."""
-    for task in tasks_db:
-        if task.id == task_id:
-            return task
+def find_task_by_id(username: str, task_id: str) -> Optional[TaskRead]:
+    """Finds a task in the user's list by its ID."""
+    tasks = load_user_tasks(username)
+    for task_dict in tasks:
+        if task_dict.get("id") == task_id:
+            return TaskRead(**task_dict)
     return None
+
+def update_task_in_db(username: str, updated_task: TaskRead):
+    tasks = load_user_tasks(username)
+    for i, task_dict in enumerate(tasks):
+        if task_dict.get("id") == updated_task.id:
+            # Convert datetime to string for JSON serialization
+            task_dict_to_save = updated_task.model_dump()
+            task_dict_to_save['created_at'] = task_dict_to_save['created_at'].isoformat()
+            task_dict_to_save['updated_at'] = task_dict_to_save['updated_at'].isoformat()
+            tasks[i] = task_dict_to_save
+            save_user_tasks(username, tasks)
+            return
+    
+    # If not found, append
+    task_dict_to_save = updated_task.model_dump()
+    task_dict_to_save['created_at'] = task_dict_to_save['created_at'].isoformat()
+    task_dict_to_save['updated_at'] = task_dict_to_save['updated_at'].isoformat()
+    tasks.append(task_dict_to_save)
+    save_user_tasks(username, tasks)
 
 # --- API Endpoints ---
 
 @router.get("/", response_model=List[TaskRead])
 async def get_tasks(
     status_filter: Optional[str] = Query(None, alias="status"),
-    search: Optional[str] = Query(None)
+    search: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Retrieve a list of tasks, optionally filtering by status and search term.
     Matches frontend filtering logic (status tabs and search input).
     """
-    filtered_tasks = tasks_db
+    tasks_dicts = load_user_tasks(current_user.username)
+    filtered_tasks = [TaskRead(**t) for t in tasks_dicts]
     
     # Filter by status
     if status_filter and status_filter != "all":
@@ -100,7 +147,10 @@ async def get_tasks(
 
 
 @router.post("/", response_model=TaskRead, status_code=status.HTTP_201_CREATED)
-async def create_task(task_data: TaskCreateBody):
+async def create_task(
+    task_data: TaskCreateBody,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Create a new task based on the provided form data.
     """
@@ -138,46 +188,52 @@ async def create_task(task_data: TaskCreateBody):
         updated_at=now,
         result_url=None,
     )
-    tasks_db.append(new_task)
+    update_task_in_db(current_user.username, new_task)
     return new_task
 
 
 @router.get("/{task_id}", response_model=TaskRead)
-async def get_task(task_id: str):
+async def get_task(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Retrieve details for a specific task by its ID.
     """
-    task = find_task_by_id(task_id)
+    task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
 
 
 @router.delete("/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_task(task_id: str):
+async def delete_task(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Delete a task by its ID.
     """
-    global tasks_db
-    task_index = -1
-    for i, task in enumerate(tasks_db):
-        if task.id == task_id:
-            task_index = i
-            break
+    tasks = load_user_tasks(current_user.username)
+    initial_length = len(tasks)
+    tasks = [t for t in tasks if t.get("id") != task_id]
             
-    if task_index == -1:
+    if len(tasks) == initial_length:
         raise HTTPException(status_code=404, detail="Task not found")
         
-    tasks_db.pop(task_index)
+    save_user_tasks(current_user.username, tasks)
     return
 
 
 @router.post("/{task_id}/pause", response_model=TaskRead)
-async def pause_task(task_id: str):
+async def pause_task(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Set the status of a task to 'paused'.
     """
-    task = find_task_by_id(task_id)
+    task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
         
@@ -186,16 +242,20 @@ async def pause_task(task_id: str):
 
     task.status = "paused"
     task.updated_at = datetime.now()
+    update_task_in_db(current_user.username, task)
     return task
 
 
 @router.post("/{task_id}/resume", response_model=TaskRead)
-async def resume_task(task_id: str):
+async def resume_task(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Set the status of a paused task back to 'running'.
     (Note: Frontend logic sets it to running, even if paused from pending)
     """
-    task = find_task_by_id(task_id)
+    task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -205,15 +265,19 @@ async def resume_task(task_id: str):
     # Determine previous state if needed, but frontend implies -> running
     task.status = "running" 
     task.updated_at = datetime.now()
+    update_task_in_db(current_user.username, task)
     return task
     
 
 @router.post("/{task_id}/run", response_model=TaskRead)
-async def run_task(task_id: str):
+async def run_task(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Start running a pending task by calling the uprobe workflow.
     """
-    task = find_task_by_id(task_id)
+    task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
         
@@ -227,22 +291,23 @@ async def run_task(task_id: str):
     task.status = "running"
     task.progress = 10
     task.updated_at = datetime.now()
+    update_task_in_db(current_user.username, task)
     
     # 异步运行uprobe任务
-    asyncio.create_task(_run_uprobe_task(task_id))
+    asyncio.create_task(_run_uprobe_task(current_user.username, task_id))
     
     return task
 
-async def _run_uprobe_task(task_id: str):
+async def _run_uprobe_task(username: str, task_id: str):
     """
     异步运行uprobe任务的内部函数
     """
-    task = find_task_by_id(task_id)
+    task = find_task_by_id(username, task_id)
     if not task:
         return
     
     try:
-        logging.info(f"开始运行任务 {task_id}")
+        logging.info(f"开始运行任务 {task_id} for user {username}")
         
         # 从workflow.py中获取路径配置
         from uprobe.http.routers.workflow import GENOMES_YAML_PATH
@@ -279,6 +344,7 @@ async def _run_uprobe_task(task_id: str):
             )
             
             task.progress = 50
+            update_task_in_db(username, task)
             stdout, stderr = await process.communicate()
             
             if process.returncode != 0:
@@ -290,6 +356,7 @@ async def _run_uprobe_task(task_id: str):
                 task.status = "failed"
                 task.progress = 0
                 task.updated_at = datetime.now()
+                update_task_in_db(username, task)
                 return
             
             # 检查输出文件
@@ -302,6 +369,7 @@ async def _run_uprobe_task(task_id: str):
                 task.status = "failed"
                 task.progress = 0
                 task.updated_at = datetime.now()
+                update_task_in_db(username, task)
                 return
             
             # 创建任务专用的结果目录
@@ -332,6 +400,7 @@ async def _run_uprobe_task(task_id: str):
             task.progress = 100
             task.result_url = str(zip_path.relative_to(RESULTS_DIR))
             task.updated_at = datetime.now()
+            update_task_in_db(username, task)
             
             logging.info(f"task {task_id} completed! Results saved to {task_results_dir}")
             
@@ -340,13 +409,17 @@ async def _run_uprobe_task(task_id: str):
         task.status = "failed"
         task.progress = 0
         task.updated_at = datetime.now()
+        update_task_in_db(username, task)
 
 @router.get("/{task_id}/download")
-async def download_task_result(task_id: str):
+async def download_task_result(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     下载任务结果文件（压缩包格式）
     """
-    task = find_task_by_id(task_id)
+    task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
         
@@ -370,11 +443,14 @@ async def download_task_result(task_id: str):
     )
 
 @router.get("/{task_id}/files")
-async def list_task_files(task_id: str):
+async def list_task_files(
+    task_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     列出任务的所有结果文件
     """
-    task = find_task_by_id(task_id)
+    task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
         
@@ -399,11 +475,15 @@ async def list_task_files(task_id: str):
     return {"files": files}
 
 @router.get("/{task_id}/file/{filename}")
-async def download_single_file(task_id: str, filename: str):
+async def download_single_file(
+    task_id: str, 
+    filename: str,
+    current_user: User = Depends(get_current_active_user)
+):
     """
     下载任务的单个结果文件
     """
-    task = find_task_by_id(task_id)
+    task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
         
