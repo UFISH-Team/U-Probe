@@ -21,7 +21,7 @@ keywords = [
 ]
 
 
-URL = "https://github.com/UFISH-Team/uprobe-http"
+URL = "https://github.com/UFISH-Team/U-Probe"
 
 
 def get_version():
@@ -79,7 +79,7 @@ setup(
     python_requires='>=3.8, <4',
     entry_points={
         'console_scripts': [
-            'uprobe = uprobe.http.server:start_server',
+            'u-probe = uprobe.http.server:start_server',
         ],
     },
 )
