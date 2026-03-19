@@ -1,27 +1,91 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, Depends
 from fastapi.responses import FileResponse
 from pathlib import Path
 from typing import List
 from datetime import datetime
 import shutil
 import os
-
+import yaml
+from uprobe.http.paths import get_public_genomes_dir, get_user_genomes_dir, get_genomes_yaml, get_user_genomes_yaml
+from uprobe.http.routers.auth import get_current_active_user, User
 
 genome = APIRouter(prefix="/genome", tags=["genome"])
-genome_path = Path('/mnt/d/repos/testdata/genomes')
 
-@genome.get("/", response_model=List[str])
-def list_genomes():
+def get_genome_dir(genome_name: str, username: str) -> Path:
+    """Helper to find if a genome is public or private, and return its path."""
+    public_dir = get_public_genomes_dir() / genome_name
+    if public_dir.exists():
+        return public_dir
+        
+    user_dir = get_user_genomes_dir(username) / genome_name
+    return user_dir
+
+def update_genomes_yaml(genome_name: str, username: str, action: str = "add"):
+    """Update user's genomes.yaml when a genome is added or removed."""
+    yaml_path = get_user_genomes_yaml(username)
+    genomes_dir = get_user_genomes_dir(username)
+    
+    # Load existing data
+    data = {}
+    if yaml_path.exists():
+        try:
+            with open(yaml_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f) or {}
+        except Exception as e:
+            print(f"Error loading {username}'s genomes.yaml: {e}")
+            
+    if action == "add":
+        if genome_name not in data:
+            genome_base = str(genomes_dir / genome_name)
+            data[genome_name] = {
+                "description": f"Custom genome {genome_name}",
+                "species": genome_name,
+                "fasta": f"{genome_base}/{genome_name}.fa",
+                "gtf": f"{genome_base}/{genome_name}.gtf",
+                "out": genome_base,
+                "align_index": ["bowtie2", "blast"],
+                "jellyfish": False
+            }
+    elif action == "delete":
+        if genome_name in data:
+            del data[genome_name]
+            
+    # Save back
     try:
-        genomes = [x.name for x in genome_path.iterdir() if x.is_dir() and not x.name.startswith('.')]
-        return genomes
+        # Ensure parent directory exists
+        yaml_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(yaml_path, 'w', encoding='utf-8') as f:
+            yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
     except Exception as e:
-        return {"error": str(e)}
+        print(f"Error saving {username}'s genomes.yaml: {e}")
+
+@genome.get("/", response_model=List[dict])
+def list_genomes(current_user: User = Depends(get_current_active_user)):
+    try:
+        genomes_dict = {}
+        
+        # Add public genomes
+        public_dir = get_public_genomes_dir()
+        if public_dir.exists():
+            for x in public_dir.iterdir():
+                if x.is_dir() and not x.name.startswith('.'):
+                    genomes_dict[x.name] = {"name": x.name, "is_public": True}
+                    
+        # Add user genomes
+        user_dir = get_user_genomes_dir(current_user.username)
+        if user_dir.exists():
+            for x in user_dir.iterdir():
+                if x.is_dir() and not x.name.startswith('.'):
+                    genomes_dict[x.name] = {"name": x.name, "is_public": False}
+                    
+        return list(genomes_dict.values())
+    except Exception as e:
+        return [{"error": str(e)}]
 
 @genome.get("/{genome_name}/files")
-async def list_genome_files(genome_name: str):
+async def list_genome_files(genome_name: str, current_user: User = Depends(get_current_active_user)):
     try:
-        genome_dir = genome_path / genome_name
+        genome_dir = get_genome_dir(genome_name, current_user.username)
         if not genome_dir.exists():
             raise HTTPException(status_code=404, detail="Genome directory not found")
         
@@ -48,9 +112,10 @@ async def list_genome_files(genome_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @genome.get("/{genome_name}/{file_name:path}/metadata")
-async def get_file_metadata(genome_name: str, file_name: str):
+async def get_file_metadata(genome_name: str, file_name: str, current_user: User = Depends(get_current_active_user)):
     try:
-        file_path = genome_path / genome_name / file_name
+        genome_dir = get_genome_dir(genome_name, current_user.username)
+        file_path = genome_dir / file_name
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
         file_stats = os.stat(file_path)
@@ -59,6 +124,9 @@ async def get_file_metadata(genome_name: str, file_name: str):
         # 这里假设预设文件是在特定时间之前创建的，或者在特定目录中
         preset_genomes = {'hg38', 'hg19', 'mm10', 'mm9'}
         is_preset = genome_name in preset_genomes
+        
+        # 也可以通过判断是否在 public 目录下
+        is_public = str(file_path).startswith(str(get_public_genomes_dir()))
         
         # 或者可以基于文件的创建时间来判断
         # 假设2024年1月1日之前的文件都是预设文件
@@ -69,18 +137,21 @@ async def get_file_metadata(genome_name: str, file_name: str):
             "size": file_stats.st_size,
             "created": datetime.fromtimestamp(file_stats.st_ctime).isoformat(),
             "modified": datetime.fromtimestamp(file_stats.st_mtime).isoformat(),
-            "is_preset": is_preset or is_preset_by_time,
-            "can_delete": not (is_preset or is_preset_by_time)
+            "is_preset": is_preset or is_preset_by_time or is_public,
+            "can_delete": not (is_preset or is_preset_by_time or is_public)
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching metadata: {str(e)}")
 
 @genome.post("/{genome_name}/upload")
-async def upload_genome_file(genome_name: str, file: UploadFile = File(...)):
+async def upload_genome_file(genome_name: str, file: UploadFile = File(...), current_user: User = Depends(get_current_active_user)):
     try:
-        genome_dir = genome_path / genome_name
+        # 只允许上传到用户的私有目录
+        genome_dir = get_user_genomes_dir(current_user.username) / genome_name
         if not genome_dir.exists():
             genome_dir.mkdir(parents=True, exist_ok=True)
+            # 如果是新创建的目录，更新 yaml
+            update_genomes_yaml(genome_name, current_user.username, "add")
         
         # 支持更多文件类型，包括.gitkeep等
         allowed_extensions = {'fa', 'fna', 'fasta', 'gff', 'gtf', 'jf', 'sam', 'bam', 'txt', 'gitkeep', 'fai'}
@@ -107,35 +178,65 @@ async def upload_genome_file(genome_name: str, file: UploadFile = File(...)):
             content = await file.read() 
             f.write(content)
             
+        # 如果上传的是 fasta 或 gtf 文件，尝试更新 genomes.yaml 中的具体路径
+        if filename.endswith(('.fa', '.fasta', '.fna', '.gtf', '.gff')):
+            yaml_path = get_user_genomes_yaml(current_user.username)
+            if yaml_path.exists():
+                try:
+                    with open(yaml_path, 'r', encoding='utf-8') as f:
+                        data = yaml.safe_load(f) or {}
+                    if genome_name in data:
+                        if filename.endswith(('.fa', '.fasta', '.fna')):
+                            data[genome_name]['fasta'] = str(file_path)
+                        elif filename.endswith(('.gtf', '.gff')):
+                            data[genome_name]['gtf'] = str(file_path)
+                        with open(yaml_path, 'w', encoding='utf-8') as f:
+                            yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+                except Exception as e:
+                    print(f"Error updating specific file paths in {current_user.username}'s genomes.yaml: {e}")
+            
         return {"message": f"File '{filename}' uploaded successfully to {genome_name}"}
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @genome.post("/{genome_name}")
-async def add_genome(genome_name: str):
+async def add_genome(genome_name: str, current_user: User = Depends(get_current_active_user)):
     try:
-        new_genome_dir = genome_path / genome_name
+        # 检查是否与 public 冲突
+        public_dir = get_public_genomes_dir() / genome_name
+        if public_dir.exists():
+            raise HTTPException(status_code=400, detail="A public genome with this name already exists")
+            
+        new_genome_dir = get_user_genomes_dir(current_user.username) / genome_name
         if new_genome_dir.exists():
             raise HTTPException(status_code=400, detail="Genome directory already exists")
-        new_genome_dir.mkdir()
+        new_genome_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 自动更新 genomes.yaml
+        update_genomes_yaml(genome_name, current_user.username, "add")
+        
         return {"message": f"Genome {genome_name} added successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @genome.delete("/{genome_name}/{file_name:path}")
-async def delete_file(genome_name: str, file_name: str):
+async def delete_file(genome_name: str, file_name: str, current_user: User = Depends(get_current_active_user)):
     try:
-        file_path = (genome_path / genome_name / file_name).resolve()
+        genome_dir = get_genome_dir(genome_name, current_user.username)
+        file_path = (genome_dir / file_name).resolve()
         
         # 安全检查：确保文件路径在genome目录内
-        genome_dir = (genome_path / genome_name).resolve()
-        if not str(file_path).startswith(str(genome_dir)):
+        if not str(file_path).startswith(str(genome_dir.resolve())):
             raise HTTPException(status_code=400, detail="Invalid file path")
             
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
         
+        # 权限检查：检查是否在 public 目录下
+        if str(file_path).startswith(str(get_public_genomes_dir())):
+            raise HTTPException(status_code=403, detail="Cannot delete public files")
+            
         # 权限检查：检查是否为预设文件
         file_stats = os.stat(file_path)
         preset_genomes = {'hg38', 'hg19', 'mm10', 'mm9'}
@@ -165,13 +266,13 @@ async def delete_file(genome_name: str, file_name: str):
         raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
 
 @genome.get("/{genome_name}/{file_name:path}")
-async def download_file(genome_name: str, file_name: str):
+async def download_file(genome_name: str, file_name: str, current_user: User = Depends(get_current_active_user)):
     try:
-        file_path = (genome_path / genome_name / file_name).resolve()
+        genome_dir = get_genome_dir(genome_name, current_user.username)
+        file_path = (genome_dir / file_name).resolve()
         
         # 安全检查：确保文件路径在genome目录内
-        genome_dir = (genome_path / genome_name).resolve()
-        if not str(file_path).startswith(str(genome_dir)):
+        if not str(file_path).startswith(str(genome_dir.resolve())):
             raise HTTPException(status_code=400, detail="Invalid file path")
             
         if not file_path.exists() or not file_path.is_file():
@@ -184,12 +285,22 @@ async def download_file(genome_name: str, file_name: str):
         raise HTTPException(status_code=500, detail=f"Error downloading file: {str(e)}")
 
 @genome.delete("/{genome_name}")
-async def delete_genome_directory(genome_name: str):
+async def delete_genome_directory(genome_name: str, current_user: User = Depends(get_current_active_user)):
     try:
-        genome_dir = genome_path / genome_name
+        # 只能删除用户自己目录下的
+        genome_dir = get_user_genomes_dir(current_user.username) / genome_name
         if not genome_dir.exists():
+            # 如果是 public 下的，提示不能删除
+            public_dir = get_public_genomes_dir() / genome_name
+            if public_dir.exists():
+                raise HTTPException(status_code=403, detail="Cannot delete public genome directory")
             raise HTTPException(status_code=404, detail="Genome directory not found")
+            
         shutil.rmtree(genome_dir)
+        
+        # 自动更新 genomes.yaml
+        update_genomes_yaml(genome_name, current_user.username, "delete")
+        
         return {"message": f"Genome directory '{genome_name}' deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
