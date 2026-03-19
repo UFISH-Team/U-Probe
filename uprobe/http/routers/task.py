@@ -14,7 +14,7 @@ import zipfile
 import os
 import json
 from uprobe.http.routers.auth import get_current_active_user, User
-from uprobe.http.paths import get_data_dir
+from uprobe.http.paths import get_data_dir, get_tasks_dir, get_results_dir
 
 router = APIRouter(
     prefix="/task",
@@ -22,12 +22,8 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# 结果文件存储目录
-RESULTS_DIR = Path("results")
-RESULTS_DIR.mkdir(exist_ok=True)
-
 def get_user_tasks_file(username: str) -> Path:
-    user_dir = get_data_dir() / "user_tasks" / username
+    user_dir = get_tasks_dir() / username
     user_dir.mkdir(parents=True, exist_ok=True)
     return user_dir / "tasks.json"
 
@@ -309,8 +305,7 @@ async def _run_uprobe_task(username: str, task_id: str):
     try:
         logging.info(f"开始运行任务 {task_id} for user {username}")
         
-        # 从workflow.py中获取路径配置
-        from uprobe.http.routers.workflow import GENOMES_YAML_PATH
+        from uprobe.http.paths import get_genomes_yaml, get_user_genomes_yaml
         
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_dir_path = Path(temp_dir)
@@ -319,6 +314,31 @@ async def _run_uprobe_task(username: str, task_id: str):
             # 写入YAML内容到临时文件
             protocol_filepath.write_text(task.yaml_content)
             
+            # 合并 public_genomes.yaml 和 user_genomes.yaml
+            merged_genomes = {}
+            
+            public_yaml = get_genomes_yaml()
+            if public_yaml.exists():
+                try:
+                    with open(public_yaml, 'r', encoding='utf-8') as f:
+                        public_data = yaml.safe_load(f) or {}
+                        merged_genomes.update(public_data)
+                except Exception as e:
+                    logging.error(f"Error loading public genomes.yaml: {e}")
+                    
+            user_yaml = get_user_genomes_yaml(username)
+            if user_yaml.exists():
+                try:
+                    with open(user_yaml, 'r', encoding='utf-8') as f:
+                        user_data = yaml.safe_load(f) or {}
+                        merged_genomes.update(user_data)
+                except Exception as e:
+                    logging.error(f"Error loading user genomes.yaml: {e}")
+            
+            merged_genomes_path = temp_dir_path / "merged_genomes.yaml"
+            with open(merged_genomes_path, 'w', encoding='utf-8') as f:
+                yaml.dump(merged_genomes, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            
             output_dir = temp_dir_path / "results"
             output_dir.mkdir()
             
@@ -326,7 +346,7 @@ async def _run_uprobe_task(username: str, task_id: str):
             cmd = [
                 "python", "-m", "uprobe", "run",
                 "--protocol", str(protocol_filepath),
-                "--genomes", GENOMES_YAML_PATH,
+                "--genomes", str(merged_genomes_path),
                 "--output", str(output_dir),
                 "--raw"
             ]
@@ -373,8 +393,9 @@ async def _run_uprobe_task(username: str, task_id: str):
                 return
             
             # 创建任务专用的结果目录
-            task_results_dir = RESULTS_DIR / task_id
-            task_results_dir.mkdir(exist_ok=True)
+            results_base_dir = get_results_dir()
+            task_results_dir = results_base_dir / task_id
+            task_results_dir.mkdir(parents=True, exist_ok=True)
             
             # 复制所有结果文件到持久化存储目录
             result_files = []
@@ -398,7 +419,7 @@ async def _run_uprobe_task(username: str, task_id: str):
             # 任务完成，设置结果URL
             task.status = "completed"
             task.progress = 100
-            task.result_url = str(zip_path.relative_to(RESULTS_DIR))
+            task.result_url = str(zip_path.relative_to(results_base_dir))
             task.updated_at = datetime.now()
             update_task_in_db(username, task)
             
@@ -430,7 +451,8 @@ async def download_task_result(
         raise HTTPException(status_code=404, detail="Result file not available for this task")
 
     # 构建实际的文件路径
-    file_path = RESULTS_DIR / task.result_url
+    results_base_dir = get_results_dir()
+    file_path = results_base_dir / task.result_url
     
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Result file not found on disk")
@@ -457,7 +479,8 @@ async def list_task_files(
     if task.status != "completed":
          raise HTTPException(status_code=400, detail="Task is not completed yet")
     
-    task_results_dir = RESULTS_DIR / task_id
+    results_base_dir = get_results_dir()
+    task_results_dir = results_base_dir / task_id
     if not task_results_dir.exists():
         return {"files": []}
     
@@ -490,7 +513,8 @@ async def download_single_file(
     if task.status != "completed":
          raise HTTPException(status_code=400, detail="Task is not completed yet")
     
-    task_results_dir = RESULTS_DIR / task_id
+    results_base_dir = get_results_dir()
+    task_results_dir = results_base_dir / task_id
     file_path = task_results_dir / filename
     
     if not file_path.exists() or not file_path.is_file():
