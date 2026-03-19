@@ -2,8 +2,9 @@ from pathlib import Path
 from fastapi import HTTPException
 from .utils import run_cmd
 import typing as t
+from uprobe.http.paths import get_fisheye_dir
 
-SYSTEM_PATH = Path('/home/qzhang/fisheye')
+SYSTEM_PATH = get_fisheye_dir()
 
 def rca(genelist: str, gtf: str, fasta: str, 
             threads: int = 16, index_prefix: str = "bowtie2-index",
