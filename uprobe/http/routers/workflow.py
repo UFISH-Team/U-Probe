@@ -15,11 +15,9 @@ from datetime import datetime
 from uprobe.http.routers.task import TaskRead, TaskParameters, update_task_in_db
 from uprobe.http.routers.auth import get_current_active_user, User
 from uprobe.core.api import UProbeAPI
+from uprobe.http.paths import get_genomes_yaml, get_barcodes_csv, get_probe_json
 
-# This path is based on your command-line example.
-# Consider making it a configurable environment variable.
-GENOMES_YAML_PATH = '/home/zhangqian/new/U-Probe/data/genomes.yaml'
-CSV_FILE_PATH = Path('D:/repos/testdata/barcodes/KYRCA 2-2-12.csv')
+CSV_FILE_PATH = get_barcodes_csv()
 
 logging.basicConfig(level=logging.INFO)
 
@@ -124,7 +122,7 @@ async def get_barcodes_dict(barcode: str):
 @workflow.get("/builtin_probes")
 async def get_builtin_probes():
     try:
-        probe_json_path = Path("data/probe.json")
+        probe_json_path = get_probe_json()
         if not probe_json_path.exists():
             return {}
         with open(probe_json_path, "r", encoding="utf-8") as f:
@@ -199,7 +197,7 @@ async def submit_task(
         raise HTTPException(status_code=400, detail=f"Error processing task: {str(e)}")
 
 @workflow.post("/run_uprobe")
-async def run_uprobe(file: UploadFile = File(...)):
+async def run_uprobe(file: UploadFile = File(...), current_user: User = Depends(get_current_active_user)):
     contents = await file.read()
     try:
         yaml.safe_load(contents)
@@ -210,6 +208,32 @@ async def run_uprobe(file: UploadFile = File(...)):
         temp_dir_path = Path(temp_dir)
         protocol_filepath = temp_dir_path / "protocol.yaml"
         protocol_filepath.write_bytes(contents)
+        
+        # 合并 public_genomes.yaml 和 user_genomes.yaml
+        from uprobe.http.paths import get_genomes_yaml, get_user_genomes_yaml
+        merged_genomes = {}
+        
+        public_yaml = get_genomes_yaml()
+        if public_yaml.exists():
+            try:
+                with open(public_yaml, 'r', encoding='utf-8') as f:
+                    public_data = yaml.safe_load(f) or {}
+                    merged_genomes.update(public_data)
+            except Exception as e:
+                logging.error(f"Error loading public genomes.yaml: {e}")
+                
+        user_yaml = get_user_genomes_yaml(current_user.username)
+        if user_yaml.exists():
+            try:
+                with open(user_yaml, 'r', encoding='utf-8') as f:
+                    user_data = yaml.safe_load(f) or {}
+                    merged_genomes.update(user_data)
+            except Exception as e:
+                logging.error(f"Error loading user genomes.yaml: {e}")
+        
+        merged_genomes_path = temp_dir_path / "merged_genomes.yaml"
+        with open(merged_genomes_path, 'w', encoding='utf-8') as f:
+            yaml.dump(merged_genomes, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
         output_dir = temp_dir_path / "results"
         output_dir.mkdir()
@@ -217,7 +241,7 @@ async def run_uprobe(file: UploadFile = File(...)):
         cmd = [
             "python", "-m", "uprobe", "run",
             "--protocol", str(protocol_filepath),
-            "--genomes", GENOMES_YAML_PATH,
+            "--genomes", str(merged_genomes_path),
             "--output", str(output_dir),
             "--raw"
         ]
