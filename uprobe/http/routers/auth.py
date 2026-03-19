@@ -36,7 +36,7 @@ router = APIRouter(
 # --- Password Hashing ---
 def build_pwd_context():
     try:
-        test_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        test_ctx = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
         test_ctx.hash("probe-test")
         return test_ctx
     except Exception:
