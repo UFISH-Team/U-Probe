@@ -73,9 +73,10 @@ class AgentSessionManager:
         """Build chat message with image support."""
         return parse_image_mentions(content)
 
-    async def upload_file(self, session_id: str, file_obj: BinaryIO, filename: str) -> Dict[str, Any]:
+    async def upload_file(self, session_id: str, file_obj: BinaryIO, filename: str, upload_dir: Optional[Path] = None) -> Dict[str, Any]:
         """Save an uploaded file and return its metadata."""
-        upload_dir = self.output_dir / "uploads" / session_id
+        if upload_dir is None:
+            upload_dir = self.output_dir / "uploads" / session_id
         upload_dir.mkdir(parents=True, exist_ok=True)
         file_id = str(uuid.uuid4())
         safe_filename = Path(filename).name

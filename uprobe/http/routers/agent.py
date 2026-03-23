@@ -23,14 +23,7 @@ def get_agent_store(current_user: User = Depends(get_current_active_user)) -> Ag
     return AgentStore(data_dir=DATA_DIR, output_dir=OUTPUT_DIR, username=current_user.username)
 
 def get_conversation_session_manager(store: AgentStore, conversation_id: str):
-    workspace_root = store.conversation_output_dir(conversation_id)
-    output_dir = store.conversation_output_dir(conversation_id)
-    memory_dir = store.conversation_memory_dir(conversation_id)
-    return get_session_manager(
-        workspace_root=workspace_root,
-        output_dir=output_dir,
-        memory_dir=memory_dir
-    )
+    return get_session_manager()
 
 
 def sync_attachments_to_session(

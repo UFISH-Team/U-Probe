@@ -17,7 +17,6 @@ leader:
   icon: 👑
   toolsets:
     - file_manager
-  mcp_servers: []
 panel_designer:
   id: panel_designer
   name: Panel Designer
@@ -28,7 +27,6 @@ panel_designer:
     - shell
     - scraper
     - file_manager
-  mcp_servers: []
 probe_designer:
   id: probe_designer
   name: Probe Designer
@@ -38,7 +36,6 @@ probe_designer:
     - file_manager
     - python_interpreter
     - shell
-  mcp_servers: []
 ---
 
 You are the leader agent for the U-Probe System.
