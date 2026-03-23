@@ -79,6 +79,8 @@ def list_genomes(current_user: User = Depends(get_current_active_user)):
                     genomes_dict[x.name] = {"name": x.name, "is_public": False}
                     
         return list(genomes_dict.values())
+    except HTTPException:
+        raise
     except Exception as e:
         return [{"error": str(e)}]
 
@@ -94,7 +96,7 @@ async def list_genome_files(genome_name: str, current_user: User = Depends(get_c
         
         def scan_directory(directory: Path, relative_path: str = ""):
             for item in directory.iterdir():
-                if item.name.startswith('.'):  # 跳过隐藏文件
+                if item.name.startswith('.') and item.name != '.gitkeep':  # 跳过隐藏文件，但保留.gitkeep
                     continue
                     
                 item_relative_path = f"{relative_path}/{item.name}" if relative_path else item.name
@@ -108,6 +110,8 @@ async def list_genome_files(genome_name: str, current_user: User = Depends(get_c
         scan_directory(genome_dir)
         return {"genome": genome_name, "files": files}
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -140,6 +144,8 @@ async def get_file_metadata(genome_name: str, file_name: str, current_user: User
             "is_preset": is_preset or is_preset_by_time or is_public,
             "can_delete": not (is_preset or is_preset_by_time or is_public)
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching metadata: {str(e)}")
 
@@ -197,6 +203,8 @@ async def upload_genome_file(genome_name: str, file: UploadFile = File(...), cur
             
         return {"message": f"File '{filename}' uploaded successfully to {genome_name}"}
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -217,6 +225,8 @@ async def add_genome(genome_name: str, current_user: User = Depends(get_current_
         update_genomes_yaml(genome_name, current_user.username, "add")
         
         return {"message": f"Genome {genome_name} added successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -262,6 +272,8 @@ async def delete_file(genome_name: str, file_name: str, current_user: User = Dep
             shutil.rmtree(file_path)
             
         return {"message": f"File '{file_name}' deleted successfully from {genome_name}"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error deleting file: {str(e)}")
 
@@ -281,6 +293,8 @@ async def download_file(genome_name: str, file_name: str, current_user: User = D
         # 获取文件名（不包含路径）
         actual_filename = file_path.name
         return FileResponse(path=str(file_path), filename=actual_filename)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error downloading file: {str(e)}")
 
@@ -302,5 +316,7 @@ async def delete_genome_directory(genome_name: str, current_user: User = Depends
         update_genomes_yaml(genome_name, current_user.username, "delete")
         
         return {"message": f"Genome directory '{genome_name}' deleted successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
