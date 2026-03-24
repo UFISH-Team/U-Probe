@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from ..routers.auth import get_current_active_user, User, save_users_db, fake_users_db
-from uprobe.http.paths import get_data_dir
+from uprobe.http.utils.paths import get_data_dir
 import shutil
 import os
 
