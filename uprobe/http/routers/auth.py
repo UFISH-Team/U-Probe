@@ -175,7 +175,7 @@ class RegisterWithCodeRequest(BaseModel):
 class UserInDB(User):
     hashed_password: str
 
-from uprobe.http.paths import get_data_dir
+from uprobe.http.utils.paths import get_data_dir
 
 # --- User Database File ---
 USERS_DB_FILE = get_data_dir() / "users_db.json"
