@@ -1,7 +1,7 @@
 Quick Start Guide
 =================
 
-This guide will get you up and running with U-Probe in just a few minutes. We'll walk through a simple probe design workflow from start to finish.
+This guide will get you up and running with U-Probe in just a few minutes. We'll show you the easiest way to design your first probes.
 
 Prerequisites
 -------------
@@ -11,122 +11,43 @@ Before you begin, make sure you have:
 - U-Probe installed (see :doc:`installation`)
 - A genome FASTA file
 - A gene annotation GTF file
-- Basic knowledge of YAML configuration files
 
 Your First Probe Design
 ------------------------
 
-Let's design probes for some target genes using a simple configuration.
+U-Probe offers an interactive AI Assistant that makes probe design incredibly easy, especially for beginners. You don't need to write complex configuration files manually; the AI will guide you through the process.
 
-Step 1: Prepare Your Data
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 1: Start the AI Assistant
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You'll need two types of files:
-
-1. **Genome files** (FASTA + GTF)
-2. **Configuration files** (YAML)
-
-For this tutorial, we'll assume you have:
-
-- ``/path/to/genome.fa`` - Genome FASTA file
-- ``/path/to/annotation.gtf`` - Gene annotation GTF file
-
-Step 2: Create Configuration Files
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-**Create genomes.yaml:**
-
-.. code-block:: yaml
-
-   # genomes.yaml
-   human_demo:
-     description: "Demo human genome"
-     species: "Homo sapiens"
-     fasta: "/path/to/genome.fa"
-     gtf: "/path/to/annotation.gtf"
-     align_index:
-       - bowtie2
-       - blast
-     jellyfish: false
-
-**Create protocol.yaml:**
-
-.. code-block:: yaml
-
-   # protocol.yaml
-   name: "MyFirstProbes"
-   genome: "human_demo"
-   
-   # Target genes to design probes for
-   targets:
-     - "GAPDH"
-     - "ACTB"
-     - "TP53"
-   
-   # How to extract target regions
-   extracts:
-     target_region:
-       source: "exon"        # Extract from exons
-       overlap: 10           # Overlap between adjacent extracts
-       length: 120           # Length of each target region
-   
-   # Probe design specifications
-   probes:
-     main_probe:
-       template: "{spacer}{target_binding}{barcode}"
-       parts:
-         spacer:
-           length: 10
-           expr: "random_seq(10)"
-         target_binding:
-           length: 25
-           expr: "rc(target_region[0:25])"
-         barcode:
-           length: 15
-           expr: "encoding[gene_name]['BC1']"
-   
-   # Barcode sequences for each gene
-   encoding:
-     GAPDH:
-       BC1: "ACGTACGTACGTACG"
-     ACTB:
-       BC1: "TGCATGCATGCATGC"
-     TP53:
-       BC1: "CGATCGATCGATCGA"
-   
-   # Quality control attributes
-   attributes:
-     gc_content:
-       target: main_probe
-       type: gc_content
-     melting_temp:
-       target: main_probe
-       type: annealing_temperature
-   
-   # Filtering criteria
-   post_process:
-     filters:
-       gc_content:
-         condition: "gc_content >= 0.4 & gc_content <= 0.6"
-       melting_temp:
-         condition: "melting_temp >= 50 & melting_temp <= 65"
-
-Step 3: Run the Complete Workflow
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Now run U-Probe with a single command:
+Open your terminal and run the following command:
 
 .. code-block:: bash
 
-   uprobe run \
-     --protocol protocol.yaml \
-     --genomes genomes.yaml \
-     --output results/ \
-     --threads 4 \
-     --raw
+   uprobe agent
 
-This command will:
+This will launch an interactive chat session.
 
+Step 2: Describe Your Needs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Simply tell the AI what you want to do in natural language. For example:
+
+* "I want to design FISH probes for the GAPDH and ACTB genes in the human genome."
+* "Help me create a protocol for targeted sequencing of TP53."
+
+The AI will ask you clarifying questions (like where your genome files are located) and automatically generate the necessary `genomes.yaml` and `protocol.yaml` files for you.
+
+Step 3: Let the AI Run the Workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Once the configuration is ready, the AI can execute the U-Probe workflow for you, or you can run it manually using the generated files:
+
+.. code-block:: bash
+
+   uprobe run -p protocol.yaml -g genomes.yaml -o ./results --threads 4
+
+This command will automatically:
 1. Build genome indices (if needed)
 2. Validate your target genes
 3. Extract target regions
@@ -143,11 +64,8 @@ Check the results directory:
 .. code-block:: bash
 
    ls results/
-   # Output:
-   # MyFirstProbes_20240131_143022.csv      # Filtered probes
-   # MyFirstProbes_20240131_143022_raw.csv  # All probes (if --raw used)
 
-The CSV files contain your designed probes with all calculated attributes:
+The generated CSV files contain your designed probes with all calculated attributes:
 
 .. code-block:: text
 
@@ -156,228 +74,21 @@ The CSV files contain your designed probes with all calculated attributes:
    ACTB,CGTA...,TGCA...,0.48,55.7,True
    ...
 
-Step-by-Step Workflow
-----------------------
-
-For more control, you can run individual steps:
-
-Step 1: Build Genome Index
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You can also generate a visual report to better understand your results:
 
 .. code-block:: bash
 
-   uprobe build-index \
-     --protocol protocol.yaml \
-     --genomes genomes.yaml \
-     --threads 4
+   uprobe generate-report -p protocol.yaml -g genomes.yaml --probes results/probes_*.csv -o results/
 
-Step 2: Validate Targets
-~~~~~~~~~~~~~~~~~~~~~~~~
+Alternative: Manual Configuration
+---------------------------------
 
-.. code-block:: bash
+If you prefer to write the configuration files yourself without the AI assistant, you need to create two files:
 
-   uprobe validate-targets \
-     --protocol protocol.yaml \
-     --genomes genomes.yaml
+1. **genomes.yaml**: Defines the paths to your FASTA and GTF files.
+2. **protocol.yaml**: Defines your target genes, probe structure, and filtering criteria.
 
-Step 3: Generate Target Sequences
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-   uprobe generate-targets \
-     --protocol protocol.yaml \
-     --genomes genomes.yaml \
-     --output results/
-
-Step 4: Design Probes
-~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-   uprobe construct-probes \
-     --protocol protocol.yaml \
-     --genomes genomes.yaml \
-     --targets results/target_sequences.csv \
-     --output results/
-
-Step 5: Post-Process (Add Attributes & Filter)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-   uprobe post-process \
-     --protocol protocol.yaml \
-     --genomes genomes.yaml \
-     --probes results/constructed_probes.csv \
-     --output results/ \
-     --raw
-
-Understanding the Output
-------------------------
-
-Probe CSV Columns
-~~~~~~~~~~~~~~~~~
-
-The output CSV files contain these key columns:
-
-- **gene_name**: Target gene identifier
-- **target_region**: Extracted genomic sequence
-- **[probe_name]**: Designed probe sequence(s)
-- **[attribute_name]**: Calculated quality metrics
-- **passed_filters**: Whether the probe passed all filters
-
-Quality Metrics
-~~~~~~~~~~~~~~~
-
-Common quality attributes include:
-
-- **gc_content**: GC content (0.0 to 1.0)
-- **annealing_temperature**: Melting temperature (°C)
-- **self_match**: Self-complementarity score
-- **fold_score**: Secondary structure propensity
-- **mapped_genes**: Off-target binding potential
-
-Customizing Your Design
------------------------
-
-Probe Structure
-~~~~~~~~~~~~~~~
-
-Modify the probe template to change structure:
-
-.. code-block:: yaml
-
-   probes:
-     forward_probe:
-       template: "{primer}{target_binding}"
-       parts:
-         primer:
-           expr: "'ACGTACGT'"  # Fixed primer sequence
-         target_binding:
-           length: 20
-           expr: "target_region[10:30]"
-     
-     reverse_probe:
-       template: "{target_binding}{primer}"
-       parts:
-         target_binding:
-           length: 20
-           expr: "rc(target_region[30:50])"
-         primer:
-           expr: "'TGCATGCA'"
-
-Target Extraction
-~~~~~~~~~~~~~~~~~
-
-Change how target regions are extracted:
-
-.. code-block:: yaml
-
-   extracts:
-     target_region:
-       source: "genome"      # Extract from anywhere in genome
-       length: 200           # Longer regions
-       overlap: 50           # More overlap
-       # Custom genomic coordinates
-       coordinates:
-         - "chr1:1000000-1001000"
-         - "chr2:2000000-2001000"
-
-Quality Filters
-~~~~~~~~~~~~~~~
-
-Adjust filtering criteria:
-
-.. code-block:: yaml
-
-   post_process:
-     filters:
-       # Stricter GC content
-       gc_content:
-         condition: "gc_content >= 0.45 & gc_content <= 0.55"
-       
-       # Temperature range
-       melting_temp:
-         condition: "melting_temp >= 55 & melting_temp <= 60"
-       
-       # Exclude high off-targets
-       mapped_genes:
-         condition: "mapped_genes <= 3"
-
-Common Use Cases
-----------------
-
-FISH Probes
-~~~~~~~~~~~
-
-For fluorescence in situ hybridization:
-
-.. code-block:: yaml
-
-   probes:
-     fish_probe:
-       template: "{target_binding}{spacer}{fluorophore_binding}"
-       parts:
-         target_binding:
-           length: 30
-           expr: "rc(target_region[0:30])"
-         spacer:
-           expr: "'TTTTTT'"  # Poly-T spacer
-         fluorophore_binding:
-           expr: "encoding[gene_name]['fluorophore']"
-
-PCR Primers
-~~~~~~~~~~~
-
-For amplification-based methods:
-
-.. code-block:: yaml
-
-   probes:
-     forward_primer:
-       template: "{primer_seq}"
-       parts:
-         primer_seq:
-           length: 22
-           expr: "target_region[0:22]"
-     
-     reverse_primer:
-       template: "{primer_seq}"
-       parts:
-         primer_seq:
-           length: 22
-           expr: "rc(target_region[-22:])"
-
-Troubleshooting
----------------
-
-No Targets Found
-~~~~~~~~~~~~~~~~
-
-If no target sequences are generated:
-
-1. Check gene names in your GTF file
-2. Verify ``source`` parameter (exon, gene, etc.)
-3. Reduce ``length`` or ``overlap`` parameters
-
-No Probes Pass Filters
-~~~~~~~~~~~~~~~~~~~~~~
-
-If all probes are filtered out:
-
-1. Relax filtering conditions
-2. Check attribute calculations
-3. Use ``--raw`` to see all designed probes
-
-Performance Issues
-~~~~~~~~~~~~~~~~~~
-
-For large genomes or many targets:
-
-1. Increase ``--threads`` parameter
-2. Process targets in smaller batches
-3. Use SSD storage for genome files
+Please refer to the :doc:`configuration` and :doc:`cli` sections for detailed instructions on how to manually set up and run U-Probe.
 
 Next Steps
 ----------
@@ -385,7 +96,7 @@ Next Steps
 Now that you've completed your first probe design:
 
 1. Explore more :doc:`examples` for different applications
-2. Learn about advanced :doc:`workflows`
+2. Learn about advanced :doc:`workflow`
 3. Customize your designs using the :doc:`config_reference`
 4. Integrate U-Probe into your pipelines with the :doc:`python_api`
 
