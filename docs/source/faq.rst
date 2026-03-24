@@ -10,7 +10,7 @@ What is U-Probe?
 U-Probe is a comprehensive tool for designing DNA/RNA probes for various molecular biology applications including FISH, PCR, and sequencing. It automates the entire workflow from target selection to quality-filtered probe generation.
 
 What makes U-Probe different from other probe design tools?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **End-to-end workflow**: Complete automation from genome to final probes
 - **Highly configurable**: YAML-based configuration for any probe design
@@ -99,7 +99,7 @@ Use coordinate-based extraction:
          - "chr2:500000-501000"
 
 What's the difference between "exon", "gene", and "genome" extraction?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **exon**: Extracts from annotated exonic regions only (spliced sequences)
 - **gene**: Extracts from entire gene regions including introns
@@ -385,7 +385,7 @@ Yes! Use the Python API:
 
 .. code-block:: python
 
-   from uprobe import UProbeAPI
+   from uprobe.core.api import UProbeAPI
    
    uprobe = UProbeAPI(protocol_dict, genomes_dict, output_dir)
    results = uprobe.run_workflow()
@@ -490,7 +490,7 @@ U-Probe is actively maintained with:
 - Security patches
 - Documentation improvements
 
-Check the :doc:`changelog` for recent updates.
+Check the GitHub releases for recent updates.
 
 Can I get commercial support?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
