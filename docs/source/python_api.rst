@@ -22,7 +22,7 @@ Basic Usage
 .. code-block:: python
 
    from pathlib import Path
-   from uprobe import UProbeAPI
+   from uprobe.core.api import UProbeAPI
 
    # Initialize the API
    uprobe = UProbeAPI(
@@ -38,6 +38,9 @@ Basic Usage
        threads=10
    )
 
+   # Generate visual analysis report
+   uprobe.generate_report(probes_df)
+
    # Access the results
    print(f"Generated {len(probes_df)} probes")
    print(probes_df.head())
@@ -51,7 +54,7 @@ For more control over the process:
 
    import pandas as pd
    from pathlib import Path
-   from uprobe import UProbeAPI
+   from uprobe.core.api import UProbeAPI
 
    # Initialize
    uprobe = UProbeAPI(
@@ -90,7 +93,10 @@ For more control over the process:
    df_final = uprobe.post_process_probes(df_combined, raw_csv=True)
    print(f"Final probes: {len(df_final)}")
 
-   # Step 7: Generate barcodes (optional)
+   # Step 7: Generate visual analysis report
+   uprobe.generate_report(df_final)
+
+   # Step 8: Generate barcodes (optional)
    barcodes = uprobe.generate_barcodes()
 
 API Reference
@@ -99,9 +105,10 @@ API Reference
 UProbeAPI Class
 ~~~~~~~~~~~~~~~
 
-.. currentmodule:: uprobe
+.. currentmodule:: uprobe.core.api
 
 .. autoclass:: UProbeAPI
+   :noindex:
    :members:
    :undoc-members:
    :show-inheritance:
@@ -429,7 +436,7 @@ Robust Error Handling
 
 .. code-block:: python
 
-   from uprobe import UProbeAPI
+   from uprobe.core.api import UProbeAPI
    import logging
 
    def robust_probe_design(protocol_path, genomes_path, output_path):
@@ -491,7 +498,7 @@ Jupyter Notebook Integration
    %matplotlib inline
    import pandas as pd
    import matplotlib.pyplot as plt
-   from uprobe import UProbeAPI
+   from uprobe.core.api import UProbeAPI
 
    # Interactive probe design
    uprobe = UProbeAPI("protocol.yaml", "genomes.yaml", "results")
@@ -529,7 +536,7 @@ Flask Web Application
 .. code-block:: python
 
    from flask import Flask, request, jsonify, render_template
-   from uprobe import UProbeAPI
+   from uprobe.core.api import UProbeAPI
    import tempfile
    import yaml
 
@@ -603,7 +610,7 @@ Memory Management
        return pd.concat(all_results, ignore_index=True)
 
 Configuration Validation
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -651,7 +658,7 @@ Next Steps
 Now that you understand the Python API:
 
 1. Explore :doc:`examples` for real-world use cases
-2. Check :doc:`workflows` for common patterns  
+2. Check :doc:`workflow` for common patterns  
 3. Review the complete :doc:`api_reference`
 4. Learn about :doc:`troubleshooting` for common issues
 
