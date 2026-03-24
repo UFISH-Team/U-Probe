@@ -792,6 +792,6 @@ Next Steps
 ----------
 
 - Try the :doc:`examples` with different configurations
-- Learn about :doc:`workflows` for your application
+- Learn about :doc:`workflow` for your application
 - Check :doc:`troubleshooting` for common issues
 - Explore the :doc:`python_api` for programmatic access
