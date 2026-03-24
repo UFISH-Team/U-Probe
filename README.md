@@ -50,255 +50,79 @@ conda activate uprobe
 pip install .
 ```
 
-## Use guide
+## Usage Guide
 
-U-Probe provides two ways to use: Command Line Interface (CLI) and Python API.
+U-Probe provides two flexible ways to use the tool: **Command Line Interface (CLI)** and **Python API**. 
 
-### Pantheon REPL (interactive multi-agent)
+Before starting, ensure you have prepared two YAML configuration files:
+1. **`genomes.yaml`**: Defines genome paths (FASTA, GTF, etc.).
+2. **`protocol.yaml`**: Defines probe design parameters.
 
-If you want to use Pantheon directly (without the current U-Probe CLI and without
-`uprobe.agent.api.UProbeAgentAPI`), you can bootstrap a workspace and start the
-REPL with the U-Probe team loaded by default:
+### 1. Command Line Interface (CLI)
 
-```bash
-# Run in any work directory (this will install the team template into .pantheon/)
-python -m uprobe.agent.repl_bootstrap
-```
+The CLI is perfect for running tasks quickly in the terminal or shell scripts.
 
-This will copy the team template to:
-
-- `<workdir>/.pantheon/teams/uprobe_team.md`
-
-And then launch:
-
-- `python -m pantheon.repl --template <workdir>/.pantheon/teams/uprobe_team.md`
-
-### Configuration Files
-
-Before using U-Probe, you need to prepare two YAML configuration files:
-
-1. **genomes.yaml** - Define genome information:
-   ```yaml
-   human_hg38:
-     fasta: "/path/to/hg38.fa"
-     gtf: "/path/to/gencode.v38.annotation.gtf"
-     align_index: ["bowtie2", "blast"]
-   ```
-
-2. **protocol.yaml** - Define probe design parameters：
-   ```yaml
-   name: "MyExperiment"
-   genome: "human_hg38"
-   targets:
-     - "GENE1"
-     - "GENE2"
-   extracts:
-     target_region:
-       source: "exon"
-       overlap: 10
-       length: 120
-   # For more parameter configurations, please refer to tests/data/*.yaml
-   ```
-
-### Command Line Interface (CLI)
-
-After installation, U-Probe provides a comprehensive CLI that can be accessed via the `uprobe` command.
-
-#### Complete Workflow
-
-One-click execution of the complete process from genome index construction to probe design:
+#### 🌟 Complete Workflow (Recommended)
+To run the entire pipeline from genome index construction to final probe generation in one go:
 
 ```bash
-uprobe run \
-  --protocol protocol.yaml \
-  --genomes genomes.yaml \
-  --output ./results \
-  --raw \
-  --threads 10
+uprobe run -p protocol.yaml -g genomes.yaml -o ./results --threads 10
 ```
 
-#### Individual Step Execution
-
-**1. Build Genome Index**
-```bash
-uprobe build-index \
-  --protocol protocol.yaml \
-  --genomes genomes.yaml \
-  --threads 10
-```
-
-**2. Validate Target Genes**
-```bash
-uprobe validate-targets \
-  --protocol protocol.yaml \
-  --genomes genomes.yaml \
-  --continue-invalid
-```
-
-**3. Generate Target Sequences**
-```bash
-uprobe generate-targets \
-  --protocol protocol.yaml \
-  --genomes genomes.yaml \
-  --output ./results \
-  --continue-invalid
-```
-
-**4. Construct Probes**
-```bash
-uprobe construct-probes \
-  --protocol protocol.yaml \
-  --genomes genomes.yaml \
-  --targets ./results/target_sequences.csv \
-  --output ./results
-```
-
-**5. Post-process Probes**
-```bash
-uprobe post-process \
-  --protocol protocol.yaml \
-  --genomes genomes.yaml \
-  --probes ./results/combined_data.csv \
-  --output ./results \
-  --raw
-```
-
-**6. Generate Barcode Sequences**
-```bash
-uprobe generate-barcodes \
-  --protocol protocol.yaml \
-  --output ./barcodes
-```
-
-#### Common Parameters
-
-| Parameter | Description |
-|------|------|
-| `--protocol, -p` | Path to probe design protocol configuration file (YAML) |
-| `--genomes, -g` | Path to genome configuration file (YAML) |
-| `--output, -o` | Output directory [default: ./results] |
-| `--raw` | Save unfiltered raw probe data |
-| `--continue-invalid` | Continue execution even if some targets are invalid |
-| `--threads, -t` | Number of threads for computation [default: 10] |
-| `--verbose, -v` | Enable verbose logging |
-| `--quiet, -q` | Suppress all output except errors |
-
-#### Get Help
+#### 🔧 Step-by-Step Execution
+For advanced users who need intermediate results or custom workflows, you can execute each step individually:
 
 ```bash
-# View all commands
-uprobe --help
+# 1. Build genome index
+uprobe build-index -p protocol.yaml -g genomes.yaml -t 10
 
-# View help for specific command
-uprobe run --help
+# 2. Validate target genes against the GTF file
+uprobe validate-targets -p protocol.yaml -g genomes.yaml
 
-# Show version
-uprobe version
+# 3. Extract target region sequences
+uprobe generate-targets -p protocol.yaml -g genomes.yaml -o ./results
+
+# 4. Construct initial probes from target sequences
+uprobe construct-probes -p protocol.yaml -g genomes.yaml --targets ./results/target_sequences.csv -o ./results
+
+# 5. Post-process probes (add attributes, filter, sort)
+uprobe post-process -p protocol.yaml -g genomes.yaml --probes ./results/constructed_probes.csv -o ./results
+
+# 6. Generate visual analysis report
+uprobe generate-report -p protocol.yaml -g genomes.yaml --probes ./results/probes_*.csv -o ./results
 ```
 
-#### Example Workflow with Individual Steps
+### 2. Python API (Ideal for Backend Integration)
 
-```bash
-# 1. First, build the genome index
-uprobe build-index -p my_protocol.yaml -g my_genomes.yaml -t 8
-
-# 2. Validate your target genes
-uprobe validate-targets -p my_protocol.yaml -g my_genomes.yaml
-
-# 3. Generate target sequences
-uprobe generate-targets -p my_protocol.yaml -g my_genomes.yaml -o ./my_results
-
-# 4. Construct probes from target sequences
-uprobe construct-probes -p my_protocol.yaml -g my_genomes.yaml \
-  --targets ./my_results/target_sequences.csv -o ./my_results
-
-# 5. Post-process and filter probes
-uprobe post-process -p my_protocol.yaml -g my_genomes.yaml \
-  --probes ./my_results/combined_data.csv -o ./my_results --raw
-
-# 6. Optional: Generate barcodes
-uprobe generate-barcodes -p my_protocol.yaml -o ./barcodes
-```
-
-### Python API
-
-U-Probe provides an object-oriented API for easy integration into other Python projects.
-
-#### Basic Usage
+If you are developing a web backend or data analysis pipeline, we recommend directly using `UProbeAPI`. It returns Pandas DataFrames, making it easy to process further.
 
 ```python
 from pathlib import Path
-from uprobe.api import UProbeAPI
+from uprobe.core.api import UProbeAPI
 
-# init
+# Initialize API
 uprobe = UProbeAPI(
     protocol_config=Path("protocol.yaml"),
     genomes_config=Path("genomes.yaml"),
     output_dir=Path("./results")
 )
 
-# run 
-probes_df = uprobe.run_workflow(
-    raw_csv=True,
-    continue_on_invalid_targets=False,
-    threads=10
-)
-```
+# --- Method 1: Complete Workflow ---
+df_final = uprobe.run_workflow(threads=10)
 
-#### Step-by-Step Execution
-
-```python
-# Initialize api
-uprobe = UProbeAPI(
-    protocol_config=Path("protocol.yaml"),
-    genomes_config=Path("genomes.yaml"),
-    output_dir=Path("./results")
-)
-
-# 1. Build genome index
+# --- Method 2: Step-by-Step Execution ---
 uprobe.build_genome_index(threads=10)
-
-# 2. Validate target genes in gtf
-if not uprobe.validate_targets(continue_on_invalid=False):
-    print("Target validation failed")
-    exit(1)
-
-# 3. Generate target sequences
+uprobe.validate_targets()
 df_targets = uprobe.generate_target_seqs()
-if df_targets.empty:
-    print("No target sequences generated")
-    exit(1)
-
-# 4. Construct probes
 df_probes = uprobe.construct_probes(df_targets)
-if df_probes.empty:
-    print("No probes constructed")
-    exit(1)
 
-# 5. Merge target and probe data
 import pandas as pd
-df_combined = pd.concat([df_targets.reset_index(drop=True), 
-                        df_probes.reset_index(drop=True)], axis=1)
+df_combined = pd.concat([df_targets, df_probes], axis=1)
+df_final = uprobe.post_process_probes(df_combined)
 
-# 6. Post-process probes
-df_final = uprobe.post_process_probes(df_combined, raw_csv=True)
-print(f"Generated {len(df_final)} probes")
-
-# 7. Generate barcode sequences (optional)
-barcode_sets = uprobe.generate_barcodes()
+# Generate HTML/PDF report
+uprobe.generate_report(df_final)
 ```
-
-#### Main Methods
-
-| Method | Description |
-|------|------|
-| `build_genome_index(threads=10)` | Build genome index |
-| `validate_targets(continue_on_invalid=False)` | Validate target genes |
-| `generate_target_seqs()` | Generate target region sequences |
-| `construct_probes(df_targets)` | Construct probes |
-| `post_process_probes(df_probes, raw_csv=False)` | Add attributes and filter probes |
-| `generate_barcodes()` | Generate DNA barcode sequences |
-| `run_workflow(...)` | Execute complete probe design workflow |
 
 ## Configuration Details
 
