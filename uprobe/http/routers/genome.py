@@ -6,7 +6,7 @@ from datetime import datetime
 import shutil
 import os
 import yaml
-from uprobe.http.paths import get_public_genomes_dir, get_user_genomes_dir, get_genomes_yaml, get_user_genomes_yaml
+from uprobe.http.utils.paths import get_public_genomes_dir, get_user_genomes_dir, get_genomes_yaml, get_user_genomes_yaml
 from uprobe.http.routers.auth import get_current_active_user, User
 
 genome = APIRouter(prefix="/genome", tags=["genome"])
