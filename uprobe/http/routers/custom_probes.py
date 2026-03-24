@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from uprobe.http.routers.auth import get_current_active_user, User
-from uprobe.http.paths import get_data_dir
+from uprobe.http.utils.paths import get_data_dir
 
 router = APIRouter(
     prefix="/custom_probes",
