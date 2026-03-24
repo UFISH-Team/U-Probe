@@ -10,8 +10,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from uprobe.core.agent.session_manager import get_session_manager
-from uprobe.http.paths import get_output_dir, get_data_dir
-from uprobe.http.agent_store import AgentStore
+from uprobe.http.utils.paths import get_output_dir, get_data_dir
+from uprobe.http.utils.agent_store import AgentStore
 from uprobe.http.routers.auth import get_current_active_user, User
 
 agent_router = APIRouter(prefix="/agent", tags=["agent"])
@@ -23,7 +23,14 @@ def get_agent_store(current_user: User = Depends(get_current_active_user)) -> Ag
     return AgentStore(data_dir=DATA_DIR, output_dir=OUTPUT_DIR, username=current_user.username)
 
 def get_conversation_session_manager(store: AgentStore, conversation_id: str):
-    return get_session_manager()
+    workspace_root = store.conversation_output_dir(conversation_id)
+    output_dir = store.conversation_output_dir(conversation_id)
+    memory_dir = store.conversation_memory_dir(conversation_id)
+    return get_session_manager(
+        workspace_root=workspace_root,
+        output_dir=output_dir,
+        memory_dir=memory_dir
+    )
 
 
 def sync_attachments_to_session(
