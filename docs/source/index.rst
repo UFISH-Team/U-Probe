@@ -21,6 +21,8 @@
 Key Features
 ------------
 
+🤖 **AI Smart Assistant**: Built-in interactive Agent allows you to complete complex design tasks through natural language conversation.
+
 ✨ **End-to-end workflow**: Automates the entire probe design process, from sequence extraction to final filtering.
 
 ⚙️ **Highly customizable**: Use simple YAML configuration files to define target genes, probe structures, and filtering criteria.
@@ -40,7 +42,13 @@ Install U-Probe with pip:
 
    pip install uprobe
 
-Run a complete probe design workflow:
+The easiest way to design probes is using our interactive AI assistant:
+
+.. code-block:: bash
+
+   uprobe agent
+
+Or, run a complete probe design workflow manually:
 
 .. code-block:: bash
 
@@ -67,7 +75,7 @@ Documentation Contents
 
    cli
    python_api
-   workflows
+   workflow
    examples
 
 .. toctree::
@@ -103,7 +111,7 @@ Learn how to use U-Probe effectively:
 
 * :doc:`cli` - Command-line interface reference
 * :doc:`python_api` - Python API guide
-* :doc:`workflows` - Common workflows and best practices
+* :doc:`workflow` - Common workflows and best practices
 * :doc:`examples` - Real-world examples and tutorials
 
 Reference
@@ -119,28 +127,10 @@ Detailed reference documentation:
 Community & Support
 -------------------
 
-.. grid:: 1 2 2 2
-   :gutter: 2
-
-   .. grid-item-card:: 💬 GitHub Discussions
-      :link: https://github.com/UFISH-Team/U-Probe/discussions
-
-      Ask questions, share ideas, and get help from the community.
-
-   .. grid-item-card:: 🐛 Bug Reports
-      :link: https://github.com/UFISH-Team/U-Probe/issues
-
-      Found a bug? Report it on GitHub Issues.
-
-   .. grid-item-card:: 📖 Documentation
-      :link: https://uprobe.readthedocs.io
-
-      You're already here! Browse the complete documentation.
-
-   .. grid-item-card:: 🚀 Contribute
-      :link: contributing
-
-      Help make U-Probe better for everyone.
+* `GitHub Discussions <https://github.com/UFISH-Team/U-Probe/discussions>`_: Ask questions, share ideas, and get help from the community.
+* `Bug Reports <https://github.com/UFISH-Team/U-Probe/issues>`_: Found a bug? Report it on GitHub Issues.
+* `Documentation <https://uprobe.readthedocs.io>`_: You're already here! Browse the complete documentation.
+* :doc:`contributing`: Help make U-Probe better for everyone.
 
 License
 -------
