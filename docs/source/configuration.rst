@@ -645,7 +645,7 @@ Now that you understand configuration files:
 
 1. Try the examples in :doc:`examples`
 2. Learn about the :doc:`cli` for running your configurations  
-3. Explore advanced :doc:`workflows`
+3. Explore advanced :doc:`workflow`
 4. Check the complete :doc:`config_reference` for all options
 
 .. tip::
