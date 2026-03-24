@@ -3,7 +3,7 @@ API Reference
 
 This page provides detailed documentation for all U-Probe classes, functions, and modules.
 
-.. currentmodule:: uprobe
+.. currentmodule:: uprobe.core.api
 
 Main API
 --------
@@ -17,7 +17,7 @@ Main API
 Attributes Module
 -----------------
 
-.. automodule:: uprobe.attributes
+.. automodule:: uprobe.core.attributes
    :members:
    :undoc-members:
    :show-inheritance:
@@ -25,17 +25,17 @@ Attributes Module
 Generation Modules
 ------------------
 
-.. automodule:: uprobe.gen.fun
+.. automodule:: uprobe.core.gen.fun
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: uprobe.gen.probe
+.. automodule:: uprobe.core.gen.probe
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. automodule:: uprobe.gen.barcodes
+.. automodule:: uprobe.core.gen.barcodes
    :members:
    :undoc-members:
    :show-inheritance:
@@ -43,7 +43,7 @@ Generation Modules
 Processing Module
 -----------------
 
-.. automodule:: uprobe.process
+.. automodule:: uprobe.core.process
    :members:
    :undoc-members:
    :show-inheritance:
@@ -51,7 +51,7 @@ Processing Module
 Tools Module
 ------------
 
-.. automodule:: uprobe.tools
+.. automodule:: uprobe.core.tools
    :members:
    :undoc-members:
    :show-inheritance:
@@ -59,7 +59,7 @@ Tools Module
 Utilities
 ---------
 
-.. automodule:: uprobe.utils
+.. automodule:: uprobe.core.utils
    :members:
    :undoc-members:
    :show-inheritance:
