@@ -15,7 +15,7 @@ from datetime import datetime
 from uprobe.http.routers.task import TaskRead, TaskParameters, update_task_in_db
 from uprobe.http.routers.auth import get_current_active_user, User
 from uprobe.core.api import UProbeAPI
-from uprobe.http.paths import get_genomes_yaml, get_barcodes_csv, get_probe_json
+from uprobe.http.utils.paths import get_genomes_yaml, get_barcodes_csv, get_probe_json
 
 CSV_FILE_PATH = get_barcodes_csv()
 
@@ -210,7 +210,7 @@ async def run_uprobe(file: UploadFile = File(...), current_user: User = Depends(
         protocol_filepath.write_bytes(contents)
         
         # 合并 public_genomes.yaml 和 user_genomes.yaml
-        from uprobe.http.paths import get_genomes_yaml, get_user_genomes_yaml
+        from uprobe.http.utils.paths import get_genomes_yaml, get_user_genomes_yaml
         merged_genomes = {}
         
         public_yaml = get_genomes_yaml()
