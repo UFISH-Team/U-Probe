@@ -21,11 +21,8 @@ except ImportError:
                     key, value = line.split('=', 1)
                     os.environ[key.strip()] = value.strip()
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s:%(name)s:%(message)s'
-)
+from uprobe.http.utils.logger import setup_logging
+setup_logging()
 
 # uprobe.http/server/app.py
 from fastapi import FastAPI
@@ -69,7 +66,7 @@ app.include_router(agent_router)
 app.include_router(custom_probes_router)
 
 def start_server():
-    uvicorn.run(app, host="127.0.0.1")  #port=8123
+    uvicorn.run(app, host="127.0.0.1", log_config=None)
 
 if __name__ == "__main__":
     start_server()
