@@ -2,7 +2,7 @@ from pathlib import Path
 from fastapi import HTTPException
 from .utils import run_cmd
 import typing as t
-from uprobe.http.paths import get_fisheye_dir
+from uprobe.http.utils.paths import get_fisheye_dir
 
 SYSTEM_PATH = get_fisheye_dir()
 
