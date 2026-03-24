@@ -14,7 +14,7 @@ import zipfile
 import os
 import json
 from uprobe.http.routers.auth import get_current_active_user, User
-from uprobe.http.paths import get_data_dir, get_tasks_dir, get_results_dir
+from uprobe.http.utils.paths import get_data_dir, get_tasks_dir, get_results_dir
 
 router = APIRouter(
     prefix="/task",
@@ -305,7 +305,7 @@ async def _run_uprobe_task(username: str, task_id: str):
     try:
         logging.info(f"开始运行任务 {task_id} for user {username}")
         
-        from uprobe.http.paths import get_genomes_yaml, get_user_genomes_yaml
+        from uprobe.http.utils.paths import get_genomes_yaml, get_user_genomes_yaml
         
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_dir_path = Path(temp_dir)
