@@ -355,7 +355,7 @@ async def _run_uprobe_task(username: str, task_id: str):
                 pass
             task.progress = 30
             update_task_in_db(username, task)
-            from uprobe.http.workers.uprobe_runner import run_uprobe_workflow
+            from uprobe.http.utils.uprobe_runner import run_uprobe_workflow
             loop = asyncio.get_running_loop()
             pool = get_process_pool()
             job = functools.partial(run_uprobe_workflow, protocol_yaml=task.yaml_content, username=username, task_id=task_id, output_dir=str(task_results_dir), threads=TASK_THREADS, raw_csv=True, continue_invalid_targets=False, log_path=str(log_path))
