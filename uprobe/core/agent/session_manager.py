@@ -19,8 +19,9 @@ class AgentSessionManager:
         if workspace_root is None:
             workspace_root = Path(__file__).resolve().parents[3]
         self.workspace_root = workspace_root
-        self.template_path = self.workspace_root / "uprobe" / "core" / "agent" / "templates" / "uprobe_team.md"
-        self.protocol_template_path = self.workspace_root / "uprobe" / "core" / "agent" / "templates" / "DEFAULT_PROTOCOL.yaml"
+        # Use absolute path to the template file in the source code
+        self.template_path = Path(__file__).resolve().parent / "templates" / "uprobe_team.md"
+        self.protocol_template_path = Path(__file__).resolve().parent / "templates" / "DEFAULT_PROTOCOL.yaml"
         self.pantheon_memory_dir = self.workspace_root / ".pantheon" / "memory"
         self.output_dir = Path(os.environ.get("UPROBE_OUTPUT_DIR", str(self.workspace_root / "outputs")))
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -30,7 +31,12 @@ class AgentSessionManager:
     async def initialize(self):
         """Initialize the ChatRoom and background services."""
         self._ensure_team_template_registered()
-        self._ensure_protocol_template_installed()
+        # self._ensure_protocol_template_installed()
+        
+        # Set pantheon log level to DEBUG to print full agent execution output
+        from pantheon.utils.log import set_level
+        set_level("DEBUG")
+        
         await self.chatroom.run_setup()
 
     def _load_team_template(self, model: Optional[str]) -> Dict[str, Any]:
@@ -64,9 +70,10 @@ class AgentSessionManager:
     def _ensure_protocol_template_installed(self) -> Path:
         """Ensure DEFAULT_PROTOCOL.yaml is present in the workspace root."""
         dest = self.workspace_root / "DEFAULT_PROTOCOL.yaml"
-        if not dest.exists() and self.protocol_template_path.exists():
-            shutil.copy2(self.protocol_template_path, dest)
-            logger.info(f"Installed protocol template to {dest}")
+        # Skip copying DEFAULT_PROTOCOL.yaml to avoid cluttering the workspace
+        # if not dest.exists() and self.protocol_template_path.exists():
+        #     shutil.copy2(self.protocol_template_path, dest)
+        #     logger.info(f"Installed protocol template to {dest}")
         return dest
 
     def _build_chat_message(self, content: str) -> List[dict]:
@@ -91,10 +98,12 @@ class AgentSessionManager:
             self.sessions[session_id]["uploads"][file_id] = {"path": str(file_path), "filename": safe_filename, "size": size}
         return {"id": file_id, "filename": safe_filename, "path": str(file_path), "size": size}
 
-    async def create_session(self, model: str = "gpt-4", api_key: Optional[str] = None, proxy: Optional[str] = None) -> str:
+    async def create_session(self, model: str = "gpt-4", api_key: Optional[str] = None, api_base: Optional[str] = None, proxy: Optional[str] = None) -> str:
         """Start a new agent session."""
         if api_key:
             os.environ["OPENAI_API_KEY"] = api_key
+        if api_base:
+            os.environ["OPENAI_API_BASE"] = api_base
         if proxy:
             os.environ["http_proxy"] = proxy
             os.environ["https_proxy"] = proxy
@@ -184,9 +193,15 @@ class AgentSessionManager:
 _INSTANCE: Optional[AgentSessionManager] = None
 
 
-def get_session_manager() -> AgentSessionManager:
+def get_session_manager(workspace_root: Path | None = None, output_dir: Path | None = None, memory_dir: Path | None = None) -> AgentSessionManager:
     """Get or create the global session manager instance."""
     global _INSTANCE
     if _INSTANCE is None:
-        _INSTANCE = AgentSessionManager()
+        _INSTANCE = AgentSessionManager(workspace_root=workspace_root)
+        if output_dir:
+            _INSTANCE.output_dir = output_dir
+            _INSTANCE.output_dir.mkdir(parents=True, exist_ok=True)
+        if memory_dir:
+            _INSTANCE.pantheon_memory_dir = memory_dir
+            _INSTANCE.chatroom = ChatRoom(memory_dir=str(_INSTANCE.pantheon_memory_dir), workspace_path=str(_INSTANCE.workspace_root))
     return _INSTANCE

@@ -19,7 +19,7 @@ def get_server_root() -> Path:
         return Path(root).expanduser().resolve()
     
     this_file = Path(__file__).resolve()
-    project_root = this_file.parent.parent.parent
+    project_root = this_file.parent.parent.parent.parent
     return project_root
 
 def get_config() -> configparser.ConfigParser:

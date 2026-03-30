@@ -49,7 +49,7 @@ post_process:
 
 
 summary:
-  report_name: dna_report  # template name  # class: template1 or template2
+  report_name: dna_report  # template name  # class: dna_report or rna_report
   attributes:
 
 

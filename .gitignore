@@ -8,6 +8,7 @@ __pycache__/
 **/.pantheon
 **/.endpoint-logs
 **/config.ini
+**/.notebook_contexts.json
 
 # Windows Alternate Data Streams (Zone.Identifier files)
 *:Zone.Identifier

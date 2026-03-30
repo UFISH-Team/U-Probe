@@ -64,6 +64,7 @@ class MessageRequest(BaseModel):
     content: str
     attachment_ids: List[str] = []
     api_key: Optional[str] = None
+    api_base: Optional[str] = None
     model: Optional[str] = "gpt-5.2"
     proxy: Optional[str] = None
 
@@ -72,6 +73,7 @@ class RewindRequest(BaseModel):
     content: str
     attachment_ids: List[str] = []
     api_key: Optional[str] = None
+    api_base: Optional[str] = None
     model: Optional[str] = "gpt-5.2"
     proxy: Optional[str] = None
 
@@ -234,12 +236,19 @@ async def send_message(conversation_id: str, req: MessageRequest, store: AgentSt
             session_id = await sm.create_session(
                 model=req.model,
                 api_key=req.api_key,
+                api_base=req.api_base,
                 proxy=req.proxy
             )
             store.set_session(conversation_id, session_id)
         except Exception as e:
             logging.error(f"Failed to start session: {e}")
             raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Update environment variables for existing session
+        if req.api_key:
+            os.environ["OPENAI_API_KEY"] = req.api_key
+        if req.api_base:
+            os.environ["OPENAI_API_BASE"] = req.api_base
 
     attachments = store.get_attachments_by_ids(conversation_id, req.attachment_ids)
     sync_attachments_to_session(sm, session_id, attachments)
@@ -309,6 +318,12 @@ async def rewind_message(conversation_id: str, req: RewindRequest, store: AgentS
         raise HTTPException(status_code=404, detail="Session not found")
         
     sm = get_conversation_session_manager(store, conversation_id)
+    
+    if req.api_key:
+        os.environ["OPENAI_API_KEY"] = req.api_key
+    if req.api_base:
+        os.environ["OPENAI_API_BASE"] = req.api_base
+        
     attachments = store.get_attachments_by_ids(conversation_id, req.attachment_ids)
     sync_attachments_to_session(sm, session_id, attachments)
     
@@ -407,6 +422,7 @@ async def clear_conversation(conversation_id: str, store: AgentStore = Depends(g
 async def upload_file(
     conversation_id: str,
     api_key: Optional[str] = Form(None),
+    api_base: Optional[str] = Form(None),
     model: Optional[str] = Form("gpt-5.2"),
     proxy: Optional[str] = Form(None),
     file: UploadFile = File(...),
@@ -432,6 +448,7 @@ async def upload_file(
             session_id = await sm.create_session(
                 model=model,
                 api_key=api_key,
+                api_base=api_base,
                 proxy=proxy
             )
             store.set_session(conversation_id, session_id)

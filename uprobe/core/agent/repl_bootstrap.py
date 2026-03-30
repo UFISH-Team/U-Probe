@@ -4,8 +4,7 @@ Bootstrap Pantheon REPL in a workspace with the U-Probe team template.
 This module intentionally bypasses the existing U-Probe CLI and the
 `uprobe.core.agent.api.UProbeAgentAPI` workflow. Instead, it:
 1) Copies `uprobe_team.md` into `<workspace>/.pantheon/teams/`
-2) Copies `DEFAULT_PROTOCOL.yaml` into `<workspace>/DEFAULT_PROTOCOL.yaml`
-3) Launches `python -m pantheon.repl --template <copied_md>`
+2) Launches `python -m pantheon.repl --template <copied_md>`
 """
 
 from __future__ import annotations
@@ -113,10 +112,11 @@ def _install_protocol_template(workspace: Path, force: bool) -> Path:
         raise FileNotFoundError(f"Protocol template not found: {src}")
 
     dest = workspace / "DEFAULT_PROTOCOL.yaml"
-    if dest.exists() and not force:
-        return dest
-
-    shutil.copy2(src, dest)
+    # Skip copying DEFAULT_PROTOCOL.yaml to avoid cluttering the workspace
+    # if dest.exists() and not force:
+    #     return dest
+    #
+    # shutil.copy2(src, dest)
     return dest
 
 
@@ -173,7 +173,7 @@ def main(argv: list[str] | None = None) -> int:
 
     workspace = Path(args.workspace).expanduser().resolve()
     template_path = _install_team_template(workspace=workspace, force=bool(args.force))
-    _install_protocol_template(workspace=workspace, force=bool(args.force))
+    # _install_protocol_template(workspace=workspace, force=bool(args.force))
 
     extra_args = _normalize_repl_args(list(args.repl_args or []))
     return _launch_repl(

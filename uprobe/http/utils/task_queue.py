@@ -26,7 +26,13 @@ def _load_queue_config():
         val = config.get("TaskQueue", "max_concurrent_tasks").strip().lower()
         if val != "auto":
             try:
-                max_tasks = int(val)
+                configured_max_tasks = int(val)
+                safe_max_tasks = max(1, total_cores // threads)
+                if configured_max_tasks > safe_max_tasks:
+                    log.warning(f"Configured max_concurrent_tasks ({configured_max_tasks}) exceeds safe limit based on CPU cores ({total_cores}) and threads per task ({threads}). Limiting to {safe_max_tasks}.")
+                    max_tasks = safe_max_tasks
+                else:
+                    max_tasks = configured_max_tasks
             except ValueError:
                 log.warning(f"Invalid max_concurrent_tasks value '{val}' in config, falling back to auto ({max_tasks})")
                 
