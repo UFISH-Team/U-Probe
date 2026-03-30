@@ -41,7 +41,7 @@ def save_user_probes(username: str, probes: List[Dict[str, Any]]):
 
 @router.get("/", response_model=List[Dict[str, Any]])
 async def get_custom_probes(current_user: User = Depends(get_current_active_user)):
-    """获取当前用户的所有自定义探针"""
+    """Get all custom probes for the current user"""
     return load_user_probes(current_user.username)
 
 @router.post("/", response_model=Dict[str, Any])
@@ -49,15 +49,15 @@ async def save_custom_probe(
     probe_data: Dict[str, Any],
     current_user: User = Depends(get_current_active_user)
 ):
-    """保存或更新自定义探针"""
+    """Save or update a custom probe"""
     probes = load_user_probes(current_user.username)
     
-    # 检查名称是否重复
+    # Check for duplicate names
     probe_name = probe_data.get("name")
     if not probe_name:
         raise HTTPException(status_code=400, detail="Probe name is required")
         
-    # 如果是更新现有的（通过ID匹配）
+    # If updating an existing probe (match by ID)
     probe_id = probe_data.get("id")
     
     existing_idx = -1
@@ -85,7 +85,7 @@ async def delete_custom_probe(
     probe_id: str,
     current_user: User = Depends(get_current_active_user)
 ):
-    """删除自定义探针"""
+    """Delete a custom probe"""
     probes = load_user_probes(current_user.username)
     
     initial_length = len(probes)
