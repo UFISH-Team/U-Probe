@@ -117,7 +117,7 @@ class AvoidOTP(object):
                 yield qname, seq, alns
 
 
-#主函数
+# Main function
 def avoid_otp(
         blocks: t.Iterable[Block],
         target_regions: t.List[GenomicRegion],
