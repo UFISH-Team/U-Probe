@@ -91,12 +91,12 @@ async def list_genome_files(genome_name: str, current_user: User = Depends(get_c
         if not genome_dir.exists():
             raise HTTPException(status_code=404, detail="Genome directory not found")
         
-        # 递归获取所有文件和文件夹的相对路径
+        # Recursively get relative paths of all files and folders
         files = []
         
         def scan_directory(directory: Path, relative_path: str = ""):
             for item in directory.iterdir():
-                if item.name.startswith('.') and item.name != '.gitkeep':  # 跳过隐藏文件，但保留.gitkeep
+                if item.name.startswith('.') and item.name != '.gitkeep':  # Skip hidden files, but keep .gitkeep
                     continue
                     
                 item_relative_path = f"{relative_path}/{item.name}" if relative_path else item.name
@@ -104,7 +104,7 @@ async def list_genome_files(genome_name: str, current_user: User = Depends(get_c
                 if item.is_file():
                     files.append(item_relative_path)
                 elif item.is_dir():
-                    # 递归扫描子目录
+                    # Recursively scan subdirectories
                     scan_directory(item, item_relative_path)
         
         scan_directory(genome_dir)
@@ -124,16 +124,16 @@ async def get_file_metadata(genome_name: str, file_name: str, current_user: User
             raise HTTPException(status_code=404, detail="File not found")
         file_stats = os.stat(file_path)
         
-        # 检查是否为预设文件（基于创建时间或特定标记）
-        # 这里假设预设文件是在特定时间之前创建的，或者在特定目录中
+        # Check if it's a preset file (based on creation time or specific marker)
+        # Assuming preset files were created before a specific time or in a specific directory
         preset_genomes = {'hg38', 'hg19', 'mm10', 'mm9'}
         is_preset = genome_name in preset_genomes
         
-        # 也可以通过判断是否在 public 目录下
+        # Can also determine by checking if it's in the public directory
         is_public = str(file_path).startswith(str(get_public_genomes_dir()))
         
-        # 或者可以基于文件的创建时间来判断
-        # 假设2024年1月1日之前的文件都是预设文件
+        # Or determine based on file creation time
+        # Assuming files before Jan 1, 2024 are preset files
         preset_cutoff = datetime(2024, 1, 1).timestamp()
         is_preset_by_time = file_stats.st_ctime < preset_cutoff
         
@@ -152,39 +152,39 @@ async def get_file_metadata(genome_name: str, file_name: str, current_user: User
 @genome.post("/{genome_name}/upload")
 async def upload_genome_file(genome_name: str, file: UploadFile = File(...), current_user: User = Depends(get_current_active_user)):
     try:
-        # 只允许上传到用户的私有目录
+        # Only allow uploading to user's private directory
         genome_dir = get_user_genomes_dir(current_user.username) / genome_name
         if not genome_dir.exists():
             genome_dir.mkdir(parents=True, exist_ok=True)
-            # 如果是新创建的目录，更新 yaml
+            # If it's a newly created directory, update yaml
             update_genomes_yaml(genome_name, current_user.username, "add")
         
-        # 支持更多文件类型，包括.gitkeep等
+        # Support more file types, including .gitkeep etc.
         allowed_extensions = {'fa', 'fna', 'fasta', 'gff', 'gtf', 'jf', 'sam', 'bam', 'txt', 'gitkeep', 'fai'}
         
-        # 处理文件路径，支持文件夹结构
+        # Process file path, support folder structure
         filename = file.filename
         if not filename:
             raise HTTPException(status_code=400, detail="No filename provided")
             
-        # 检查文件扩展名（跳过.gitkeep等特殊文件的检查）
+        # Check file extension (skip check for special files like .gitkeep)
         if '.' in filename:
             file_extension = filename.split(".")[-1].lower()
             if file_extension not in allowed_extensions:
                 raise HTTPException(status_code=400, detail=f"Unsupported file type: {file_extension}")
         
-        # 创建完整的文件路径，支持子目录
+        # Create full file path, support subdirectories
         file_path = genome_dir / filename
         
-        # 确保父目录存在
+        # Ensure parent directory exists
         file_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # 写入文件
+        # Write file
         with open(file_path, "wb") as f:
             content = await file.read() 
             f.write(content)
             
-        # 如果上传的是 fasta 或 gtf 文件，尝试更新 genomes.yaml 中的具体路径
+        # If uploaded file is fasta or gtf, try to update specific paths in genomes.yaml
         if filename.endswith(('.fa', '.fasta', '.fna', '.gtf', '.gff')):
             yaml_path = get_user_genomes_yaml(current_user.username)
             if yaml_path.exists():
@@ -211,7 +211,7 @@ async def upload_genome_file(genome_name: str, file: UploadFile = File(...), cur
 @genome.post("/{genome_name}")
 async def add_genome(genome_name: str, current_user: User = Depends(get_current_active_user)):
     try:
-        # 检查是否与 public 冲突
+        # Check for conflict with public genomes
         public_dir = get_public_genomes_dir() / genome_name
         if public_dir.exists():
             raise HTTPException(status_code=400, detail="A public genome with this name already exists")
@@ -221,7 +221,7 @@ async def add_genome(genome_name: str, current_user: User = Depends(get_current_
             raise HTTPException(status_code=400, detail="Genome directory already exists")
         new_genome_dir.mkdir(parents=True, exist_ok=True)
         
-        # 自动更新 genomes.yaml
+        # Automatically update genomes.yaml
         update_genomes_yaml(genome_name, current_user.username, "add")
         
         return {"message": f"Genome {genome_name} added successfully"}
@@ -236,23 +236,23 @@ async def delete_file(genome_name: str, file_name: str, current_user: User = Dep
         genome_dir = get_genome_dir(genome_name, current_user.username)
         file_path = (genome_dir / file_name).resolve()
         
-        # 安全检查：确保文件路径在genome目录内
+        # Security check: ensure file path is within genome directory
         if not str(file_path).startswith(str(genome_dir.resolve())):
             raise HTTPException(status_code=400, detail="Invalid file path")
             
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
         
-        # 权限检查：检查是否在 public 目录下
+        # Permission check: check if it's in public directory
         if str(file_path).startswith(str(get_public_genomes_dir())):
             raise HTTPException(status_code=403, detail="Cannot delete public files")
             
-        # 权限检查：检查是否为预设文件
+        # Permission check: check if it's a preset file
         file_stats = os.stat(file_path)
         preset_genomes = {'hg38', 'hg19', 'mm10', 'mm9'}
         is_preset = genome_name in preset_genomes
         
-        # 基于创建时间判断是否为预设文件
+        # Determine if it's a preset file based on creation time
         preset_cutoff = datetime(2024, 1, 1).timestamp()
         is_preset_by_time = file_stats.st_ctime < preset_cutoff
         
@@ -262,7 +262,7 @@ async def delete_file(genome_name: str, file_name: str, current_user: User = Dep
         if file_path.is_file():
             file_path.unlink()
         elif file_path.is_dir():
-            # 检查目录中的所有文件是否都可以删除
+            # Check if all files in directory can be deleted
             for root, dirs, files in os.walk(file_path):
                 for f in files:
                     f_path = Path(root) / f
@@ -283,14 +283,14 @@ async def download_file(genome_name: str, file_name: str, current_user: User = D
         genome_dir = get_genome_dir(genome_name, current_user.username)
         file_path = (genome_dir / file_name).resolve()
         
-        # 安全检查：确保文件路径在genome目录内
+        # Security check: ensure file path is within genome directory
         if not str(file_path).startswith(str(genome_dir.resolve())):
             raise HTTPException(status_code=400, detail="Invalid file path")
             
         if not file_path.exists() or not file_path.is_file():
             raise HTTPException(status_code=404, detail="File not found")
             
-        # 获取文件名（不包含路径）
+        # Get filename (without path)
         actual_filename = file_path.name
         return FileResponse(path=str(file_path), filename=actual_filename)
     except HTTPException:
@@ -301,10 +301,10 @@ async def download_file(genome_name: str, file_name: str, current_user: User = D
 @genome.delete("/{genome_name}")
 async def delete_genome_directory(genome_name: str, current_user: User = Depends(get_current_active_user)):
     try:
-        # 只能删除用户自己目录下的
+        # Only allow deleting from user's own directory
         genome_dir = get_user_genomes_dir(current_user.username) / genome_name
         if not genome_dir.exists():
-            # 如果是 public 下的，提示不能删除
+            # If it's under public, notify that it cannot be deleted
             public_dir = get_public_genomes_dir() / genome_name
             if public_dir.exists():
                 raise HTTPException(status_code=403, detail="Cannot delete public genome directory")
@@ -312,7 +312,7 @@ async def delete_genome_directory(genome_name: str, current_user: User = Depends
             
         shutil.rmtree(genome_dir)
         
-        # 自动更新 genomes.yaml
+        # Automatically update genomes.yaml
         update_genomes_yaml(genome_name, current_user.username, "delete")
         
         return {"message": f"Genome directory '{genome_name}' deleted successfully"}
