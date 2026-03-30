@@ -40,6 +40,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+@app.on_event("startup")
+async def startup_event():
+    from uprobe.http.routers.task import reset_stuck_tasks_on_startup
+    reset_stuck_tasks_on_startup()
+
 origins = [
     os.getenv("FRONTEND_URL", "http://localhost:5173"),
 ]
