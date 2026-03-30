@@ -13,6 +13,10 @@ import shutil
 import zipfile
 import os
 import json
+import re
+from collections import deque
+import functools
+from uprobe.http.utils.process_pool import get_process_pool
 from uprobe.http.routers.auth import get_current_active_user, User
 from uprobe.http.utils.paths import get_data_dir, get_tasks_dir, get_results_dir
 
@@ -81,6 +85,7 @@ class TaskRead(TaskBase):
     updated_at: datetime
     result_url: Optional[str] = None
     yaml_content: Optional[str] = None
+    error_message: Optional[str] = None
 
 # --- Helper Function ---
 def find_task_by_id(username: str, task_id: str) -> Optional[TaskRead]:
@@ -109,6 +114,30 @@ def update_task_in_db(username: str, updated_task: TaskRead):
     task_dict_to_save['updated_at'] = task_dict_to_save['updated_at'].isoformat()
     tasks.append(task_dict_to_save)
     save_user_tasks(username, tasks)
+
+def reset_stuck_tasks_on_startup():
+    """
+    Reset 'running' tasks to 'failed' on server startup.
+    Since the queue is memory-based, execution context is lost after restart.
+    """
+    tasks_dir = get_tasks_dir()
+    if not tasks_dir.exists():
+        return
+        
+    for user_dir in tasks_dir.iterdir():
+        if user_dir.is_dir():
+            username = user_dir.name
+            tasks = load_user_tasks(username)
+            modified = False
+            for task_dict in tasks:
+                if task_dict.get("status") == "running":
+                    task_dict["status"] = "failed"
+                    task_dict["progress"] = 0
+                    task_dict["description"] = (task_dict.get("description") or "") + " [System restarted, task failed]"
+                    modified = True
+            if modified:
+                save_user_tasks(username, tasks)
+                logging.info(f"Reset stuck tasks for user {username} on startup.")
 
 # --- API Endpoints ---
 
@@ -283,154 +312,140 @@ async def run_task(
     if not task.yaml_content:
         raise HTTPException(status_code=400, detail="Task has no YAML configuration")
     
-    # 更新任务状态为运行中
-    task.status = "running"
-    task.progress = 10
+    # Keep pending status, update time to indicate queue entry
+    task.status = "pending"
     task.updated_at = datetime.now()
     update_task_in_db(current_user.username, task)
     
-    # 异步运行uprobe任务
+    # Run uprobe task asynchronously
     asyncio.create_task(_run_uprobe_task(current_user.username, task_id))
     
     return task
 
 async def _run_uprobe_task(username: str, task_id: str):
     """
-    异步运行uprobe任务的内部函数
+    Internal async function to run uprobe task with queue waiting logic.
     """
-    task = find_task_by_id(username, task_id)
-    if not task:
-        return
+    from uprobe.http.utils.task_queue import get_task_semaphore, TASK_THREADS
     
-    try:
-        logging.info(f"开始运行任务 {task_id} for user {username}")
-        
-        from uprobe.http.utils.paths import get_genomes_yaml, get_user_genomes_yaml
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_dir_path = Path(temp_dir)
-            protocol_filepath = temp_dir_path / "protocol.yaml"
-            
-            # 写入YAML内容到临时文件
-            protocol_filepath.write_text(task.yaml_content)
-            
-            # 合并 public_genomes.yaml 和 user_genomes.yaml
-            merged_genomes = {}
-            
-            public_yaml = get_genomes_yaml()
-            if public_yaml.exists():
-                try:
-                    with open(public_yaml, 'r', encoding='utf-8') as f:
-                        public_data = yaml.safe_load(f) or {}
-                        merged_genomes.update(public_data)
-                except Exception as e:
-                    logging.error(f"Error loading public genomes.yaml: {e}")
-                    
-            user_yaml = get_user_genomes_yaml(username)
-            if user_yaml.exists():
-                try:
-                    with open(user_yaml, 'r', encoding='utf-8') as f:
-                        user_data = yaml.safe_load(f) or {}
-                        merged_genomes.update(user_data)
-                except Exception as e:
-                    logging.error(f"Error loading user genomes.yaml: {e}")
-            
-            merged_genomes_path = temp_dir_path / "merged_genomes.yaml"
-            with open(merged_genomes_path, 'w', encoding='utf-8') as f:
-                yaml.dump(merged_genomes, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-            
-            output_dir = temp_dir_path / "results"
-            output_dir.mkdir()
-            
-            # 构建uprobe命令
-            cmd = [
-                "python", "-m", "uprobe", "run",
-                "--protocol", str(protocol_filepath),
-                "--genomes", str(merged_genomes_path),
-                "--output", str(output_dir),
-                "--raw"
-            ]
-            
-            logging.info(f"Running command: {' '.join(cmd)}")
-            
-            # 更新进度
-            task.progress = 30
-            
-            # 执行uprobe命令
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-            
-            task.progress = 50
-            update_task_in_db(username, task)
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode != 0:
-                error_message = stderr.decode()
-                stdout_message = stdout.decode()
-                logging.error(f"Uprobe CLI failed with code {process.returncode}")
-                logging.error(f"STDERR: {error_message}")
-                logging.error(f"STDOUT: {stdout_message}")
-                task.status = "failed"
-                task.progress = 0
-                task.updated_at = datetime.now()
-                update_task_in_db(username, task)
-                return
-            
-            # 检查输出文件
-            csv_files = list(output_dir.glob('*.csv'))
-            html_files = list(output_dir.glob('*.html'))
-            
-            if not csv_files and not html_files:
-                log_output = stdout.decode()
-                logging.warning(f"Uprobe command stdout: {log_output}")
-                task.status = "failed"
-                task.progress = 0
-                task.updated_at = datetime.now()
-                update_task_in_db(username, task)
-                return
-            
-            # 创建任务专用的结果目录
+    semaphore = get_task_semaphore()
+    should_wait = getattr(semaphore, "locked", None) and semaphore.locked()
+    if should_wait:
+        logging.info(f"Task {task_id} for user {username} is queued, waiting for CPU resources...")
+    else:
+        logging.info(f"Task {task_id} for user {username} submitted and will start soon.")
+    async with semaphore:
+        task = find_task_by_id(username, task_id)
+        if not task or task.status != "pending":
+            logging.info(f"Task {task_id} was cancelled or removed from queue.")
+            return
+        task.status = "running"
+        task.progress = 10
+        task.updated_at = datetime.now()
+        update_task_in_db(username, task)
+        try:
+            logging.info(f"Task {task_id} acquired execution slot, dispatching worker.")
             results_base_dir = get_results_dir()
             task_results_dir = results_base_dir / task_id
             task_results_dir.mkdir(parents=True, exist_ok=True)
-            
-            # 复制所有结果文件到持久化存储目录
-            result_files = []
-            for csv_file in csv_files:
-                dest_path = task_results_dir / csv_file.name
-                shutil.copy2(csv_file, dest_path)
-                result_files.append(csv_file.name)
-                
-            for html_file in html_files:
-                dest_path = task_results_dir / html_file.name
-                shutil.copy2(html_file, dest_path)
-                result_files.append(html_file.name)
-            
-            # 创建压缩包包含所有结果文件
-            zip_path = task_results_dir / f"{task_id}_results.zip"
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for file_name in result_files:
-                    file_path = task_results_dir / file_name
-                    zipf.write(file_path, file_name)
-            
-            # 任务完成，设置结果URL
+            log_path = task_results_dir / "run.log"
+            try:
+                log_path.touch(exist_ok=True)
+            except Exception:
+                pass
+            task.progress = 30
+            update_task_in_db(username, task)
+            from uprobe.http.workers.uprobe_runner import run_uprobe_workflow
+            loop = asyncio.get_running_loop()
+            pool = get_process_pool()
+            job = functools.partial(run_uprobe_workflow, protocol_yaml=task.yaml_content, username=username, task_id=task_id, output_dir=str(task_results_dir), threads=TASK_THREADS, raw_csv=True, continue_invalid_targets=False, log_path=str(log_path))
+            fut = loop.run_in_executor(pool, job)
+            tail_buf = deque(maxlen=2000)
+            last_progress = [task.progress]
+            def _progress_from_line(line: str) -> int:
+                if "Building genome index" in line:
+                    return 35
+                if "Validating targets" in line:
+                    return 45
+                if "Target validation successful" in line:
+                    return 50
+                if "Generating target region sequences" in line or "Extracting" in line:
+                    return 60
+                if "Constructing probes" in line or "Successfully generated" in line:
+                    return 70
+                if "Adding attributes to probes" in line:
+                    return 80
+                if "Post-processing probes" in line:
+                    return 85
+                if "Generating final report" in line or "Generating" in line and "HTML report" in line:
+                    return 92
+                if "Workflow completed successfully" in line or "U-Probe Workflow Completed" in line:
+                    return 100
+                return 0
+            async def _tail_log():
+                try:
+                    pos = 0
+                    while True:
+                        if fut.done():
+                            return
+                        try:
+                            with open(log_path, "r", encoding="utf-8", errors="replace") as rf:
+                                rf.seek(pos)
+                                chunk = rf.read()
+                                pos = rf.tell()
+                                if chunk:
+                                    for line in chunk.splitlines():
+                                        if line.strip():
+                                            tail_buf.append(line)
+                                            logging.info(f"[{task_id}] log: {line}")
+                                            p = _progress_from_line(line)
+                                            if p and p > last_progress[0] and p < 100:
+                                                last_progress[0] = p
+                                                task.progress = p
+                                                task.updated_at = datetime.now()
+                                                update_task_in_db(username, task)
+                        except Exception:
+                            pass
+                        await asyncio.sleep(0.5)
+                except Exception:
+                    return
+            tail_task = asyncio.create_task(_tail_log())
+            result = await fut
+            try:
+                tail_task.cancel()
+            except Exception:
+                pass
+            if not isinstance(result, dict) or not result.get("ok"):
+                err = (result or {}).get("error") if isinstance(result, dict) else "Unknown error"
+                task.status = "failed"
+                task.progress = 0
+                task.error_message = err or "\n".join(tail_buf)
+                task.updated_at = datetime.now()
+                update_task_in_db(username, task)
+                return
+            zip_name = result.get("zip_name")
+            zip_path = task_results_dir / zip_name if zip_name else None
+            if zip_path is None or not zip_path.exists():
+                task.status = "failed"
+                task.progress = 0
+                task.error_message = "Workflow finished but zip archive is missing.\n\nLog tail:\n" + "\n".join(tail_buf)
+                task.updated_at = datetime.now()
+                update_task_in_db(username, task)
+                return
             task.status = "completed"
             task.progress = 100
             task.result_url = str(zip_path.relative_to(results_base_dir))
             task.updated_at = datetime.now()
+            task.error_message = None
             update_task_in_db(username, task)
-            
-            logging.info(f"task {task_id} completed! Results saved to {task_results_dir}")
-            
-    except Exception as e:
-        logging.error(f"task {task_id} failed: {str(e)}")
-        task.status = "failed"
-        task.progress = 0
-        task.updated_at = datetime.now()
-        update_task_in_db(username, task)
+            logging.info(f"Task {task_id} completed! Results saved to {task_results_dir}")
+        except Exception as e:
+            logging.error(f"Task {task_id} failed: {str(e)}")
+            task.status = "failed"
+            task.progress = 0
+            task.error_message = f"Internal server error: {str(e)}"
+            task.updated_at = datetime.now()
+            update_task_in_db(username, task)
 
 @router.get("/{task_id}/download")
 async def download_task_result(
@@ -438,7 +453,7 @@ async def download_task_result(
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    下载任务结果文件（压缩包格式）
+    Download task result files as a zip archive.
     """
     task = find_task_by_id(current_user.username, task_id)
     if task is None:
@@ -450,14 +465,14 @@ async def download_task_result(
     if not task.result_url:
         raise HTTPException(status_code=404, detail="Result file not available for this task")
 
-    # 构建实际的文件路径
+    # Build actual file path
     results_base_dir = get_results_dir()
     file_path = results_base_dir / task.result_url
     
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Result file not found on disk")
     
-    # 返回文件下载响应
+    # Return file download response
     return FileResponse(
         path=str(file_path),
         filename=f"{task.name}_{task_id}_results.zip",
@@ -470,7 +485,7 @@ async def list_task_files(
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    列出任务的所有结果文件
+    List all result files for a task.
     """
     task = find_task_by_id(current_user.username, task_id)
     if task is None:
@@ -504,7 +519,7 @@ async def download_single_file(
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    下载任务的单个结果文件
+    Download a single result file for a task.
     """
     task = find_task_by_id(current_user.username, task_id)
     if task is None:
@@ -520,7 +535,7 @@ async def download_single_file(
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
     
-    # 确保文件在任务目录内（安全检查）
+    # Ensure file is within task directory (security check)
     if not str(file_path.resolve()).startswith(str(task_results_dir.resolve())):
         raise HTTPException(status_code=403, detail="Access denied")
     
