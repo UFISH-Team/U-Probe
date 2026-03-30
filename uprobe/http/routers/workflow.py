@@ -141,34 +141,34 @@ async def submit_task(
         yaml_content = yaml.safe_load(contents)
         print("Received yaml content:", yaml_content)
         
-        # 生成唯一的任务ID
+        # Generate unique task ID
         task_id = f"task-{uuid.uuid4()}"
         now = datetime.now()
         
-        # 从YAML配置中提取任务信息
+        # Extract task info from YAML config
         task_name = yaml_content.get('name', f'Uprobe Task {task_id[:8]}') 
         task_description = yaml_content.get('description', 'Uprobe design task')
-        # 尝试从多个可能的字段中获取物种信息
+        # Try to get species info from multiple possible fields
         genome = yaml_content.get('genome') or yaml_content.get('species', 'Unknown')
         
-        # 构建任务参数，从YAML中提取更多信息
-        probe_length = 120  # 默认值
+        # Build task parameters, extract more info from YAML
+        probe_length = 120  # Default value
         if yaml_content.get('extracts', {}).get('target_region', {}).get('length'):
             probe_length = yaml_content['extracts']['target_region']['length']
         
-        # 提取探针类型信息
+        # Extract probe type info
         probe_type = yaml_content.get('probe_type', 'Unknown')
         probe_name = yaml_content.get('probe_name', probe_type)
         
         parameters = TaskParameters(
             probe_length=probe_length,
-            tm_range="60-70",  # 默认值
-            gc_range="40-60",  # 默认值
+            tm_range="60-70",  # Default value
+            gc_range="40-60",  # Default value
             probe_type=probe_type,
             probe_name=probe_name
         )
         
-        # 创建任务记录
+        # Create task record
         new_task = TaskRead(
             id=task_id,
             name=task_name,
@@ -182,10 +182,10 @@ async def submit_task(
             result_url=None,
         )
         
-        # 将YAML内容保存到任务中（添加yaml_content字段）
+        # Save YAML content to task (add yaml_content field)
         new_task.yaml_content = yaml.dump(yaml_content, default_style='"', allow_unicode=True)
         
-        # 保存任务到数据库
+        # Save task to database
         update_task_in_db(current_user.username, new_task)
         
         return {
@@ -209,7 +209,7 @@ async def run_uprobe(file: UploadFile = File(...), current_user: User = Depends(
         protocol_filepath = temp_dir_path / "protocol.yaml"
         protocol_filepath.write_bytes(contents)
         
-        # 合并 public_genomes.yaml 和 user_genomes.yaml
+        # Merge public_genomes.yaml and user_genomes.yaml
         from uprobe.http.utils.paths import get_genomes_yaml, get_user_genomes_yaml
         merged_genomes = {}
         
@@ -238,12 +238,15 @@ async def run_uprobe(file: UploadFile = File(...), current_user: User = Depends(
         output_dir = temp_dir_path / "results"
         output_dir.mkdir()
 
+        # Build uprobe command with --threads limit
+        from uprobe.http.utils.task_queue import TASK_THREADS
         cmd = [
             "python", "-m", "uprobe", "run",
             "--protocol", str(protocol_filepath),
             "--genomes", str(merged_genomes_path),
             "--output", str(output_dir),
-            "--raw"
+            "--raw",
+            "--threads", str(TASK_THREADS)
         ]
         
         logging.info(f"Running command: {' '.join(cmd)}")
