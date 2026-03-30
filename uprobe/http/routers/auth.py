@@ -49,9 +49,9 @@ oauth2_scheme = HTTPBearer()
 
 # --- Pydantic Models ---
 class LoginRequest(BaseModel):
-    email_or_username: str  # 支持邮箱或用户名登录
+    email_or_username: str  # Support both email or username login
     password: str
-    remember_me: Optional[bool] = False  # 记住我选项
+    remember_me: Optional[bool] = False  # Remember me option
 
 class RegisterRequest(BaseModel):
     email: str
@@ -60,7 +60,7 @@ class RegisterRequest(BaseModel):
     
     @validator('email')
     def validate_email(cls, v):
-        # 基础邮箱格式验证，不再限制特定域名
+        # Basic email format validation
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_pattern, v.lower()):
             raise ValueError('Please enter a valid email address')
@@ -76,7 +76,7 @@ class RegisterRequest(BaseModel):
     def validate_username(cls, v):
         if len(v.strip()) < 2:
             raise ValueError('Username must be at least 2 characters long')
-        # 可以添加更多关于用户名的规则，比如不能包含特殊字符等
+        # Additional rules for username, e.g., no special characters
         if not re.match(r'^[a-zA-Z0-9_-]+$', v.strip()):
             raise ValueError('Username can only contain letters, numbers, underscores and hyphens')
         return v.strip()
@@ -225,15 +225,15 @@ def get_db():
     global fake_users_db
     return fake_users_db
 
-# 存储密码重置代码（在生产环境中应该使用Redis或数据库）
+# Store password reset codes (in production, use Redis or DB)
 reset_codes = {}
 
-# 存储注册验证码
+# Store registration verification codes
 verification_codes = {}
 
 # --- Utility Functions ---
 def send_email_sync(to_email: str, subject: str, body: str) -> bool:
-    """同步发送邮件函数"""
+    """Sync function to send email"""
     if SMTP_USER == "your_email@163.com":
         print(f"Warning: SMTP not configured. Would send to {to_email}: {body}")
         return True
@@ -260,35 +260,35 @@ def get_user(db, username: str):
     return None
 
 def get_user_by_email(db, email: str):
-    """通过邮箱查找用户"""
+    """Find user by email"""
     for username, user_data in db.items():
         if user_data.get('email') == email:
             return UserInDB(**user_data)
     return None
 
 def generate_username_from_email(email: str) -> str:
-    """从邮箱生成用户名"""
-    # 取邮箱@前的部分作为用户名
+    """Generate username from email"""
+    # Use the part before @ as username
     username = email.split('@')[0]
     return username
 
 def is_email_exists(db, email: str) -> bool:
-    """检查邮箱是否已存在"""
+    """Check if email already exists"""
     for user_data in db.values():
         if user_data.get('email') == email:
             return True
     return False
 
 def is_username_exists(db, username: str) -> bool:
-    """检查用户名是否已存在"""
+    """Check if username already exists"""
     return username in db
 
 def generate_reset_code() -> str:
-    """生成隔6位数字重置代码"""
+    """Generate 6-digit reset code"""
     return ''.join(random.choices(string.digits, k=6))
 
 def store_reset_code(email: str, code: str):
-    """存储重置代码，有10分钟过期"""
+    """Store reset code, expires in 10 minutes"""
     expiry_time = datetime.now() + timedelta(minutes=10)
     reset_codes[email] = {
         'code': code,
@@ -296,25 +296,25 @@ def store_reset_code(email: str, code: str):
     }
 
 def verify_reset_code(email: str, code: str) -> bool:
-    """验证重置代码"""
+    """Verify reset code"""
     if email not in reset_codes:
         return False
     
     stored_data = reset_codes[email]
     if datetime.now() > stored_data['expiry']:
-        # 代码已过期
+        # Code expired
         del reset_codes[email]
         return False
     
     return stored_data['code'] == code
 
 def clear_reset_code(email: str):
-    """清除使用过的重置代码"""
+    """Clear used reset code"""
     if email in reset_codes:
         del reset_codes[email]
 
 def store_verification_code(email: str, code: str):
-    """存储注册验证码，10分钟过期"""
+    """Store registration verification code, expires in 10 minutes"""
     expiry_time = datetime.now() + timedelta(minutes=10)
     verification_codes[email] = {
         'code': code,
@@ -322,7 +322,7 @@ def store_verification_code(email: str, code: str):
     }
 
 def verify_verification_code(email: str, code: str) -> bool:
-    """验证注册验证码"""
+    """Verify registration verification code"""
     if email not in verification_codes:
         return False
     
@@ -334,18 +334,18 @@ def verify_verification_code(email: str, code: str) -> bool:
     return stored_data['code'] == code
 
 def clear_verification_code(email: str):
-    """清除使用过的注册验证码"""
+    """Clear used registration verification code"""
     if email in verification_codes:
         del verification_codes[email]
 
 def get_user_by_email_or_username(db, email_or_username: str):
-    """通过邮箱或用户名查找用户"""
-    # 先尝试作为用户名查找（管理员账户）
+    """Find user by email or username"""
+    # Try as username first (admin accounts)
     if email_or_username in db:
         user_dict = db[email_or_username]
         return UserInDB(**user_dict)
     
-    # 再尝试作为邮箱查找（普通用户）
+    # Then try as email (regular users)
     for username, user_data in db.items():
         if user_data.get('email') == email_or_username:
             return UserInDB(**user_data)
@@ -409,11 +409,11 @@ async def login_for_access_token(login_request: LoginRequest):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # 根据记住我选项设置不同的过期时间
+    # Set different expiration times based on remember me option
     if login_request.remember_me:
-        access_token_expires = timedelta(days=30)  # 30天
+        access_token_expires = timedelta(days=30)  # 30 days
     else:
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)  # 30分钟
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)  # 30 minutes
     
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
@@ -433,25 +433,25 @@ async def register_user(register_request: RegisterRequest):
     global fake_users_db
     fake_users_db = db
     
-    # 检查邮箱是否已存在
+    # Check if email already exists
     if is_email_exists(db, register_request.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email address is already registered"
         )
     
-    # 检查用户名是否已存在
+    # Check if username already exists
     if is_username_exists(db, register_request.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username is already taken"
         )
     
-    # 创建新用户
+    # Create new user
     hashed_password = pwd_context.hash(register_request.password)
     new_user_data = {
         "username": register_request.username,
-        "full_name": register_request.username, # 默认将全名设为用户名
+        "full_name": register_request.username, # Default full name to username
         "email": register_request.email,
         "hashed_password": hashed_password,
         "disabled": False,
@@ -463,17 +463,17 @@ async def register_user(register_request: RegisterRequest):
         "bio": "Researcher specializing in probe design and bioinformatics analysis."
     }
     
-    # 保存到数据库
+    # Save to database
     db[register_request.username] = new_user_data
     save_users_db(db)
     
-    # 创建访问令牌
+    # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": register_request.username}, expires_delta=access_token_expires
     )
     
-    # 返回用户信息
+    # Return user info
     user_info = User(**new_user_data)
     
     return {
@@ -489,18 +489,18 @@ async def send_verification_code(request: SendVerificationCodeRequest):
     global fake_users_db
     fake_users_db = db
     
-    # 检查邮箱是否已存在
+    # Check if email already exists
     if is_email_exists(db, request.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email address is already registered"
         )
     
-    # 生成验证码
-    code = generate_reset_code()  # 复用生成6位数字的函数
+    # Generate verification code
+    code = generate_reset_code()  # Reuse 6-digit code generation function
     store_verification_code(request.email, code)
     
-    # 发送邮件
+    # Send email
     subject = "🔬U-Probe - Registration Verification Code"
     body = f"🔬Welcome to U-Probe! \n\nA universal probe design platform.\n\nYour registration verification code is: {code}\n\nThis code will expire in 10 minutes.\nIf you did not request this, please ignore this email."
     
@@ -520,32 +520,32 @@ async def register_with_code(request: RegisterWithCodeRequest):
     global fake_users_db
     fake_users_db = db
     
-    # 检查邮箱是否已存在
+    # Check if email already exists
     if is_email_exists(db, request.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email address is already registered"
         )
         
-    # 检查用户名是否已存在
+    # Check if username already exists
     if is_username_exists(db, request.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username is already taken"
         )
         
-    # 验证验证码
+    # Verify verification code
     if not verify_verification_code(request.email, request.verification_code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired verification code"
         )
         
-    # 创建新用户
+    # Create new user
     hashed_password = pwd_context.hash(request.password)
     new_user_data = {
         "username": request.username,
-        "full_name": request.username, # 默认将全名设为用户名
+        "full_name": request.username, # Default full name to username
         "email": request.email,
         "hashed_password": hashed_password,
         "disabled": False,
@@ -557,20 +557,20 @@ async def register_with_code(request: RegisterWithCodeRequest):
         "bio": "Researcher specializing in probe design and bioinformatics analysis."
     }
     
-    # 保存到数据库
+    # Save to database
     db[request.username] = new_user_data
     save_users_db(db)
     
-    # 清除验证码
+    # Clear verification code
     clear_verification_code(request.email)
     
-    # 创建访问令牌
+    # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": request.username}, expires_delta=access_token_expires
     )
     
-    # 返回用户信息
+    # Return user info
     user_info = User(**new_user_data)
     
     return {
@@ -664,17 +664,17 @@ async def forgot_password(request: ForgotPasswordRequest):
     global fake_users_db
     fake_users_db = db
     
-    # 检查邮箱是否存在
+    # Check if email exists
     user = get_user_by_email(db, request.email)
     if not user:
-        # 为了安全起见，不要透露邮箱是否存在
+        # For security, do not reveal if email exists
         return {"message": "If the email exists, a reset code has been sent."}
     
-    # 生成重置代码
+    # Generate reset code
     reset_code = generate_reset_code()
     store_reset_code(request.email, reset_code)
     
-    # 发送密码重置邮件
+    # Send password reset email
     subject = "UProbe - Password Reset Code"
     body = f"Hello,\n\nYour password reset code is: {reset_code}\n\nThis code will expire in 10 minutes.\nIf you did not request a password reset, please ignore this email."
     
@@ -693,14 +693,14 @@ async def reset_password(request: ResetPasswordRequest):
     global fake_users_db
     fake_users_db = db
     
-    # 验证重置代码
+    # Verify reset code
     if not verify_reset_code(request.email, request.reset_code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired reset code"
         )
     
-    # 查找用户
+    # Find user
     user = get_user_by_email(db, request.email)
     if not user:
         raise HTTPException(
@@ -708,12 +708,12 @@ async def reset_password(request: ResetPasswordRequest):
             detail="User not found"
         )
     
-    # 更新密码
+    # Update password
     new_hashed_password = pwd_context.hash(request.new_password)
     db[user.username]["hashed_password"] = new_hashed_password
     save_users_db(db)
     
-    # 清除重置代码
+    # Clear reset code
     clear_reset_code(request.email)
     
     return {"message": "Password has been reset successfully"}
