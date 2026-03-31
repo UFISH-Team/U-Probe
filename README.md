@@ -1,6 +1,6 @@
-<h1 align="center">
-  <img src="./assets/uprobe.svg" alt="uprobe logo" height="80" align="absmiddle"> Universal & Agentic Probe Design Tool
-</h1>
+<h3 align="center">
+  <img src="./assets/uprobe.svg" alt="uprobe logo" height="80" align="absmiddle"> U-Probe: Universal & Agentic Probe Design Tool
+</h3>
 <br>
 
 - U-Probe is a powerful and flexible Python-based tool for designing custom DNA or RNA probes for various molecular biology applications, such as *in situ* hybridization and targeted sequencing. 
