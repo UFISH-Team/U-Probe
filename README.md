@@ -55,7 +55,14 @@ Before starting, ensure you have prepared two YAML configuration files:
 
 The CLI is perfect for running tasks quickly in the terminal or shell scripts.
 
-#### 🌐 Start Web Server (New!)
+#### 🤖 AI Smart Assistant 
+U-Probe includes an interactive AI Agent powered by Pantheon. You can design probes through natural language conversation without writing YAML files manually.
+
+```bash
+uprobe agent
+```
+
+#### 🌐 Start Web Server 
 U-Probe now comes with a built-in web server and UI for an intuitive visual experience.
 
 ```bash
