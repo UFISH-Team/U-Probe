@@ -25,9 +25,9 @@ URL = "https://github.com/UFISH-Team/U-Probe"
 
 
 def get_version():
-    with open("uprobe/http/__init__.py") as f:
+    with open("uprobe/__init__.py") as f:
         for line in f.readlines():
-            m = re.match("__version__ = '([^']+)'", line)
+            m = re.match(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", line)
             if m:
                 return m.group(1)
         raise IOError("Version information can not found.")
@@ -61,7 +61,7 @@ requires_dev = packages_for_dev
 setup(
     name='uprobe',
     author='Qian Zhang, Weize Xu',
-    author_email='jshn2022@163.com',
+    author_email='jshn2022@163.com, ',
     version=get_version(),
     license='MIT',
     description='Web server for U-Probe',
@@ -79,7 +79,8 @@ setup(
     python_requires='>=3.8, <4',
     entry_points={
         'console_scripts': [
-            'u-probe = uprobe.http.server:start_server',
+            'uprobe = uprobe.core.cli:main',
+            'u-probe = uprobe.core.cli:main',
         ],
     },
 )
