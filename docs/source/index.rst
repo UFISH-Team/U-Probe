@@ -1,4 +1,6 @@
-🧬 U-Probe: Universal Probe Design Tool
+.. rst-class:: homepage-hero
+
+Universal & Agentic Probe Design Tool
 =======================================
 
 .. image:: https://img.shields.io/github/license/UFISH-Team/U-Probe
@@ -9,58 +11,65 @@
    :target: https://www.python.org/downloads/
    :alt: Python Version
 
-.. image:: https://readthedocs.org/projects/uprobe/badge/?version=latest
-   :target: https://uprobe.readthedocs.io/en/latest/?badge=latest
-   :alt: Documentation Status
+**U-Probe** is a comprehensive, automated, and highly customizable Python-based framework for designing nucleic acid probes. It provides an end-to-end workflow tailored for various molecular biology applications, including *in situ* hybridization (e.g., FISH) and targeted sequencing.
 
-**U-Probe** is a powerful and flexible Python-based tool for designing custom DNA or RNA probes for various molecular biology applications, such as *in situ* hybridization and targeted sequencing. It provides a comprehensive workflow from target gene selection to final probe generation, with a focus on automation, customization, and ease of use.
+By integrating advanced sequence analysis, thermodynamic evaluation, and off-target filtering, U-Probe ensures the generation of highly specific and efficient probe sets.
 
-.. note::
-   U-Probe is developed by the UFISH Team and is actively maintained. For the latest updates and source code, visit our `GitHub repository <https://github.com/UFISH-Team/U-Probe>`_.
+-------------------
+Why Choose U-Probe?
+-------------------
 
-Key Features
-------------
+.. grid:: 1 2 2 2
+    :gutter: 3
 
-🤖 **AI Smart Assistant**: Built-in interactive Agent allows you to complete complex design tasks through natural language conversation.
+    .. grid-item-card:: 🚀 End-to-End Automation
+        :class-card: border-2
 
-✨ **End-to-end workflow**: Automates the entire probe design process, from sequence extraction to final filtering.
+        Seamlessly transition from target gene selection to final probe generation without manual intervention.
 
-⚙️ **Highly customizable**: Use simple YAML configuration files to define target genes, probe structures, and filtering criteria.
+    .. grid-item-card:: ⚙️ Highly Customizable
+        :class-card: border-2
 
-🔍 **Advanced filtering**: Filter probes based on a wide range of attributes like GC content, melting temperature (Tm), and off-target potential.
+        Define complex probe structures, target regions, and filtering criteria using intuitive YAML configurations.
 
-🔌 **Extensible API**: In addition to a command-line interface, U-Probe offers a clean Python API for programmatic access and integration into other bioinformatics pipelines.
+    .. grid-item-card:: 🔬 Advanced Filtering
+        :class-card: border-2
 
-🗃️ **Built-in indexing**: Automatically handles the creation of genome indices for alignment tools like Bowtie2 and BLAST.
+        Evaluate GC content, melting temperature (Tm), secondary structure (MFE), and genome-wide off-target potential.
 
+    .. grid-item-card:: 💻 Flexible Interfaces
+        :class-card: border-2
+
+        Access U-Probe via an interactive Web UI, a robust Command-Line Interface (CLI), or a programmatic Python API.
+
+-----------
 Quick Start
 -----------
 
-Install U-Probe with pip:
+Install U-Probe via pip:
 
 .. code-block:: bash
 
    pip install uprobe
 
-The easiest way to design probes is using our interactive AI assistant:
+Launch the interactive Web UI to design probes visually:
 
 .. code-block:: bash
 
-   uprobe agent
+   uprobe server
 
-Or, run a complete probe design workflow manually:
+Or execute a complete automated workflow via CLI:
 
 .. code-block:: bash
 
-   uprobe run --protocol protocol.yaml --genomes genomes.yaml --output results/
+   uprobe run -p protocol.yaml -g genomes.yaml -o ./results --threads 10
 
-For detailed installation instructions and usage examples, see the :doc:`installation` and :doc:`quickstart` guides.
-
+----------------------
 Documentation Contents
 ----------------------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Getting Started
    :hidden:
 
@@ -69,7 +78,7 @@ Documentation Contents
    configuration
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: User Guide
    :hidden:
 
@@ -79,67 +88,60 @@ Documentation Contents
    examples
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Reference
    :hidden:
 
-   api_reference
    config_reference
    troubleshooting
    faq
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Development
    :hidden:
 
    contributing
 
-Getting Started
-~~~~~~~~~~~~~~~
+.. grid:: 1 2 2 2
+    :gutter: 3
 
-New to U-Probe? Start here:
+    .. grid-item-card:: 📚 Getting Started
+        :link: installation
+        :link-type: doc
 
-* :doc:`installation` - Install U-Probe on your system
-* :doc:`quickstart` - Get up and running in minutes
-* :doc:`configuration` - Learn about configuration files
+        Installation instructions, quickstart guide, and configuration basics.
 
-User Guide
-~~~~~~~~~~
+    .. grid-item-card:: 🛠️ User Guide
+        :link: cli
+        :link-type: doc
 
-Learn how to use U-Probe effectively:
+        Detailed tutorials for CLI, Python API, and common design workflows.
 
-* :doc:`cli` - Command-line interface reference
-* :doc:`python_api` - Python API guide
-* :doc:`workflow` - Common workflows and best practices
-* :doc:`examples` - Real-world examples and tutorials
+    .. grid-item-card:: 📖 Configuration Reference
+        :link: config_reference
+        :link-type: doc
 
-Reference
-~~~~~~~~~
+        Comprehensive documentation of U-Probe's YAML configuration parameters.
 
-Detailed reference documentation:
+    .. grid-item-card:: 💡 Contributing
+        :link: contributing
+        :link-type: doc
 
-* :doc:`api_reference` - Complete API documentation
-* :doc:`config_reference` - Configuration file reference
-* :doc:`troubleshooting` - Common issues and solutions
-* :doc:`faq` - Frequently asked questions
+        Guidelines for contributing to the U-Probe open-source project.
 
-Community & Support
--------------------
+--------
+Citation
+--------
 
-* `GitHub Discussions <https://github.com/UFISH-Team/U-Probe/discussions>`_: Ask questions, share ideas, and get help from the community.
-* `Bug Reports <https://github.com/UFISH-Team/U-Probe/issues>`_: Found a bug? Report it on GitHub Issues.
-* `Documentation <https://uprobe.readthedocs.io>`_: You're already here! Browse the complete documentation.
-* :doc:`contributing`: Help make U-Probe better for everyone.
+If you use U-Probe in your research, please cite:
 
-License
--------
+.. code-block:: bibtex
 
-U-Probe is released under the MIT License. See the `LICENSE <https://github.com/UFISH-Team/U-Probe/blob/main/LICENSE>`_ file for details.
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+    @software{uprobe2025,
+      title={U-Probe: Universal Probe Design Tool},
+      author={Zhang, Qian and Xu, Weize and Cai, Huaiyuan},
+      year={2025},
+      url={https://github.com/UFISH-Team/U-Probe},
+      version={1.0.0}
+    }
