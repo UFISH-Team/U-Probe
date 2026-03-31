@@ -1,0 +1,3 @@
+include requirements.txt
+include requirements-dev.txt
+recursive-include uprobe *.ini *.yaml *.json *.html *.css *.js
