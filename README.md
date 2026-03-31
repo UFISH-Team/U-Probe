@@ -15,28 +15,23 @@
 - **Advanced filtering**: Filter probes based on a wide range of attributes like GC content, melting temperature (Tm), and off-target potential.
 - **Extensible API**: In addition to a command-line interface, U-Probe offers a clean Python API for programmatic access and integration into other bioinformatics pipelines.
 - **Built-in indexing**: Automatically handles the creation of genome indices for alignment tools like Bowtie2 and BLAST.
+- **Interactive Web UI**: Includes a built-in web server for visual workflow management and result analysis.
 
 ## Installation
 
-To get started with U-Probe, clone the repository and install the package.
+U-Probe can be easily installed via pip. We recommend using a virtual environment (like conda or venv).
 
-### Install from source (Recommended)
+### Install via pip (Recommended)
 
 ```bash
-git clone https://github.com/UFISH-Team/U-Probe.git
-cd u-probe
-pip install .
+pip install uprobe
 ```
 
-After installation, you can use U-Probe directly with the `uprobe` command.
-
-### Development install
-
-For development purposes, install in editable mode:
+### Install from source (For development)
 
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
-cd u-probe
+cd U-Probe
 pip install -e .
 ```
 
@@ -44,7 +39,7 @@ pip install -e .
 
 ```bash
 git clone https://github.com/UFISH-Team/U-Probe.git
-cd u-probe
+cd U-Probe
 conda env create -f environments.yaml
 conda activate uprobe
 pip install .
@@ -52,7 +47,7 @@ pip install .
 
 ## Usage Guide
 
-U-Probe provides two flexible ways to use the tool: **Command Line Interface (CLI)** and **Python API**. 
+U-Probe provides flexible ways to use the tool: **Command Line Interface (CLI)**, **Python API**, and an **Interactive Web UI**. 
 
 Before starting, ensure you have prepared two YAML configuration files:
 1. **`genomes.yaml`**: Defines genome paths (FASTA, GTF, etc.).
@@ -61,6 +56,13 @@ Before starting, ensure you have prepared two YAML configuration files:
 ### 1. Command Line Interface (CLI)
 
 The CLI is perfect for running tasks quickly in the terminal or shell scripts.
+
+#### 🌐 Start Web Server (New!)
+U-Probe now comes with a built-in web server and UI for an intuitive visual experience.
+
+```bash
+uprobe server --host 127.0.0.1 --port 8000
+```
 
 #### 🌟 Complete Workflow (Recommended)
 To run the entire pipeline from genome index construction to final probe generation in one go:
@@ -97,52 +99,144 @@ uprobe generate-report -p protocol.yaml -g genomes.yaml --probes ./results/probe
 If you are developing a web backend or data analysis pipeline, we recommend directly using `UProbeAPI`. It returns Pandas DataFrames, making it easy to process further.
 
 ```python
+import uprobe
 from pathlib import Path
-from uprobe.core.api import UProbeAPI
 
 # Initialize API
-uprobe = UProbeAPI(
+api = uprobe.UProbeAPI(
     protocol_config=Path("protocol.yaml"),
     genomes_config=Path("genomes.yaml"),
     output_dir=Path("./results")
 )
 
 # --- Method 1: Complete Workflow ---
-df_final = uprobe.run_workflow(threads=10)
+df_final = api.run_workflow(threads=10)
 
 # --- Method 2: Step-by-Step Execution ---
-uprobe.build_genome_index(threads=10)
-uprobe.validate_targets()
-df_targets = uprobe.generate_target_seqs()
-df_probes = uprobe.construct_probes(df_targets)
+api.build_genome_index(threads=10)
+api.validate_targets()
+df_targets = api.generate_target_seqs()
+df_probes = api.construct_probes(df_targets)
 
 import pandas as pd
 df_combined = pd.concat([df_targets, df_probes], axis=1)
-df_final = uprobe.post_process_probes(df_combined)
+df_final = api.post_process_probes(df_combined)
 
 # Generate HTML/PDF report
-uprobe.generate_report(df_final)
+api.generate_report(df_final)
 ```
 
 ## Configuration Details
 
-### `genomes.yaml`
-This file maps a genome name to its corresponding file paths.
+U-Probe relies on two main configuration files to run. Here is a breakdown of how to structure them.
 
-- `fasta`: Path to the genome FASTA file.
-- `gtf`: Path to the gene annotation GTF file.
-- `align_index`: A list of aligners (e.g., `bowtie2`, `blast`) for which to build indices.
+### 1. `genomes.yaml`
+This file maps a genome name to its corresponding file paths. It tells U-Probe where to find the reference genome and annotation files, and which aligner indices to build.
 
-### `protocol.yaml`
-This file defines all parameters for a specific probe design run.
+```yaml
+# Example genomes.yaml
+GRCh38:
+  fasta: "/path/to/GRCh38.fasta"
+  gtf: "/path/to/GRCh38.gtf"
+  align_index:
+    - bowtie2
+    - blast
+  jellyfish: false  
+```
 
-- `name`: A unique name for your experiment.
-- `genome`: The name of the genome to use (must match a key in `genomes.yaml`).
-- `targets`: A list of target gene names or IDs.
-- `extracts`: Parameters for extracting target sequences (e.g., source, overlap, length).
-- `probes`: The core of the design, defining probe templates, parts, and expressions.
-- `encoding`: Mapping of genes to barcodes or other identifiers.
-- `filters`: Criteria for post-processing and filtering probes (e.g., GC content, Tm).
+### 2. `protocol.yaml`
+This is the core configuration file that defines all parameters for a specific probe design run. It is highly customizable.
+
+```yaml
+# Example protocol.yaml snippet
+name: my_rna_probe_design
+genome: GRCh38
+targets:
+  - CD4
+
+extracts:
+  target_region:
+    source: exon  # genome / exon / CDS / UTR
+    length: 30
+    overlap: 15
+
+# Define how genes map to specific barcodes
+encoding:
+  CD4:
+    BC1: ACGAGCCTTCCA
+    BC2: CGGTAATGGACT
+
+# Define the structure of your probes
+probes:
+  probe_1:
+    template: "{part1}{part2}"
+    parts:
+      part1:
+        expr: "rc(target_region[0:20])"
+      part2:
+        template: "CC{barcode1}TGCGTCTATTT{barcode2}TAGTGGAGCCT"
+        parts:
+          barcode1:
+            expr: "encoding[target]['BC1']"
+          barcode2:
+            expr: "encoding[target]['BC2']"
+  probe_2:
+    template: "{part1}AGGCTCCACTA"
+    parts:
+      part1:
+        expr: "rc(target_region[-10:])"
+
+attributes:
+  # target region attributes
+  target_gcContent:
+    target: target_region
+    type: gc_content
+  target_tm:
+    target: target_region
+    type: annealing_temperature
+
+# Define filtering and sorting criteria
+post_process:
+  filters:
+    target_tm:
+      condition: target_tm >= 37 & target_tm <= 47
+  sorts:
+    is_ascending: 
+     - target_gc
+    is_descending: 
+     - target_foldScore
+
+remove_overlap:
+  location_interval: 0
+
+# Define what attributes to include in the final report
+summary:
+  report_name: rna_report   # rna_report / dna_report
+  attributes:
+    - target_foldScore
+    - target_gc
+```
+
+#### Key Sections in `protocol.yaml`:
+- **`name` & `genome`**: Basic metadata. The `genome` must match a key in your `genomes.yaml`.
+- **`targets`**: A list of target gene names or IDs you want to design probes for.
+- **`extracts`**: Parameters for extracting target sequences. The `source` can be `genome`, `exon`, `CDS`, or `UTR`. You can also define the sliding window `length` and `overlap`.
+- **`encoding`**: Mapping of specific genes to custom barcodes or identifiers (e.g., assigning `BC1` and `BC2` to `CD4`).
+- **`probes`**: The core of the design, powered by a **Directed Acyclic Graph (DAG)** architecture. This allows for complex, modular probe construction where parts and probes can reference each other.
+  - **`template`**: Construct sequences using placeholders (e.g., `{part1}{part2}`).
+  - **`expr`**: Apply Python-like expressions. You can use built-in functions like `rc()` (reverse complement), slice sequences (`[0:20]`), or fetch from the `encoding` map (`encoding[target]['BC1']`).
+  - **DAG References**: Because of the DAG structure, subsequent probes or parts can dynamically reference the sequences of previously defined probes/parts in their expressions.
+- **`attributes`**: Define the biochemical or physical properties you want to calculate for specific targets or probe parts. Available attribute types include:
+  - `gc_content`: Calculates the GC ratio of the sequence.
+  - `annealing_temperature`: Calculates the melting temperature (Tm) using Primer3.
+  - `fold_score`: Calculates the RNA folding minimum free energy (MFE) using ViennaRNA (lower is more stable).
+  - `self_match`: Calculates the potential for self-dimerization.
+  - `mapped_sites`: Aligns the sequence to the genome (via Bowtie2) and counts off-target mapped sites.
+  - `n_mapped_genes`: Counts the number of unique genes the sequence aligns to (via Bowtie2).
+  - `kmer_count`: Counts k-mer occurrences in the genome (via Jellyfish) to evaluate specificity.
+- **`post_process`**: Define strict `filters` (e.g., Tm ranges) based on the calculated attributes, and `sorts` to rank the best probes (ascending or descending).
+- **`remove_overlap`**: Control the spacing between probes on the target sequence. `location_interval: 0` ensures probes do not overlap.
+- **`summary`**: Define the `report_name` (e.g., `rna_report` or `dna_report`) and the specific `attributes` you want to visualize and output in the final report.
 
 For more detailed examples and advanced configurations, please refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
@@ -181,10 +275,10 @@ Open `docs/build/html/index.html` in your browser to view the local documentatio
 
 ## Citation
 
-If you use U-Probe in your research, please cite:
+If you use U-Probe in your research, please cite our paper (or software):
 
 ```bibtex
-@software{uprobe2024,
+@software{uprobe2025,
   title={U-Probe: Universal Probe Design Tool},
   author={Zhang, Qian and Xu, Weize and Cai, Huaiyuan},
   year={2025},
@@ -192,19 +286,22 @@ If you use U-Probe in your research, please cite:
   version={1.0.0}
 }
 ```
+*(Note: Update the citation format with actual journal details once published.)*
 
 ## License
 
-U-Probe is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+U-Probe is released under the [MIT License](LICENSE). See the `LICENSE` file for details.
 
 ## Acknowledgments
 
 We thank the bioinformatics community for valuable feedback during development, and the authors of the following tools that U-Probe integrates:
 
-- [Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/) - Fast sequence alignment
+- [Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/) - Fast and memory-efficient sequence alignment
 - [BLAST+](https://blast.ncbi.nlm.nih.gov/) - Sequence similarity search  
-- [Jellyfish](https://github.com/gmarcais/Jellyfish) - K-mer counting
-- [ViennaRNA](https://www.tbi.univie.ac.at/RNA/) - Secondary structure prediction
+- [Jellyfish](https://github.com/gmarcais/Jellyfish) - Fast k-mer counting
+- [ViennaRNA](https://www.tbi.univie.ac.at/RNA/) - RNA secondary structure prediction
+- [Primer3](https://primer3.org/) - Primer and probe design algorithms
+- [FastAPI](https://fastapi.tiangolo.com/) & [Vue.js](https://vuejs.org/) - Powering our interactive Web UI
 
 
 
