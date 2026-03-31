@@ -705,18 +705,52 @@ def generate_report(protocol, genomes, probes, output, no_plots, pdf, no_pdf):
 
 
 @cli.command()
-def agent():
-    """Start an interactive session with the U-Probe Agent."""
-    import asyncio
+@click.option('--workspace', default='.', help='Workspace directory to install templates into.')
+@click.option('--force', is_flag=True, help='Overwrite existing team template.')
+@click.option('--memory-dir', default=None, help='Pantheon memory dir.')
+@click.option('--log-level', default=None, help='Log level for REPL.')
+@click.option('--quiet', is_flag=True, help='Disable console logging in REPL.')
+@click.option('--resync', is_flag=True, help='Force pantheon.repl to resync templates.')
+@click.option('--chat-id', default=None, help='Resume a specific chat ID.')
+@click.argument('repl_args', nargs=-1, type=click.UNPROCESSED)
+def agent(workspace, force, memory_dir, log_level, quiet, resync, chat_id, repl_args):
+    """
+    Start an interactive session with the U-Probe AI Agent.
+    
+    This command bootstraps the Pantheon REPL with the U-Probe team template,
+    allowing you to design probes through natural language conversation.
+    """
     try:
-        from uprobe.core.agent.uprobe_agent import run_interactive_session
+        from uprobe.core.agent.repl_bootstrap import main as repl_main
     except ImportError as e:
         log.error(f"Failed to import U-Probe Agent modules: {e}")
         log.error("Please ensure all agent dependencies are installed.")
         sys.exit(1)
-    log.info("Starting U-Probe Agent interactive session...")
-    log.info("This will launch a conversational agent to help you design probes.")
-    asyncio.run(run_interactive_session())
+        
+    log.info("Starting U-Probe AI Agent...")
+    
+    # Build args for repl_bootstrap
+    args = []
+    if workspace != '.':
+        args.extend(['--workspace', workspace])
+    if force:
+        args.append('--force')
+    if memory_dir:
+        args.extend(['--memory-dir', memory_dir])
+    if log_level:
+        args.extend(['--log-level', log_level])
+    if quiet:
+        args.append('--quiet')
+    if resync:
+        args.append('--resync')
+    if chat_id:
+        args.extend(['--chat-id', chat_id])
+        
+    if repl_args:
+        args.append('--')
+        args.extend(repl_args)
+        
+    sys.exit(repl_main(args))
 
 
 @cli.command()
