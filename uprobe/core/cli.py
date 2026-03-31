@@ -9,7 +9,7 @@ import pandas as pd
 
 from .api import UProbeAPI
 from .utils import get_logger
-from . import __version__
+from uprobe import __version__
 
 
 log = get_logger(__name__)
@@ -723,6 +723,22 @@ def agent():
 def version():
     """Show the U-Probe version."""
     click.echo(f"U-Probe version {__version__}")
+
+
+@cli.command()
+@click.option('--host', default='127.0.0.1', help='Host to bind the server to.')
+@click.option('--port', default=8000, type=int, help='Port to bind the server to.')
+def server(host, port):
+    """Start the U-Probe HTTP web server."""
+    try:
+        import uvicorn
+        from uprobe.http.server import app
+        log.info(f"Starting U-Probe server on {host}:{port}...")
+        uvicorn.run(app, host=host, port=port, log_config=None)
+    except ImportError as e:
+        log.error(f"Failed to start server: {e}")
+        log.error("Please ensure web dependencies (fastapi, uvicorn) are installed.")
+        sys.exit(1)
 
 
 def main():
