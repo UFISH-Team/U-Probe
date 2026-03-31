@@ -1,104 +1,103 @@
+=================
 Quick Start Guide
 =================
 
-This guide will get you up and running with U-Probe in just a few minutes. We'll show you the easiest way to design your first probes.
+This guide provides a rapid introduction to U-Probe, demonstrating how to design your first set of probes using both the interactive Web UI and the automated Command-Line Interface (CLI).
 
 Prerequisites
 -------------
 
-Before you begin, make sure you have:
+Before proceeding, ensure you have:
 
-- U-Probe installed (see :doc:`installation`)
-- A genome FASTA file
-- A gene annotation GTF file
+1. Successfully installed U-Probe (see :doc:`installation`).
+2. Downloaded a reference genome (FASTA format).
+3. Downloaded the corresponding gene annotation file (GTF format).
 
-Your First Probe Design
-------------------------
+Method 1: Interactive Web UI (New!)
+-----------------------------------
 
-U-Probe offers an interactive AI Assistant that makes probe design incredibly easy, especially for beginners. You don't need to write complex configuration files manually; the AI will guide you through the process.
+For a visual and intuitive design experience, U-Probe provides a built-in web server. This is the recommended approach for users who prefer graphical interfaces over command-line tools.
 
-Step 1: Start the AI Assistant
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1. **Launch the Server:**
 
-Open your terminal and run the following command:
+   .. code-block:: bash
 
-.. code-block:: bash
+      uprobe server --host 127.0.0.1 --port 8000
 
-   uprobe agent
+2. **Access the Dashboard:**
+   Open your web browser and navigate to ``http://127.0.0.1:8000``. 
 
-This will launch an interactive chat session.
+3. **Design Probes:**
+   Follow the on-screen instructions to upload your genome/GTF files, select target genes, define probe structures, and set filtering criteria. The UI will guide you through the entire process and visualize the results.
 
-Step 2: Describe Your Needs
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Method 2: Command-Line Automated Run
+--------------------------------------------------
 
-Simply tell the AI what you want to do in natural language. For example:
+For high-throughput or reproducible workflows, the CLI is highly efficient. U-Probe requires two YAML configuration files to execute a run.
 
-* "I want to design FISH probes for the GAPDH and ACTB genes in the human genome."
-* "Help me create a protocol for targeted sequencing of TP53."
-
-The AI will ask you clarifying questions (like where your genome files are located) and automatically generate the necessary `genomes.yaml` and `protocol.yaml` files for you.
-
-Step 3: Let the AI Run the Workflow
+Step 1: Prepare Configuration Files
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Once the configuration is ready, the AI can execute the U-Probe workflow for you, or you can run it manually using the generated files:
+Create a ``genomes.yaml`` to define your reference paths:
+
+.. code-block:: yaml
+
+   # genomes.yaml
+   GRCh38:
+     fasta: "/path/to/GRCh38.fasta"
+     gtf: "/path/to/GRCh38.gtf"
+     align_index:
+       - bowtie2
+
+Create a ``protocol.yaml`` to define your design parameters:
+
+.. code-block:: yaml
+
+   # protocol.yaml
+   name: my_first_design
+   genome: GRCh38
+   targets:
+     - GAPDH
+     - ACTB
+   
+   extracts:
+     target_region:
+       source: exon
+       length: 30
+       overlap: 15
+
+   probes:
+     main_probe:
+       template: "{part1}"
+       parts:
+         part1:
+           expr: "rc(target_region)"
+
+Step 2: Execute the Workflow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Run the complete end-to-end pipeline with a single command:
 
 .. code-block:: bash
 
-   uprobe run -p protocol.yaml -g genomes.yaml -o ./results --threads 4
+   uprobe run -p protocol.yaml -g genomes.yaml -o ./results --threads 8
 
-This command will automatically:
-1. Build genome indices (if needed)
-2. Validate your target genes
-3. Extract target regions
-4. Design probes
-5. Calculate quality attributes
-6. Apply filters
-7. Save results to CSV files
+This command automatically performs:
+1. Genome index construction (if not already present).
+2. Target sequence extraction.
+3. Probe construction based on the defined DAG structure.
+4. Thermodynamic and off-target attribute calculation.
+5. Final filtering and output generation.
 
-Step 4: Examine the Results
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 3: Review Results
+~~~~~~~~~~~~~~~~~~~~~~
 
-Check the results directory:
+Upon completion, navigate to the ``./results`` directory. You will find CSV files containing the generated probes, their sequences, and all calculated attributes (e.g., GC content, Tm, off-target hits).
 
-.. code-block:: bash
-
-   ls results/
-
-The generated CSV files contain your designed probes with all calculated attributes:
-
-.. code-block:: text
-
-   gene_name,target_region,main_probe,gc_content,melting_temp,passed_filters
-   GAPDH,ATGC...,ACGT...,0.52,58.3,True
-   ACTB,CGTA...,TGCA...,0.48,55.7,True
-   ...
-
-You can also generate a visual report to better understand your results:
-
-.. code-block:: bash
-
-   uprobe generate-report -p protocol.yaml -g genomes.yaml --probes results/probes_*.csv -o results/
-
-Alternative: Manual Configuration
----------------------------------
-
-If you prefer to write the configuration files yourself without the AI assistant, you need to create two files:
-
-1. **genomes.yaml**: Defines the paths to your FASTA and GTF files.
-2. **protocol.yaml**: Defines your target genes, probe structure, and filtering criteria.
-
-Please refer to the :doc:`configuration` and :doc:`cli` sections for detailed instructions on how to manually set up and run U-Probe.
-
+----------
 Next Steps
 ----------
 
-Now that you've completed your first probe design:
-
-1. Explore more :doc:`examples` for different applications
-2. Learn about advanced :doc:`workflow`
-3. Customize your designs using the :doc:`config_reference`
-4. Integrate U-Probe into your pipelines with the :doc:`python_api`
-
-.. tip::
-   Join our `GitHub Discussions <https://github.com/UFISH-Team/U-Probe/discussions>`_ to share your designs and get help from the community!
+* Understand the full potential of YAML configurations in the :doc:`configuration` guide.
+* Explore advanced use cases in the :doc:`examples` section.
+* Learn how to integrate U-Probe into your scripts using the :doc:`python_api`.
