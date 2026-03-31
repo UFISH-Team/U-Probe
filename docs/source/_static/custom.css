@@ -1,0 +1,119 @@
+/* Custom CSS to align the logo with the sidebar text */
+:root {
+    --font-stack--headings: Arial, Helvetica, sans-serif;
+}
+
+.sidebar-brand {
+    padding-left: 1.5rem; /* Match the padding of the sidebar links */
+    justify-content: flex-start; /* Align to the left instead of center */
+}
+
+.sidebar-logo {
+    margin-left: 0; /* Remove auto centering margin */
+    max-width: 100%; /* Ensure it fits */
+}
+
+.sidebar-brand-text {
+    display: none;
+}
+
+/* Typography & hierarchy: make headings easier to scan (Furo theme) */
+article[role="main"] {
+    max-width: 78ch;
+    padding-top: 0.85rem;
+}
+
+article[role="main"] p,
+article[role="main"] li {
+    line-height: 1.7;
+}
+
+.content h1,
+.content h2,
+.content h5,
+.content h6,
+article[role="main"] h1,
+article[role="main"] h2,
+article[role="main"] h5,
+article[role="main"] h6 {
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: 700;
+    color: var(--color-foreground-primary);
+}
+
+.content h3,
+.content h4,
+article[role="main"] h3,
+article[role="main"] h4 {
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: 600;
+    color: var(--color-foreground-primary);
+}
+
+.content h1,
+article[role="main"] h1 {
+    letter-spacing: normal;
+    margin-top: 0.9rem;
+    margin-bottom: 1rem;
+    font-size: 1.65rem;
+}
+
+article[role="main"] > section:first-child > h1,
+article[role="main"] > h1 {
+    margin-top: 1.2rem;
+}
+
+article[role="main"] > section.homepage-hero > h1 {
+    margin-top: 1.5rem;
+    margin-bottom: 1.15rem;
+    font-size: 2.1rem;
+}
+
+.content h2,
+article[role="main"] h2 {
+    letter-spacing: normal;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--color-foreground-border);
+    font-size: 1.32rem;
+}
+
+.content h3,
+article[role="main"] h3 {
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.12rem;
+}
+
+.content h4,
+article[role="main"] h4 {
+    margin-top: 1.25rem;
+    margin-bottom: 0.35rem;
+    font-size: 1rem;
+}
+
+article[role="main"] h2 + p,
+article[role="main"] h3 + p,
+article[role="main"] h4 + p {
+    margin-top: 0.25rem;
+}
+
+/* Lists: add a bit more breathing room */
+article[role="main"] ul,
+article[role="main"] ol {
+    margin-top: 0.6rem;
+    margin-bottom: 0.9rem;
+}
+
+/* Code blocks: slightly more contrast and spacing */
+article[role="main"] pre {
+    border: 1px solid var(--color-foreground-border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+}
+
+/* Admonitions: clearer separation */
+article[role="main"] .admonition {
+    border-left-width: 6px;
+}
