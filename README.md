@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="./assets/uprobe.svg" alt="uprobe logo" height="60" align="absmiddle"> U-Probe: Universal Probe Design Tool
+  <img src="./assets/uprobe.svg" alt="uprobe logo" height="60" align="absmiddle"> Universal & Agentic Probe Design Tool
 </h1>
 <br>
 
