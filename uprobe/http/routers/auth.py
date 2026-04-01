@@ -501,8 +501,8 @@ async def send_verification_code(request: SendVerificationCodeRequest):
     store_verification_code(request.email, code)
     
     # Send email
-    subject = "🔬U-Probe - Registration Verification Code"
-    body = f"🔬Welcome to U-Probe! \n\nA universal probe design platform.\n\nYour registration verification code is: {code}\n\nThis code will expire in 10 minutes.\nIf you did not request this, please ignore this email."
+    subject = "U-Probe - Registration Verification Code"
+    body = f"Welcome to U-Probe! \n\nA universal probe design platform.\n\nYour registration verification code is: {code}\n\nThis code will expire in 10 minutes.\nIf you did not request this, please ignore this email.\n\nSincerely,\nThe U-Probe Team"
     
     success = send_email_sync(request.email, subject, body)
     if not success:
@@ -675,8 +675,8 @@ async def forgot_password(request: ForgotPasswordRequest):
     store_reset_code(request.email, reset_code)
     
     # Send password reset email
-    subject = "UProbe - Password Reset Code"
-    body = f"Hello,\n\nYour password reset code is: {reset_code}\n\nThis code will expire in 10 minutes.\nIf you did not request a password reset, please ignore this email."
+    subject = "U-Probe - Password Reset Code"
+    body = f"Hello,\n\nYour password reset code is: {reset_code}\n\nThis code will expire in 10 minutes.\nIf you did not request a password reset, please ignore this email.\n\nSincerely,\nThe U-Probe Team"
     
     success = send_email_sync(request.email, subject, body)
     if not success:
