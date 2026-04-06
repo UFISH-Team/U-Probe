@@ -87,7 +87,7 @@ def _generate_default_attributes(protocol_config: dict) -> dict:
         }
         attributes['target_mapped_genes'] = {
             'target': 'target_region',
-            'type': 'n_mapped_genes',
+            'type': 'mapped_genes',
             'aligner': 'bowtie2',
             'min_mapq': 30
         }
