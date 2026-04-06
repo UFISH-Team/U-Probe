@@ -307,19 +307,19 @@ def _get_plot_config_for_attribute(attribute_name: str) -> Optional[Dict]:
             "title": f"{attribute_name}",
             "xlabel": "Folding Score"
         }
-    if 'selfmatch' in name_lower:
+    if 'self_match' in name_lower:
         return {
             "plot_type": "bar",
             "title": f"{attribute_name}",
             "xlabel": "Self Match Score"
         }
-    if 'mappedsites' in name_lower:
+    if 'mapped_sites' in name_lower:
         return {
             "plot_type": "scatter",
             "title": f"{attribute_name}",
             "xlabel": "Mapped Sites"
         }
-    if 'mappedgenes' in name_lower:
+    if 'mapped_genes' in name_lower:
         return {
             "plot_type": "scatter",
             "title": f"{attribute_name}",
