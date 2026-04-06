@@ -81,7 +81,7 @@ def add_attributes(
                 shutil.rmtree(tmp_dir)
             else:
                 raise NotImplementedError(f"Aligner {attr['aligner']} is not implemented.")
-        elif attr_type == "n_mapped_genes":
+        elif attr_type == "mapped_genes":
             if attr.get('aligner') == "bowtie2":
                 assert 'bowtie2' in genome.get('align_index', []), "bowtie2 must be enabled in genome align_index" 
                 fasta_path = Path(genome['fasta'])
