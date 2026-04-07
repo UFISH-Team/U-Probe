@@ -760,18 +760,36 @@ def version():
 
 
 @cli.command()
-@click.option('--host', default='127.0.0.1', help='Host to bind the server to.')
-@click.option('--port', default=8000, type=int, help='Port to bind the server to.')
-def server(host, port):
-    """Start the U-Probe HTTP web server."""
+@click.option('--host', default=None, help='Host to bind the server to (overrides .env).')
+@click.option('--port', default=None, type=int, help='Port to bind the server to (overrides .env).')
+@click.option('--workers', default=None, type=int, help='Number of worker processes (overrides .env).')
+@click.option('--env', default=None, type=click.Choice(['development', 'production']), help='Environment mode (overrides APP_ENV).')
+def server(host, port, workers, env):
+    """Start the U-Probe HTTP web server using Granian."""
     try:
-        import uvicorn
-        from uprobe.http.server import app
-        log.info(f"Starting U-Probe server on {host}:{port}...")
-        uvicorn.run(app, host=host, port=port, log_config=None)
+        import os
+        from granian import Granian
+        from granian.constants import Interfaces, Loops
+        
+        # Override environment variables if CLI arguments are provided
+        if env is not None:
+            os.environ["APP_ENV"] = env
+        if host is not None:
+            os.environ["HOST"] = host
+        if port is not None:
+            os.environ["PORT"] = str(port)
+        if workers is not None:
+            os.environ["WORKERS"] = str(workers)
+            
+        # Import start_server from server module to reuse the logic
+        from uprobe.http.server import start_server
+        
+        log.info("Starting U-Probe server via Granian...")
+        start_server()
+        
     except ImportError as e:
         log.error(f"Failed to start server: {e}")
-        log.error("Please ensure web dependencies (fastapi, uvicorn) are installed.")
+        log.error("Please ensure web dependencies (fastapi, granian, uvloop) are installed.")
         sys.exit(1)
 
 

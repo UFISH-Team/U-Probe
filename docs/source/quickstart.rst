@@ -22,7 +22,11 @@ For a visual and intuitive design experience, U-Probe provides a built-in web se
 
    .. code-block:: bash
 
+      # Start in development mode (default)
       uprobe server --host 127.0.0.1 --port 8000
+
+      # Or start in production mode for external access
+      uprobe server --env production --host 0.0.0.0 --port 8000 --workers 4
 
 2. **Access the Dashboard:**
    Open your web browser and navigate to ``http://127.0.0.1:8000``. 

@@ -66,7 +66,11 @@ uprobe agent
 U-Probe now comes with a built-in web server and UI for an intuitive visual experience.
 
 ```bash
+# Start in development mode (default)
 uprobe server --host 127.0.0.1 --port 8000
+
+# Start in production mode with multiple workers
+uprobe server --env production --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 #### 🌟 Complete Workflow (Recommended)

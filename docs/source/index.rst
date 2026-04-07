@@ -56,7 +56,11 @@ Launch the interactive Web UI to design probes visually:
 
 .. code-block:: bash
 
-   uprobe server
+   # Start in development mode (default)
+   uprobe server --host 127.0.0.1 --port 8000
+
+   # Start in production mode
+   uprobe server --env production --host 0.0.0.0 --port 8000 --workers 4
 
 Or execute a complete automated workflow via CLI:
 

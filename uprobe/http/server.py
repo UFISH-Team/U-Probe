@@ -26,7 +26,8 @@ setup_logging()
 
 # uprobe.http/server/app.py
 from fastapi import FastAPI
-import uvicorn
+from granian import Granian
+from granian.constants import Interfaces, Loops
 
 from uprobe.http.routers.genome import genome 
 from uprobe.http.routers.workflow import workflow 
@@ -71,9 +72,31 @@ app.include_router(agent_router)
 app.include_router(custom_probes_router)
 
 def start_server():
-    uvicorn.run(app, host="127.0.0.1", log_config=None)
+    env = os.getenv("APP_ENV", "development").lower()
+    host = os.getenv("HOST", "0.0.0.0" if env == "production" else "127.0.0.1")
+    port = int(os.getenv("PORT", 8000))
+    
+    is_prod = env == "production"
+    
+    default_workers = min(os.cpu_count(), 6)
+    workers = int(os.getenv("WORKERS", default_workers if is_prod else 1))
+    
+    reload = not is_prod
+
+    print(f"Starting server in {env} mode on {host}:{port} with {workers} workers (reload={reload})")
+
+    Granian(
+        "uprobe.http.server:app",
+        address=host,
+        port=port,
+        interface=Interfaces.ASGI,
+        loop=Loops.uvloop,
+        workers=workers,
+        reload=reload,
+    ).serve()
 
 if __name__ == "__main__":
     start_server()
 
-# uvicorn uprobe.http.server:app --reload
+# 开发模式启动: python -m uprobe.http.server (或 APP_ENV=development python -m uprobe.http.server)
+# 生产模式启动: APP_ENV=production HOST=0.0.0.0 PORT=8000 WORKERS=4 python -m uprobe.http.server

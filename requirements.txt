@@ -11,8 +11,9 @@ click
 intervaltree
 matplotlib
 plotly
+granian
+uvloop
 
-executor-http>=0.1.2
 fire
 pyyaml
 python-jose
