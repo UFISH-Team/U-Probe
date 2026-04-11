@@ -3,17 +3,22 @@
 </h1>
 <br>
 
-- U-Probe is a powerful and flexible Python-based tool for designing custom DNA or RNA probes for various molecular biology applications, such as *in situ* hybridization and targeted sequencing. 
-- It provides a comprehensive workflow from target gene selection to final probe generation, with a focus on automation, customization, and ease of use.
+[![License](https://img.shields.io/github/license/UFISH-Team/U-Probe)](https://github.com/UFISH-Team/U-Probe/blob/main/LICENSE)
+[![Python Version](https://img.shields.io/badge/python-3.7+-blue)](https://www.python.org/downloads/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://ufish-team.github.io/uprobe-official/)
+[![Website](https://img.shields.io/badge/Website-Official-green.svg)](https://ufish-team.github.io/uprobe-official/)
+
+**U-Probe** is a universal and agentic probe design platform tailored for imaging-based spatial-omics. It overcomes the architectural limitations of existing tools and lowers the expertise barrier by combining an innovative declarative configuration system with LLM-based AI agents.
+
+Whether you are designing standard probes for established protocols or developing entirely novel architectures, U-Probe provides a comprehensive, automated workflow from target sequence extraction to rigorous thermodynamic filtering.
 
 ## Features
 
-- **End-to-end workflow**: Automates the entire probe design process, from sequence extraction to final filtering.
-- **Highly customizable**: Use simple YAML configuration files to define target genes, probe structures, and filtering criteria.
-- **Advanced filtering**: Filter probes based on a wide range of attributes like GC content, melting temperature (Tm), and off-target potential.
-- **Extensible API**: In addition to a command-line interface, U-Probe offers a clean Python API for programmatic access and integration into other bioinformatics pipelines.
-- **Built-in indexing**: Automatically handles the creation of genome indices for alignment tools like Bowtie2 and BLAST.
-- **Interactive Web UI**: Includes a built-in web server for visual workflow management and result analysis.
+- **Universal Probe Architecture**: Features a declarative configuration system and a directed acyclic graph (DAG)-based assembly engine. Easily design arbitrary and complex multi-part probe structures (e.g., DNA-FISH, smFISH, MERFISH, seqFISH, $\pi$-FISH, MiP-seq, RCA) without modifying any source code.
+- **Agentic AI Workflow**: Integrates hierarchical LLM-based AI agents (via PantheonOS) for conversational design. Users can describe experimental goals in plain language or provide scRNA-seq data, and the agents will autonomously construct configurations, select parameters, and execute the design pipeline.
+- **Comprehensive Quality Filtering**: Automatically computes and filters candidates based on GC content, melting temperature, secondary structure stability (via ViennaRNA), off-target mapping (via Bowtie2), and k-mer frequency (via Jellyfish).
+- **End-to-End Automation**: Streamlines the entire process from target sequence extraction to advanced post-processing, including overlap removal and equal spacing for tiling designs.
+- **Extensible API & Web UI**: Offers a clean Python API for programmatic integration, a command-line interface, and an interactive web server for visual workflow management and result analysis.
 
 ## Installation
 
@@ -241,7 +246,7 @@ summary:
   - `fold_score`: Calculates the RNA folding minimum free energy (MFE) using ViennaRNA (lower is more stable).
   - `self_match`: Calculates the potential for self-dimerization.
   - `mapped_sites`: Aligns the sequence to the genome (via Bowtie2) and counts off-target mapped sites.
-  - `n_mapped_genes`: Counts the number of unique genes the sequence aligns to (via Bowtie2).
+  - `mapped_genes`: Counts the number of unique genes the sequence aligns to (via Bowtie2).
   - `kmer_count`: Counts k-mer occurrences in the genome (via Jellyfish) to evaluate specificity.
 - **`post_process`**: Define strict `filters` (e.g., Tm ranges) based on the calculated attributes, and `sorts` to rank the best probes (ascending or descending).
 - **`remove_overlap`**: Control the spacing between probes on the target sequence. `location_interval: 0` ensures probes do not overlap.
@@ -307,6 +312,7 @@ We thank the bioinformatics community for valuable feedback during development, 
 
 - [Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/) - Fast and memory-efficient sequence alignment
 - [BLAST+](https://blast.ncbi.nlm.nih.gov/) - Sequence similarity search  
+- [MMseqs2](https://github.com/soedinglab/MMseqs2) - Ultra-fast and sensitive sequence search and clustering
 - [Jellyfish](https://github.com/gmarcais/Jellyfish) - Fast k-mer counting
 - [ViennaRNA](https://www.tbi.univie.ac.at/RNA/) - RNA secondary structure prediction
 - [Primer3](https://primer3.org/) - Primer and probe design algorithms
