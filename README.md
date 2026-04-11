@@ -284,6 +284,7 @@ U-Probe is released under the [MIT License](LICENSE). See the `LICENSE` file for
 
 We thank the bioinformatics community for valuable feedback during development, and the authors of the following tools that U-Probe integrates:
 
+- [PantheonOS](https://github.com/aristoteleo/PantheonOS) - The multi-agent framework powering our AI agent design
 - [Bowtie2](http://bowtie-bio.sourceforge.net/bowtie2/) - Fast and memory-efficient sequence alignment
 - [BLAST+](https://blast.ncbi.nlm.nih.gov/) - Sequence similarity search  
 - [MMseqs2](https://github.com/soedinglab/MMseqs2) - Ultra-fast and sensitive sequence search and clustering
