@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="./assets/uprobe.svg" alt="uprobe logo" height="80" align="absmiddle"> Universal & Agentic Probe Design Tool
+  <img src="./assets/uprobe.svg" alt="uprobe logo" height="80" align="absmiddle"> Universal Agentic Probe Design Platform
 </h1>
 <br>
 
@@ -254,32 +254,6 @@ summary:
 
 For more detailed examples and advanced configurations, please refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.
 
-## Documentation
-
-📖 **Complete documentation is available at [uprobe.readthedocs.io](https://uprobe.readthedocs.io/)**
-
-The documentation includes:
-- Detailed installation instructions
-- Step-by-step tutorials
-- Complete CLI and Python API reference  
-- Real-world examples for FISH, PCR, and sequencing applications
-- Configuration file reference
-- Troubleshooting guide
-- Contributing guidelines
-
-### Building Documentation Locally
-
-```bash
-# Install documentation dependencies
-pip install -e ".[docs]"
-
-# Build documentation
-cd docs/
-./build_docs.sh
-```
-
-Open `docs/build/html/index.html` in your browser to view the local documentation.
-
 ## Community & Support
 
 - 📖 **Documentation**: [uprobe.readthedocs.io](https://uprobe.readthedocs.io/)
@@ -292,7 +266,7 @@ Open `docs/build/html/index.html` in your browser to view the local documentatio
 If you use U-Probe in your research, please cite our paper (or software):
 
 ```bibtex
-@software{uprobe2025,
+@software{uprobe2026,
   title={U-Probe: Universal Probe Design Tool},
   author={Zhang, Qian and Xu, Weize and Cai, Huaiyuan},
   year={2025},
