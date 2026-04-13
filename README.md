@@ -3,8 +3,9 @@
 </h1>
 <br>
 
-[![License](https://img.shields.io/github/license/UFISH-Team/U-Probe)](https://github.com/UFISH-Team/U-Probe/blob/main/LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.7+-blue)](https://www.python.org/downloads/)
+[![PyPI](https://img.shields.io/pypi/v/uprobe)](https://pypi.org/project/uprobe/)
+[![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/UFISH-Team/U-Probe/blob/main/LICENSE)
+[![Python Version](https://img.shields.io/badge/python-3.8+-blue)](https://www.python.org/downloads/)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://ufish-team.github.io/uprobe-official/)
 [![Website](https://img.shields.io/badge/Website-Official-green.svg)](https://ufish-team.github.io/uprobe-official/)
 
