@@ -1,5 +1,10 @@
 <h1 align="center">
-  <img src="./assets/uprobe.svg" alt="uprobe logo" height="80" align="absmiddle"> Universal Agentic Probe Design Platform
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/uprobe-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./assets/uprobe.svg">
+    <img src="./assets/uprobe.svg" alt="uprobe logo" height="80" align="absmiddle">
+  </picture>
+  Universal Agentic Probe Design Platform
 </h1>
 <br>
 
