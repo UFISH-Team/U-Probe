@@ -23,3 +23,5 @@ bcrypt==3.2.2
 fastapi>=0.135.0
 uvicorn
 python-dotenv
+
+pantheon-agents
