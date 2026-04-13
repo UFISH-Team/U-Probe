@@ -14,10 +14,12 @@ import configparser
 
 def get_server_root() -> Path:
     """Return the server root directory used for resolving runtime paths."""
+    # Try to read from environment variable first
     root = os.environ.get("UPROBE_SERVER_ROOT")
     if root:
         return Path(root).expanduser().resolve()
     
+    # Fallback to project root
     this_file = Path(__file__).resolve()
     project_root = this_file.parent.parent.parent.parent
     return project_root

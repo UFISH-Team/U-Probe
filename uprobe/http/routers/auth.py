@@ -15,17 +15,29 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 
+from uprobe.http.utils.paths import get_data_dir, get_config
+import secrets
+
 # --- Configuration ---
-SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key")  # In a real app, use a secure, environment-variable-based key
+config = get_config()
+
+# Read SECRET_KEY from environment variables, fallback to generating a random one
+# It is highly recommended to set SECRET_KEY in .env file for production
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    # Generate a random 32-byte hex string if not provided
+    SECRET_KEY = secrets.token_hex(32)
+    print(f"Warning: SECRET_KEY not found in environment. Using a randomly generated key for this session.")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # --- SMTP Configuration ---
-# Read from environment variables or use defaults
-SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.163.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", 465))
-SMTP_USER = os.environ.get("SMTP_USER", "your_email@163.com")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "your_auth_code")
+# Read from environment variables, fallback to config.ini, then defaults
+SMTP_SERVER = os.environ.get("SMTP_SERVER", config.get("SMTP", "server", fallback="smtp.163.com"))
+SMTP_PORT = int(os.environ.get("SMTP_PORT", config.get("SMTP", "port", fallback="465")))
+SMTP_USER = os.environ.get("SMTP_USER", config.get("SMTP", "user", fallback="your_email@163.com"))
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", config.get("SMTP", "password", fallback="your_auth_code"))
 
 # --- Router Setup ---
 router = APIRouter(
@@ -174,8 +186,6 @@ class RegisterWithCodeRequest(BaseModel):
 
 class UserInDB(User):
     hashed_password: str
-
-from uprobe.http.utils.paths import get_data_dir
 
 # --- User Database File ---
 USERS_DB_FILE = get_data_dir() / "users_db.json"

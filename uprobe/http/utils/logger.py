@@ -50,14 +50,33 @@ class StreamToLogger:
 
     def write(self, buf):
         for line in buf.rstrip().splitlines():
-            if line.strip():
-                self.logger.log(self.level, line.rstrip())
+            line = line.strip()
+            if line:
+                # Remove granian's internal log prefixes if present to avoid duplication
+                if line.startswith("[INFO] "):
+                    line = line[7:]
+                elif line.startswith("[WARN] "):
+                    line = line[7:]
+                elif line.startswith("[ERROR] "):
+                    line = line[8:]
+                
+                # Remove granian's internal timestamp prefix for access logs
+                # e.g. "[2026-04-08 00:10:05 +0800] 127.0.0.1 - ..."
+                import re
+                line = re.sub(r'^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4}\]\s*', '', line)
+                
+                # Skip empty lines after stripping
+                if not line.strip():
+                    continue
+                    
+                self.logger.log(self.level, line)
 
     def flush(self):
         pass
 
 def setup_logging():
-    log_format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+
+    log_format = '%(asctime)s - %(levelname)s - %(message)s'
     formatter = logging.Formatter(log_format)
     
     root_logger = logging.getLogger()
@@ -79,11 +98,11 @@ def setup_logging():
     root_logger.addHandler(file_handler)
 
     # Redirect stdout and stderr to logging
-    sys.stdout = StreamToLogger(logging.getLogger('STDOUT'), logging.INFO)
-    sys.stderr = StreamToLogger(logging.getLogger('STDERR'), logging.ERROR)
+    sys.stdout = StreamToLogger(logging.getLogger('Server'), logging.INFO)
+    sys.stderr = StreamToLogger(logging.getLogger('Server'), logging.ERROR)
 
-    # Ensure uvicorn and fastapi loggers use our handlers and don't duplicate
-    for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"):
+    # Ensure granian, uvicorn and fastapi loggers use our handlers and don't duplicate
+    for logger_name in ("granian", "granian.access", "uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"):
         logger = logging.getLogger(logger_name)
         logger.handlers = [console_handler, file_handler]
         logger.propagate = False

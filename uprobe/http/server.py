@@ -22,6 +22,7 @@ except ImportError:
                     os.environ[key.strip()] = value.strip()
 
 from uprobe.http.utils.logger import setup_logging
+from uprobe.http.utils.paths import get_config
 setup_logging()
 
 # uprobe.http/server/app.py
@@ -46,8 +47,13 @@ async def startup_event():
     from uprobe.http.routers.task import reset_stuck_tasks_on_startup
     reset_stuck_tasks_on_startup()
 
+config = get_config()
+frontend_url = config.get("Server", "frontend_url", fallback="http://localhost:5173")
+if os.getenv("FRONTEND_URL"):
+    frontend_url = os.getenv("FRONTEND_URL")
+
 origins = [
-    os.getenv("FRONTEND_URL", "http://localhost:5173"),
+    frontend_url
 ]
 
 app.add_middleware(
@@ -72,14 +78,29 @@ app.include_router(agent_router)
 app.include_router(custom_probes_router)
 
 def start_server():
-    env = os.getenv("APP_ENV", "development").lower()
-    host = os.getenv("HOST", "0.0.0.0" if env == "production" else "127.0.0.1")
-    port = int(os.getenv("PORT", 8000))
+    config = get_config()
+    
+    # Read from config.ini, fallback to defaults
+    env = config.get("Server", "app_env", fallback="development").lower()
+    env = os.getenv("APP_ENV", env).lower()
     
     is_prod = env == "production"
     
-    default_workers = min(os.cpu_count(), 6)
-    workers = int(os.getenv("WORKERS", default_workers if is_prod else 1))
+    host = config.get("Server", "host", fallback="0.0.0.0" if is_prod else "127.0.0.1")
+    host = os.getenv("HOST", host)
+    
+    port = config.getint("Server", "port", fallback=8000)
+    port = int(os.getenv("PORT", port))
+    
+    default_workers = min(os.cpu_count() or 1, 6)
+    
+    workers_config = config.get("Server", "workers", fallback="")
+    if workers_config and workers_config.isdigit():
+        workers = int(workers_config)
+    else:
+        workers = default_workers if is_prod else 1
+        
+    workers = int(os.getenv("WORKERS", workers))
     
     reload = not is_prod
 
@@ -93,6 +114,8 @@ def start_server():
         loop=Loops.uvloop,
         workers=workers,
         reload=reload,
+        log_level="info",
+        log_access=True,
     ).serve()
 
 if __name__ == "__main__":
