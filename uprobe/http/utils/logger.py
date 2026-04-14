@@ -74,6 +74,9 @@ class StreamToLogger:
     def flush(self):
         pass
 
+    def isatty(self):
+        return False
+
 def setup_logging():
 
     log_format = '%(asctime)s - %(levelname)s - %(message)s'

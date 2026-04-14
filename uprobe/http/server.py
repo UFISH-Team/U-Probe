@@ -27,8 +27,7 @@ setup_logging()
 
 # uprobe.http/server/app.py
 from fastapi import FastAPI
-from granian import Granian
-from granian.constants import Interfaces, Loops
+import uvicorn
 
 from uprobe.http.routers.genome import genome 
 from uprobe.http.routers.workflow import workflow 
@@ -106,17 +105,19 @@ def start_server():
 
     print(f"Starting server in {env} mode on {host}:{port} with {workers} workers (reload={reload})")
 
-    Granian(
-        "uprobe.http.server:app",
-        address=host,
-        port=port,
-        interface=Interfaces.ASGI,
-        loop=Loops.uvloop,
-        workers=workers,
-        reload=reload,
-        log_level="info",
-        log_access=True,
-    ).serve()
+    run_kwargs = {
+        "host": host,
+        "port": port,
+        "workers": workers,
+        "reload": reload,
+        "log_level": "info",
+        "access_log": True,
+    }
+    
+    if reload:
+        run_kwargs["reload_excludes"] = ["*.log", "*.log.*", "data/*", "logs/*", "results/*", "genomes/*", "temp/*"]
+
+    uvicorn.run("uprobe.http.server:app", **run_kwargs)
 
 if __name__ == "__main__":
     start_server()

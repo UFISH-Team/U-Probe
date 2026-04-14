@@ -397,7 +397,9 @@ async def _run_uprobe_task(username: str, task_id: str):
                                     for line in chunk.splitlines():
                                         if line.strip():
                                             tail_buf.append(line)
-                                            logging.info(f"[{task_id}] log: {line}")
+                                            # Clean up redundant core logger prefix for cleaner server logs
+                                            clean_line = re.sub(r'^[a-zA-Z0-9_.]+\s+[A-Z]+\s+@\s+\d{2}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}:\s*', '', line)
+                                            logging.info(f"[{task_id}] {clean_line}")
                                             p = _progress_from_line(line)
                                             if p and p > last_progress[0] and p < 100:
                                                 last_progress[0] = p

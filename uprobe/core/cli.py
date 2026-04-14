@@ -765,11 +765,10 @@ def version():
 @click.option('--workers', default=None, type=int, help='Number of worker processes (overrides .env).')
 @click.option('--env', default=None, type=click.Choice(['development', 'production']), help='Environment mode (overrides APP_ENV).')
 def server(host, port, workers, env):
-    """Start the U-Probe HTTP web server using Granian."""
+    """Start the U-Probe HTTP web server using Uvicorn."""
     try:
         import os
-        from granian import Granian
-        from granian.constants import Interfaces, Loops
+        import uvicorn
         
         # Override environment variables if CLI arguments are provided
         if env is not None:
@@ -784,12 +783,11 @@ def server(host, port, workers, env):
         # Import start_server from server module to reuse the logic
         from uprobe.http.server import start_server
         
-        log.info("Starting U-Probe server via Granian...")
         start_server()
         
     except ImportError as e:
         log.error(f"Failed to start server: {e}")
-        log.error("Please ensure web dependencies (fastapi, granian, uvloop) are installed.")
+        log.error("Please ensure web dependencies (fastapi, uvicorn) are installed.")
         sys.exit(1)
 
 

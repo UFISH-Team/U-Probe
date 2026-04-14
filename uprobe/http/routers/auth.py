@@ -255,7 +255,11 @@ def send_email_sync(to_email: str, subject: str, body: str) -> bool:
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
     
     try:
-        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        # Create SSL context to handle security
+        import ssl
+        context = ssl.create_default_context()
+        
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, context=context)
         server.login(SMTP_USER, SMTP_PASSWORD)
         server.send_message(msg)
         server.quit()
