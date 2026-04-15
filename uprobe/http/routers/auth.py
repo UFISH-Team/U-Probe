@@ -273,7 +273,7 @@ def send_email_sync(to_email: str, subject: str, body: str) -> bool:
         return True
         
     msg = MIMEMultipart()
-    msg['From'] = SMTP_USER
+    msg['From'] = "U-Probe Team <support@noreply.u-probe.org>"
     msg['To'] = to_email
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'plain', 'utf-8'))
