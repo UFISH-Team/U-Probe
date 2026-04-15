@@ -712,13 +712,28 @@ def generate_report(protocol, genomes, probes, output, no_plots, pdf, no_pdf):
 @click.option('--quiet', is_flag=True, help='Disable console logging in REPL.')
 @click.option('--resync', is_flag=True, help='Force pantheon.repl to resync templates.')
 @click.option('--chat-id', default=None, help='Resume a specific chat ID.')
+@click.option(
+    '--model',
+    default=None,
+    envvar='UPROBE_AGENT_MODEL',
+    help=(
+        'LiteLLM model id written into uprobe_team.md for all agents (e.g. gpt-5.4). '
+        'May be set via env UPROBE_AGENT_MODEL. If unset here, UPROBE_AGENT_DEFAULT_MODEL is still '
+        'used by the bootstrap when launching the REPL.'
+    ),
+)
 @click.argument('repl_args', nargs=-1, type=click.UNPROCESSED)
-def agent(workspace, force, memory_dir, log_level, quiet, resync, chat_id, repl_args):
+def agent(workspace, force, memory_dir, log_level, quiet, resync, chat_id, model, repl_args):
     """
     Start an interactive session with the U-Probe AI Agent.
-    
+
     This command bootstraps the Pantheon REPL with the U-Probe team template,
     allowing you to design probes through natural language conversation.
+
+    Model selection: pass ``--model <id>`` or set ``UPROBE_AGENT_MODEL`` (or
+    ``UPROBE_AGENT_DEFAULT_MODEL`` for bootstrap-only fallback). Without these,
+    the template file defaults apply until you edit
+    ``<workspace>/.pantheon/teams/uprobe_team.md``.
     """
     try:
         from uprobe.core.agent.repl_bootstrap import main as repl_main
@@ -745,7 +760,8 @@ def agent(workspace, force, memory_dir, log_level, quiet, resync, chat_id, repl_
         args.append('--resync')
     if chat_id:
         args.extend(['--chat-id', chat_id])
-        
+    if model:
+        args.extend(['--model', model])
     if repl_args:
         args.append('--')
         args.extend(repl_args)
