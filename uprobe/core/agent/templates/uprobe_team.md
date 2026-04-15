@@ -6,6 +6,10 @@ id: uprobe_team
 name: U-Probe Design Team
 type: team
 version: 1.0.0
+# Each agent `model` below is a template default on disk. The web Agent API overrides
+# all of them per session from the Model field (see AgentSessionManager._load_team_template).
+# Pantheon REPL reads this file as-is: set UPROBE_AGENT_MODEL, or run
+# `python -m uprobe.core.agent.repl_bootstrap --model <litellm_model_id>`, or edit the file.
 agents:
   - leader
   - panel_designer
@@ -13,14 +17,14 @@ agents:
 leader:
   id: leader
   name: Leader
-  model: gpt-5.2
+  model: gpt-5.4
   icon: 👑
   toolsets:
     - file_manager
 panel_designer:
   id: panel_designer
   name: Panel Designer
-  model: gpt-5.2
+  model: gpt-5.4
   icon: 🔬
   toolsets:
     - python_interpreter
@@ -30,7 +34,7 @@ panel_designer:
 probe_designer:
   id: probe_designer
   name: Probe Designer
-  model: gpt-5.2
+  model: gpt-5.4
   icon: 🧪
   toolsets:
     - file_manager
