@@ -4,13 +4,15 @@ Bootstrap Pantheon REPL in a workspace with the U-Probe team template.
 This module intentionally bypasses the existing U-Probe CLI and the
 `uprobe.core.agent.api.UProbeAgentAPI` workflow. Instead, it:
 1) Copies `uprobe_team.md` into `<workspace>/.pantheon/teams/`
-2) Launches `python -m pantheon.repl --template <copied_md>`
+2) Optionally rewrites every `model:` line in the YAML frontmatter (`--model` or `UPROBE_AGENT_MODEL`)
+3) Launches `python -m pantheon.repl --template <copied_md>`
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -71,6 +73,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Resume a specific chat ID (passed to pantheon.repl).",
     )
     parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help=(
+            "LiteLLM model id written into uprobe_team.md frontmatter for all agents "
+            "(e.g. gpt-5.4, gemini/gemini-2.0-flash). If omitted, uses UPROBE_AGENT_MODEL "
+            "or UPROBE_AGENT_DEFAULT_MODEL when set."
+        ),
+    )
+    parser.add_argument(
         "repl_args",
         nargs=argparse.REMAINDER,
         help=(
@@ -103,6 +115,23 @@ def _install_team_template(workspace: Path, force: bool) -> Path:
 
     shutil.copy2(src, dest)
     return dest
+
+
+def _patch_team_models_in_frontmatter(md_path: Path, model: str) -> None:
+    """Rewrite each `model:` line in the first YAML frontmatter block."""
+    raw = md_path.read_text(encoding="utf-8")
+    if not raw.startswith("---"):
+        return
+    tail = raw[3:]
+    mid_end = tail.find("\n---")
+    if mid_end == -1:
+        return
+    front = tail[:mid_end]
+    rest = tail[mid_end:]
+    new_front = re.sub(r"(?m)^(\s*model:\s*)\S.*$", lambda m: f"{m.group(1)}{model}", front)
+    if new_front == front:
+        return
+    md_path.write_text("---" + new_front + rest, encoding="utf-8")
 
 
 def _install_protocol_template(workspace: Path, force: bool) -> Path:
@@ -174,6 +203,9 @@ def main(argv: list[str] | None = None) -> int:
     workspace = Path(args.workspace).expanduser().resolve()
     template_path = _install_team_template(workspace=workspace, force=bool(args.force))
     # _install_protocol_template(workspace=workspace, force=bool(args.force))
+    model_patch = (args.model or os.environ.get("UPROBE_AGENT_MODEL") or os.environ.get("UPROBE_AGENT_DEFAULT_MODEL") or "").strip()
+    if model_patch:
+        _patch_team_models_in_frontmatter(template_path, model_patch)
 
     extra_args = _normalize_repl_args(list(args.repl_args or []))
     return _launch_repl(
