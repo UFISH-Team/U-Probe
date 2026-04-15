@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from uprobe.core.agent.session_manager import get_session_manager
+from uprobe.core.agent.session_manager import get_session_manager, apply_proxy_environment
 from uprobe.http.utils.paths import get_output_dir, get_data_dir
 from uprobe.http.utils.agent_store import AgentStore
 from uprobe.http.routers.auth import get_current_active_user, User
@@ -18,6 +18,12 @@ agent_router = APIRouter(prefix="/agent", tags=["agent"])
 
 DATA_DIR = get_data_dir()
 OUTPUT_DIR = get_output_dir()
+
+def _http_error_detail(text: str, max_len: int = 2500) -> str:
+    t = (text or "").strip() or "Error"
+    if len(t) > max_len:
+        return t[: max_len - 1] + "…"
+    return t
 
 def get_agent_store(current_user: User = Depends(get_current_active_user)) -> AgentStore:
     return AgentStore(data_dir=DATA_DIR, output_dir=OUTPUT_DIR, username=current_user.username)
@@ -65,7 +71,7 @@ class MessageRequest(BaseModel):
     attachment_ids: List[str] = []
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-    model: Optional[str] = "gpt-5.2"
+    model: Optional[str] = "gpt-5.4"
     proxy: Optional[str] = None
 
 class RewindRequest(BaseModel):
@@ -74,7 +80,7 @@ class RewindRequest(BaseModel):
     attachment_ids: List[str] = []
     api_key: Optional[str] = None
     api_base: Optional[str] = None
-    model: Optional[str] = "gpt-5.2"
+    model: Optional[str] = "gpt-5.4"
     proxy: Optional[str] = None
 
 class MessageResponse(BaseModel):
@@ -242,13 +248,14 @@ async def send_message(conversation_id: str, req: MessageRequest, store: AgentSt
             store.set_session(conversation_id, session_id)
         except Exception as e:
             logging.error(f"Failed to start session: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=_http_error_detail(str(e)))
     else:
         # Update environment variables for existing session
         if req.api_key:
             os.environ["OPENAI_API_KEY"] = req.api_key
         if req.api_base:
             os.environ["OPENAI_API_BASE"] = req.api_base
+        apply_proxy_environment(req.proxy)
 
     attachments = store.get_attachments_by_ids(conversation_id, req.attachment_ids)
     sync_attachments_to_session(sm, session_id, attachments)
@@ -264,8 +271,10 @@ async def send_message(conversation_id: str, req: MessageRequest, store: AgentSt
     )
     
     if not final_message or not final_message.get("success", True):
-        raise HTTPException(status_code=500, detail=(final_message or {}).get("message", "Chat failed"))
-        
+        raise HTTPException(
+            status_code=500,
+            detail=_http_error_detail(str((final_message or {}).get("message", "Chat failed"))),
+        )
     final_text = None
     try:
         if isinstance(final_message, dict):
@@ -276,9 +285,7 @@ async def send_message(conversation_id: str, req: MessageRequest, store: AgentSt
             final_text = str(final_message)
     except Exception:
         final_text = str(final_message)
-        
     enhanced_text = _process_thinking_steps(thinking_steps, str(final_text or ""))
-    
     messages = conv.get("messages", [])
     user_msg = {
         "id": f"msg_{os.urandom(4).hex()}",
@@ -323,7 +330,8 @@ async def rewind_message(conversation_id: str, req: RewindRequest, store: AgentS
         os.environ["OPENAI_API_KEY"] = req.api_key
     if req.api_base:
         os.environ["OPENAI_API_BASE"] = req.api_base
-        
+    apply_proxy_environment(req.proxy)
+
     attachments = store.get_attachments_by_ids(conversation_id, req.attachment_ids)
     sync_attachments_to_session(sm, session_id, attachments)
     
@@ -339,8 +347,10 @@ async def rewind_message(conversation_id: str, req: RewindRequest, store: AgentS
     )
     
     if not final_message or not final_message.get("success", True):
-        raise HTTPException(status_code=500, detail=(final_message or {}).get("message", "Chat failed"))
-        
+        raise HTTPException(
+            status_code=500,
+            detail=_http_error_detail(str((final_message or {}).get("message", "Chat failed"))),
+        )
     final_text = None
     try:
         if isinstance(final_message, dict):
@@ -351,9 +361,7 @@ async def rewind_message(conversation_id: str, req: RewindRequest, store: AgentS
             final_text = str(final_message)
     except Exception:
         final_text = str(final_message)
-        
     enhanced_text = _process_thinking_steps(thinking_steps, str(final_text or ""))
-    
     # Update messages in store
     messages = conv.get("messages", [])
     # Find the user message at user_turn_index
@@ -423,7 +431,7 @@ async def upload_file(
     conversation_id: str,
     api_key: Optional[str] = Form(None),
     api_base: Optional[str] = Form(None),
-    model: Optional[str] = Form("gpt-5.2"),
+    model: Optional[str] = Form("gpt-5.4"),
     proxy: Optional[str] = Form(None),
     file: UploadFile = File(...),
     store: AgentStore = Depends(get_agent_store)
@@ -437,7 +445,11 @@ async def upload_file(
     sm = get_conversation_session_manager(store, conversation_id)
     if session_id:
         sm.sessions.setdefault(session_id, {"chat_id": session_id})
-    
+        if api_key:
+            os.environ["OPENAI_API_KEY"] = api_key
+        if api_base:
+            os.environ["OPENAI_API_BASE"] = api_base
+        apply_proxy_environment(proxy)
     if not session_id:
         # Create a placeholder session or just generate an ID?
         # Actually, session_manager.upload_file needs a session_id to store metadata in memory,
@@ -454,7 +466,7 @@ async def upload_file(
             store.set_session(conversation_id, session_id)
         except Exception as e:
             logging.error(f"Failed to start session for upload: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=_http_error_detail(str(e)))
             
     try:
         upload_dir = store.conversation_upload_dir(conversation_id)
@@ -485,7 +497,7 @@ async def upload_file(
         )
     except Exception as e:
         logging.error(f"Failed to upload file: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_http_error_detail(str(e)))
 
 @agent_router.delete("/conversations/{conversation_id}/upload/{attachment_id}")
 async def delete_upload(conversation_id: str, attachment_id: str, store: AgentStore = Depends(get_agent_store)):
