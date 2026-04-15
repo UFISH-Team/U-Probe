@@ -12,6 +12,30 @@ from pantheon.utils.vision import parse_image_mentions
 logger = logging.getLogger(__name__)
 
 
+def resolve_agent_model(explicit: Optional[str]) -> str:
+    m = (explicit or "").strip()
+    if m:
+        return m
+    env = (os.environ.get("UPROBE_AGENT_MODEL") or os.environ.get("UPROBE_AGENT_DEFAULT_MODEL") or "").strip()
+    if env:
+        return env
+    return "gpt-5.4"
+
+
+def apply_proxy_environment(proxy: Optional[str]) -> None:
+    """write proxy environment variables for httpx/LiteLLM etc. (including case sensitivity)."""
+    if not proxy:
+        return
+    p = str(proxy).strip()
+    if not p:
+        return
+    os.environ["http_proxy"] = p
+    os.environ["https_proxy"] = p
+    os.environ["HTTP_PROXY"] = p
+    os.environ["HTTPS_PROXY"] = p
+    os.environ["ALL_PROXY"] = p
+
+
 class AgentSessionManager:
     """Manages agent sessions using Pantheon ChatRoom."""
 
@@ -53,9 +77,11 @@ class AgentSessionManager:
         team_dict["type"] = "team"
         team_dict["source_path"] = str(team_template_path)
         if model:
-            for agent_cfg in team_dict.get("agents", []):
-                if isinstance(agent_cfg, dict):
-                    agent_cfg["model"] = model
+            for aid in team_dict.get("agents") or []:
+                if isinstance(aid, str) and isinstance(team_dict.get(aid), dict):
+                    team_dict[aid]["model"] = model
+                elif isinstance(aid, dict) and aid.get("id"):
+                    aid["model"] = model
         return team_dict
 
     def _ensure_team_template_registered(self) -> Path:
@@ -98,30 +124,29 @@ class AgentSessionManager:
             self.sessions[session_id]["uploads"][file_id] = {"path": str(file_path), "filename": safe_filename, "size": size}
         return {"id": file_id, "filename": safe_filename, "path": str(file_path), "size": size}
 
-    async def create_session(self, model: str = "gpt-4", api_key: Optional[str] = None, api_base: Optional[str] = None, proxy: Optional[str] = None) -> str:
-        """Start a new agent session."""
+    async def create_session(self, model: Optional[str] = None, api_key: Optional[str] = None, api_base: Optional[str] = None, proxy: Optional[str] = None) -> str:
+        """Start a new agent session. Model: request value, else UPROBE_AGENT_MODEL / UPROBE_AGENT_DEFAULT_MODEL, else gpt-5.4."""
+        resolved = resolve_agent_model(model)
         if api_key:
             os.environ["OPENAI_API_KEY"] = api_key
         if api_base:
             os.environ["OPENAI_API_BASE"] = api_base
-        if proxy:
-            os.environ["http_proxy"] = proxy
-            os.environ["https_proxy"] = proxy
+        apply_proxy_environment(proxy)
         await self.initialize()
         create_res = await self.chatroom.create_chat("http-session")
         if not create_res.get("success"):
             raise RuntimeError(f"Failed to create chat: {create_res.get('message')}")
         chat_id = create_res["chat_id"]
         try:
-            template = self._load_team_template(model)
+            template = self._load_team_template(resolved)
             setup_res = await self.chatroom.setup_team_for_chat(chat_id, template)
             if not setup_res.get("success"):
                 raise RuntimeError(f"Failed to setup team: {setup_res.get('message')}")
         except Exception as e:
             await self.chatroom.delete_chat(chat_id)
             raise e
-        self.sessions[chat_id] = {"chat_id": chat_id, "model": model}
-        logger.info(f"Started agent session {chat_id} with model={model}")
+        self.sessions[chat_id] = {"chat_id": chat_id, "model": resolved}
+        logger.info(f"Started agent session {chat_id} with model={resolved}")
         return chat_id
 
     async def chat(self, session_id: str, content: str, attachment_ids: Optional[List[str]] = None, process_step_message=None) -> Dict[str, Any]:
