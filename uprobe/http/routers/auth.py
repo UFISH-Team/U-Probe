@@ -162,20 +162,23 @@ class RegisterWithCodeRequest(BaseModel):
     verification_code: str
     password: str
     username: str
-    
+    full_name: str
+    department: str
+    location: str
+
     @validator('email')
     def validate_email(cls, v):
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_pattern, v.lower()):
             raise ValueError('Please enter a valid email address')
         return v.lower()
-    
+
     @validator('password')
     def validate_password(cls, v):
         if len(v) < 6:
             raise ValueError('Password must be at least 6 characters long')
         return v
-    
+
     @validator('username')
     def validate_username(cls, v):
         if len(v.strip()) < 2:
@@ -183,6 +186,27 @@ class RegisterWithCodeRequest(BaseModel):
         if not re.match(r'^[a-zA-Z0-9_-]+$', v.strip()):
             raise ValueError('Username can only contain letters, numbers, underscores and hyphens')
         return v.strip()
+
+    @validator('full_name')
+    def validate_full_name(cls, v):
+        s = (v or "").strip()
+        if len(s) < 2:
+            raise ValueError('Full name must be at least 2 characters')
+        return s
+
+    @validator('department')
+    def validate_department(cls, v):
+        s = (v or "").strip()
+        if len(s) < 2:
+            raise ValueError('Organization must be at least 2 characters')
+        return s
+
+    @validator('location')
+    def validate_location(cls, v):
+        s = (v or "").strip()
+        if len(s) < 2:
+            raise ValueError('Region must be at least 2 characters')
+        return s
 
 class UserInDB(User):
     hashed_password: str
@@ -559,14 +583,14 @@ async def register_with_code(request: RegisterWithCodeRequest):
     hashed_password = pwd_context.hash(request.password)
     new_user_data = {
         "username": request.username,
-        "full_name": request.username, # Default full name to username
+        "full_name": request.full_name,
         "email": request.email,
         "hashed_password": hashed_password,
         "disabled": False,
         "avatar_url": None,
         "title": "Researcher",
-        "department": "Research & Development",
-        "location": "Not set",
+        "department": request.department,
+        "location": request.location,
         "phone": "Not set",
         "bio": "Researcher specializing in probe design and bioinformatics analysis."
     }
