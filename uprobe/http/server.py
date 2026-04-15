@@ -122,5 +122,5 @@ def start_server():
 if __name__ == "__main__":
     start_server()
 
-# 开发模式启动: python -m uprobe.http.server (或 APP_ENV=development python -m uprobe.http.server)
-# 生产模式启动: APP_ENV=production HOST=0.0.0.0 PORT=8000 WORKERS=4 python -m uprobe.http.server
+# Dev: python -m uprobe.http.server  (same as APP_ENV=development python -m uprobe.http.server)
+# Prod: APP_ENV=production HOST=0.0.0.0 PORT=8000 WORKERS=4 python -m uprobe.http.server
