@@ -115,3 +115,21 @@ def get_tasks_dir() -> Path:
 def get_output_dir() -> Path:
     """Return the output directory for uploads and generated files."""
     return get_results_dir()
+
+
+def get_workspace_outputs_dir() -> Path:
+    """
+    Repo / CLI artifact tree ``<root>/outputs/...`` (e.g. ``outputs/agent_runs/...``).
+
+    This is **not** the same as ``get_results_dir()`` / ``get_output_dir()`` used for the HTTP
+    agent's **per-user** layout (``results/users/<user>/<conversation>/``). Agents and docs often
+    still cite workspace ``outputs`` paths; file download can fall back here when the sandbox path
+    misses.
+
+    Set ``UPROBE_WORKSPACE_OUTPUTS`` to an absolute directory to override ``<server_root>/outputs``.
+    """
+
+    explicit = os.environ.get("UPROBE_WORKSPACE_OUTPUTS")
+    if explicit and explicit.strip():
+        return Path(explicit.strip()).expanduser().resolve()
+    return (get_server_root() / "outputs").expanduser().resolve()

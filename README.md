@@ -56,11 +56,18 @@ pip install .
 
 ## Usage Guide
 
-U-Probe provides flexible ways to use the tool: **Command Line Interface (CLI)**, **Python API**, and an **Interactive Web UI**. 
+U-Probe provides three main entry points: **Command Line Interface (CLI)**, **Python API**, and the **HTTP/Web UI**.
 
-Before starting, ensure you have prepared two YAML configuration files:
-1. **`genomes.yaml`**: Defines genome paths (FASTA, GTF, etc.).
-2. **`protocol.yaml`**: Defines probe design parameters.
+For source installs, install the package and runtime dependencies before running examples:
+
+```bash
+pip install -e .
+```
+
+Most workflow commands require two YAML files:
+
+1. **`genomes.yaml`**: genome paths such as FASTA and GTF.
+2. **`protocol.yaml`**: probe design parameters.
 
 ### 1. Command Line Interface (CLI)
 
@@ -72,6 +79,14 @@ U-Probe includes an interactive AI Agent powered by Pantheon. You can design pro
 ```bash
 uprobe agent
 ```
+
+CLI Agent sessions set `UPROBE_OUTPUT_DIR` automatically. New generated files should be under:
+
+```text
+<workspace>/outputs/agent/<user>/<session>/agent_runs/<run>/
+```
+
+Use `uprobe agent --force` after upgrading if you need to refresh the installed Pantheon team template.
 
 #### 🌐 Start Web Server 
 U-Probe now comes with a built-in web server and UI for an intuitive visual experience.
@@ -91,6 +106,12 @@ To run the entire pipeline from genome index construction to final probe generat
 uprobe run -p protocol.yaml -g genomes.yaml -o ./results --threads 10
 ```
 
+Useful flags:
+
+```bash
+uprobe run -p protocol.yaml -g genomes.yaml -o ./results --continue-invalid --raw --threads 10
+```
+
 #### 🔧 Step-by-Step Execution
 For advanced users who need intermediate results or custom workflows, you can execute each step individually:
 
@@ -99,20 +120,34 @@ For advanced users who need intermediate results or custom workflows, you can ex
 uprobe build-index -p protocol.yaml -g genomes.yaml -t 10
 
 # 2. Validate target genes against the GTF file
-uprobe validate-targets -p protocol.yaml -g genomes.yaml
+uprobe validate-targets -p protocol.yaml -g genomes.yaml --continue-invalid
 
 # 3. Extract target region sequences
-uprobe generate-targets -p protocol.yaml -g genomes.yaml -o ./results
+uprobe generate-targets -p protocol.yaml -g genomes.yaml -o ./results --continue-invalid
 
 # 4. Construct initial probes from target sequences
 uprobe construct-probes -p protocol.yaml -g genomes.yaml --targets ./results/target_sequences.csv -o ./results
 
-# 5. Post-process probes (add attributes, filter, sort)
-uprobe post-process -p protocol.yaml -g genomes.yaml --probes ./results/constructed_probes.csv -o ./results
+# 5. Post-process probes (requires target + probe columns)
+uprobe post-process -p protocol.yaml -g genomes.yaml --probes ./results/constructed_probes_combined.csv -o ./results
 
-# 6. Generate visual analysis report
+# 6. Generate HTML analysis report
 uprobe generate-report -p protocol.yaml -g genomes.yaml --probes ./results/probes_*.csv -o ./results
 ```
+
+#### 🧬 Generate Barcodes
+
+```bash
+uprobe generate-barcodes \
+  --strategy max_orthogonality \
+  --name barcodes \
+  --num-barcodes 16 \
+  --length 8 \
+  --alphabet ACT \
+  --output ./results/barcodes
+```
+
+This writes `barcodes.csv` (column `sequence`) and `barcodes.txt`.
 
 ### 2. Python API (Ideal for Backend Integration)
 
@@ -142,8 +177,12 @@ import pandas as pd
 df_combined = pd.concat([df_targets, df_probes], axis=1)
 df_final = api.post_process_probes(df_combined)
 
-# Generate HTML/PDF report
-api.generate_report(df_final)
+# Generate HTML report
+reports = api.generate_report(df_final)
+print(reports["html_reports"])
+
+# Quick barcode generation
+barcodes = api.quick_generate_barcodes(num_barcodes=16, length=8, alphabet="ACT")
 ```
 
 ## Configuration Details
@@ -206,35 +245,35 @@ probes:
       part1:
         expr: "rc(target_region[-10:])"
 
+# Optional. If omitted or empty, the CLI auto-generates attributes,
+# post_process, and summary based on source mode and probe structure.
 attributes:
-  # target region attributes
-  target_gcContent:
+  target_gc:
     target: target_region
     type: gc_content
   target_tm:
     target: target_region
     type: annealing_temperature
+  target_fold:
+    target: target_region
+    type: fold_score
 
-# Define filtering and sorting criteria
 post_process:
   filters:
     target_tm:
-      condition: target_tm >= 37 & target_tm <= 47
+      condition: target_tm >= 50 & target_tm <= 90
   sorts:
-    is_ascending: 
-     - target_gc
-    is_descending: 
-     - target_foldScore
+    is_ascending:
+      - target_gc
+    is_descending:
+      - target_fold
 
-remove_overlap:
-  location_interval: 0
-
-# Define what attributes to include in the final report
 summary:
   report_name: rna_report   # rna_report / dna_report
   attributes:
-    - target_foldScore
     - target_gc
+    - target_tm
+    - target_fold
 ```
 
 #### Key Sections in `protocol.yaml`:
@@ -255,7 +294,7 @@ summary:
   - `mapped_genes`: Counts the number of unique genes the sequence aligns to (via Bowtie2).
   - `kmer_count`: Counts k-mer occurrences in the genome (via Jellyfish) to evaluate specificity.
 - **`post_process`**: Define strict `filters` (e.g., Tm ranges) based on the calculated attributes, and `sorts` to rank the best probes (ascending or descending).
-- **`remove_overlap`**: Control the spacing between probes on the target sequence. `location_interval: 0` ensures probes do not overlap.
+- **`remove_overlap`**: Optional post-processing step for controlling spacing between probes. Put it under `post_process` when you need it, e.g. `post_process: { remove_overlap: { location_interval: 0 } }`.
 - **`summary`**: Define the `report_name` (e.g., `rna_report` or `dna_report`) and the specific `attributes` you want to visualize and output in the final report.
 
 For more detailed examples and advanced configurations, please refer to the [`tests/data/*.yaml`](https://github.com/UFISH-Team/U-Probe/tree/main/tests/data "Click to visit here") directory.

@@ -1,26 +1,22 @@
-name: # protocol name
+name:
 
-description: Protocol for designing probe type xxx from species xxx
+description: 
 
-genome:   # genome name
+genome: 
+
+targets:
+  - xxx1: # chr:start-end | gene_name | name: string
+
+encoding:
+  xxx1:
+    BC1: xxx
+    BC2: xxx
 
 extracts:
   target_region:
     source:   # genome | exon | CDS | UTR
     length:   # int
     overlap:   # int
-
-targets:
-  - xxx1: # chr:start-end | gene_name | name: string
-  - xxx2: # chr:start-end | gene_name | name: string
-
-encoding:
-  xxx1:
-    BC1: xxx
-    BC2: xxx
-  xxx2:
-    BC1: xxx
-    BC2: xxx
 
 probes:
 
@@ -34,22 +30,20 @@ attributes:
 post_process:
   filters:
 
-  # clean
+  sorts:
+
+  # only dna mode
   avoid_otp:
 
-  # equal_space
+  # only dna mode
   equal_space:
 
   # remove overlap
   remove_overlap:
-    location_interval: 0
-
-  sorts:
-
-
+    location_interval: # int
 
 summary:
-  report_name: dna_report  # template name  # class: dna_report or rna_report
+  report_name:  # template name  # class: dna_report or rna_report
   attributes:
 
 

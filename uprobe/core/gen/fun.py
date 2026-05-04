@@ -29,10 +29,7 @@ def read_gtf(
         df[f] = df[basic_fields[-1]].str.extract(f"{f} \"(.*?)\"")
     chr_new = []
     for chr_ in df.chr:
-        if str(chr_).startswith('chr'):
-            chr_new.append(chr_)
-        else:
-            chr_new.append(f'chr{chr_}')
+        chr_new.append(str(chr_).replace('chr', ''))
     df.chr = chr_new
     return df
 
@@ -101,7 +98,22 @@ def extract_exons_rca(df_gtf: pd.DataFrame, fa: Fasta,
             exon_name = '_'.join([chr_, str(start), str(end), strand])
             n_trans = row['count']
             #chr_ = chr_.replace('chr', '')
-            seq = fa[chr_][start:end].seq.upper()
+            print(f"STDOUT DEBUG: Processing chr={chr_}, FASTA keys={list(fa.keys())[:5]}")
+            if str(chr_) not in fa.keys():
+                chr_fixed = str(chr_).replace('chr', '')
+                if chr_fixed in fa.keys():
+                    chr_ = chr_fixed
+                else:
+                    chr_fixed = 'chr' + str(chr_)
+                    if chr_fixed in fa.keys():
+                        chr_ = chr_fixed
+            try:
+                seq = fa[chr_][start:end].seq.upper()
+            except Exception as e:
+                import sys
+                print(f"STDOUT ERROR: KeyError accessing {chr_}. FASTA keys: {list(fa.keys())[:5]}", file=sys.stdout)
+                sys.stdout.flush()
+                raise e
             if strand == '-':
                 seq = reverse_complement(seq)
             exon = (exon_name, trans_name, seq, n_trans)
@@ -152,6 +164,14 @@ def extract_gene_features(df_gtf: pd.DataFrame, fa: Fasta,
             chr_, start, end, strand = str(row['chr']), row['start'], row['end'], row['strand']
             name = f"{gene}_{start}_{end}"
             n_trans = row['count']
+            if chr_ not in fa.keys():
+                chr_fixed = chr_.replace('chr', '')
+                if chr_fixed in fa.keys():
+                    chr_ = chr_fixed
+                else:
+                    chr_fixed = 'chr' + chr_
+                    if chr_fixed in fa.keys():
+                        chr_ = chr_fixed
             seq = fa[chr_][start:end].seq.upper()
             if strand == '-':
                 seq = reverse_complement(seq)
@@ -164,6 +184,14 @@ def extract_gene_features(df_gtf: pd.DataFrame, fa: Fasta,
                 chr_, start, end, strand = str(row['chr']), row['start'], row['end'], row['strand']
                 name = f"{gene}_{start}_{end}"
                 n_trans = 1
+                if chr_ not in fa.keys():
+                    chr_fixed = chr_.replace('chr', '')
+                    if chr_fixed in fa.keys():
+                        chr_ = chr_fixed
+                    else:
+                        chr_fixed = 'chr' + chr_
+                        if chr_fixed in fa.keys():
+                            chr_ = chr_fixed
                 seq = fa[chr_][start:end].seq.upper()
                 if strand == '-':
                     seq = reverse_complement(seq) 

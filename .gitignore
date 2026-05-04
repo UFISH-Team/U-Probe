@@ -9,10 +9,12 @@ __pycache__/
 **/.endpoint-logs
 **/config.ini
 **/.notebook_contexts.json
+**/uprobe_*/
 
 # Windows Alternate Data Streams (Zone.Identifier files)
 *:Zone.Identifier
 *:Zone.Identifier:Zone.Identifier
+*.vscode
 
 **/results
 **/static
@@ -21,6 +23,9 @@ __pycache__/
 **/data
 **/config.ini
 **/U-Probe-Manuscript
+**/uprobe-web-ui
+**/agent_runs
+**/docs
 
 # C extensions
 *.so

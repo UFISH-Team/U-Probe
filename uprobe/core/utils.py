@@ -9,6 +9,7 @@ import subprocess
 
 def get_logger(name):
     log = logging.getLogger(name)
+    log.setLevel(logging.INFO)
     if not log.handlers:
         handler = logging.StreamHandler(sys.stderr)
         LOGGING_FMT = "%(name)-20s %(levelname)-7s @ %(asctime)s: %(message)s"

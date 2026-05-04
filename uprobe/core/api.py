@@ -109,7 +109,9 @@ class UProbeAPI:
         valid_genome_targets = []
         if genome_targets:
             gtf_path = Path(self.genome['gtf'])
+            log.info(f"DEBUG: genome_targets={genome_targets}")
             _, valid_list, invalid_list = validate_targets(genome_targets, gtf_path, DTF_NAME_FIX=True)
+            log.info(f"DEBUG: valid_list={valid_list}")
             
             if invalid_list:
                 log.warning(f"Invalid targets found (not in genome): {invalid_list}")
@@ -131,6 +133,10 @@ class UProbeAPI:
         return True
 
     def generate_target_seqs(self) -> pd.DataFrame:
+        log.info("STDOUT DEBUG: generate_target_seqs called")
+        import sys
+        print("STDOUT DEBUG: generate_target_seqs PRINTED", file=sys.stdout)
+        sys.stdout.flush()
         log.info("Generating target region sequences...")
         extract_params = self.protocol['extracts']['target_region']
         genome_targets, direct_targets = self._parse_targets()

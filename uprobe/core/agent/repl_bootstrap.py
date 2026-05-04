@@ -149,8 +149,27 @@ def _install_protocol_template(workspace: Path, force: bool) -> Path:
     return dest
 
 
+def _repl_subprocess_cwd(workspace: Path, session_output: Path) -> Path:
+    """
+    Pantheon shell tools inherit this working directory.
+
+    Default: ``session_output`` (same as ``UPROBE_OUTPUT_DIR`` from the shared path contract)
+    so ``./agent_runs/...`` lands in the sandbox, not repo ``outputs/``.
+
+    Override with ``UPROBE_AGENT_SHELL_CWD=workspace`` (aliases: repo, project) to restore repo-root cwd.
+    """
+
+    ws = workspace.expanduser().resolve()
+    out = Path(session_output).expanduser().resolve()
+    raw = os.environ.get("UPROBE_AGENT_SHELL_CWD", "").strip().lower().replace("-", "_")
+    if raw in ("workspace", "repo", "project"):
+        return ws
+    return out
+
+
 def _launch_repl(
     workspace: Path,
+    session_output: Path,
     template_path: Path,
     memory_dir: str | None,
     log_level: str | None,
@@ -191,7 +210,8 @@ def _launch_repl(
     if extra_args:
         cmd += extra_args
 
-    completed = subprocess.run(cmd, cwd=str(workspace), env=env)
+    shell_cwd = _repl_subprocess_cwd(workspace, session_output)
+    completed = subprocess.run(cmd, cwd=str(shell_cwd), env=env)
     return int(completed.returncode)
 
 
@@ -290,11 +310,26 @@ def main(argv: list[str] | None = None) -> int:
     if model_patch:
         _patch_team_models_in_frontmatter(template_path, model_patch)
 
+    from uprobe.core.agent.output_sandbox import apply_agent_runtime_env, resolve_agent_paths
+
+    runtime_paths = resolve_agent_paths(
+        entrypoint="cli",
+        workspace=workspace,
+        memory_dir=Path(args.memory_dir).expanduser().resolve() if args.memory_dir else None,
+        session_id=args.chat_id,
+    )
+    apply_agent_runtime_env(runtime_paths)
+    shell_cwd = _repl_subprocess_cwd(workspace, runtime_paths.output_root)
+    print(f"[uprobe-agent] UPROBE_OUTPUT_DIR -> {runtime_paths.output_root}", flush=True)
+    print(f"[uprobe-agent] Pantheon memory -> {runtime_paths.memory_root}", flush=True)
+    print(f"[uprobe-agent] shell/tool cwd → {shell_cwd} (set UPROBE_AGENT_SHELL_CWD=workspace for repo cwd)", flush=True)
+
     extra_args = _normalize_repl_args(list(args.repl_args or []))
     return _launch_repl(
         workspace=workspace,
+        session_output=runtime_paths.output_root,
         template_path=template_path,
-        memory_dir=args.memory_dir,
+        memory_dir=str(runtime_paths.memory_root),
         log_level=args.log_level,
         quiet=bool(args.quiet),
         resync=bool(args.resync),

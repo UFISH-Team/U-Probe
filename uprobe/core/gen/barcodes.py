@@ -104,5 +104,7 @@ class BarcodeGenerator:
         logger.info(f"Saved {len(barcodes)} barcodes to {filepath}")
 
 def quick_generate(num_barcodes: int, length: int, **kwargs) -> T.List[str]:
+    """Max-orthogonal barcodes via seqwalk; ``uprobe generate-barcodes --strategy max_orthogonality`` delegates here."""
+
     generator = BarcodeGenerator()
     return generator.generate_max_orthogonality(num_barcodes, length, **kwargs)

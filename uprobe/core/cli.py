@@ -517,11 +517,24 @@ def construct_probes(protocol, genomes, targets, output):
             sys.exit(1)
         else:
             log.info(f"Constructed {len(df_probes)} probes successfully!")
-            # Save probes to file
-            probes_file = Path(output) / "constructed_probes.csv"
-            Path(output).mkdir(parents=True, exist_ok=True)
+            out_dir = Path(output)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            probes_file = out_dir / "constructed_probes.csv"
             df_probes.to_csv(probes_file, index=False)
-            log.info(f"Constructed probes saved to {probes_file}")            
+            log.info(f"Constructed probes saved to {probes_file}")
+
+            if len(df_targets) == len(df_probes):
+                combined_file = out_dir / "constructed_probes_combined.csv"
+                df_combined = pd.concat(
+                    [df_targets.reset_index(drop=True), df_probes.reset_index(drop=True)],
+                    axis=1,
+                )
+                df_combined.to_csv(combined_file, index=False)
+                log.info(f"Combined target/probe table saved to {combined_file}")
+            else:
+                log.warning(
+                    "Target/probe row counts differ; combined post-process input was not saved."
+                )
     except Exception as e:
         log.error(f"Probe construction failed: {e}")
         sys.exit(1)
@@ -563,6 +576,87 @@ def post_process(protocol, genomes, probes, output, raw):
         sys.exit(1)
 
 
+def _generate_barcodes_dispatch(
+    *,
+    strategy: str,
+    num_barcodes: int | None,
+    length: int | None,
+    alphabet: str,
+    gc_limits: tuple[int, int] | None,
+    prevent_patterns: list[str] | None,
+    k_constraint: int | None,
+) -> list:
+    """Run barcode synthesis for the given CLI strategy (uses ``quick_generate`` where applicable)."""
+    from .gen.barcodes import BarcodeGenerator, quick_generate
+
+    ptn = prevent_patterns or None
+
+    if strategy == "max_orthogonality":
+        if not num_barcodes or not length:
+            raise click.UsageError("'max_orthogonality' requires '--num-barcodes' and '--length'.")
+        kw = {"alphabet": alphabet or "ACT", "rc_free": True}
+        if gc_limits is not None:
+            kw["gc_limits"] = gc_limits
+        if ptn:
+            kw["prevent_patterns"] = ptn
+        return quick_generate(num_barcodes, length, **kw)
+
+    if strategy == "pcr":
+        if not num_barcodes:
+            raise click.UsageError("'pcr' requires '--num-barcodes'.")
+        length = length or 8
+        lc, hc = length // 4, 3 * length // 4
+        gc_pct = (round(100 * lc / length), round(100 * hc / length)) if length else (25, 75)
+        return quick_generate(
+            num_barcodes,
+            length,
+            alphabet="ACGT",
+            rc_free=True,
+            gc_limits=gc_pct,
+            prevent_patterns=["AAAA", "TTTT", "CCCC", "GGGG"],
+        )
+
+    if strategy == "sequencing":
+        if not num_barcodes:
+            raise click.UsageError("'sequencing' requires '--num-barcodes'.")
+        length = length or 12
+        lc, hc = length // 3, 2 * length // 3
+        gc_pct = (round(100 * lc / length), round(100 * hc / length)) if length else (33, 67)
+        return quick_generate(
+            num_barcodes,
+            length,
+            alphabet="ACGT",
+            rc_free=True,
+            gc_limits=gc_pct,
+            prevent_patterns=["AAA", "TTT", "CCC", "GGG"],
+        )
+
+    if strategy == "max_size":
+        if not k_constraint or not length:
+            raise click.UsageError("'max_size' requires '--k-constraint' and '--length'.")
+        gen = BarcodeGenerator(strategy="max_size")
+        return gen.generate_max_size(
+            length,
+            k_constraint,
+            alphabet=alphabet or "ACT",
+            rc_free=True,
+            gc_limits=None,
+            prevent_patterns=ptn,
+        )
+
+    if strategy == "precomputed":
+        raise click.UsageError("Strategy 'precomputed' is not implemented.")
+
+    raise click.UsageError(f"Unknown strategy '{strategy}'.")
+
+
+def _save_generated_barcodes(output_dir: Path, name: str, barcodes: list) -> None:
+    csv_path = output_dir / f"{name}.csv"
+    pd.DataFrame({"sequence": barcodes}).to_csv(csv_path, index=False)
+    txt_path = output_dir / f"{name}.txt"
+    txt_path.write_text("\n".join(str(b) for b in barcodes) + ("\n" if barcodes else ""), encoding="utf-8")
+
+
 @cli.command(name='generate-barcodes')
 @click.option('--protocol', '-p', type=click.Path(exists=True),
               help='Path to protocol config file (YAML). Used if no strategy is specified.')
@@ -585,65 +679,93 @@ def generate_barcodes(protocol, output, strategy, name, num_barcodes, length, k_
     """
     Generate DNA barcode sequences.
 
-    Can generate from a protocol file or from command-line arguments.
+    ``max_orthogonality``, ``pcr``, and ``sequencing`` use ``uprobe.core.gen.barcodes.quick_generate``
+    (seqwalk ``max_orthogonality``). ``max_size`` uses ``BarcodeGenerator.generate_max_size``.
+
+    With ``--save`` (default), writes ``{name}.csv`` (column ``sequence``) and ``{name}.txt``.
+    Alternatively, pass ``-p/--protocol`` pointing to YAML that contains a ``barcode_generation`` block.
     """
     try:
         output_dir = Path(output)
         output_dir.mkdir(parents=True, exist_ok=True)
-        uprobe = UProbeAPI(
-            protocol_config=Path(protocol) if protocol else {},
-            genomes_config={},
-            output_dir=output_dir,
-            require_genome=False
-        )
+
+        gc_tuple: tuple[int, int] | None = None
+        if gc_limits:
+            parts = [int(x.strip()) for x in gc_limits.split(",")]
+            if len(parts) != 2:
+                raise click.UsageError('--gc-limits must be two comma-separated integers (percent GC), e.g. "25,75".')
+            gc_tuple = (parts[0], parts[1])
+
+        ptn_list: list[str] | None = None
+        if prevent_patterns:
+            ptn_list = [x.strip() for x in prevent_patterns.split(",") if x.strip()]
+
+        strat = strategy
+        nbc = num_barcodes
+        ln = length
+        kc = k_constraint
+        ab = alphabet or "ACT"
+
         if protocol:
             log.info("Generating barcodes from protocol file...")
-            barcode_sets = uprobe.generate_barcodes()
-        elif strategy:
-            log.info(f"Generating barcodes using '{strategy}' strategy...")            
-            params = {'strategy': strategy}
-            if length:
-                params['length'] = length
-            if alphabet:
-                params['alphabet'] = alphabet
-            if gc_limits:
-                params['gc_limits'] = [int(x.strip()) for x in gc_limits.split(',')]
-            if prevent_patterns:
-                params['prevent_patterns'] = [x.strip() for x in prevent_patterns.split(',')]            
-            if strategy in ['max_orthogonality', 'pcr', 'sequencing']:
-                if not num_barcodes:
-                    raise click.UsageError("Option '--num-barcodes' is required for this strategy.")
-                params['num_barcodes'] = num_barcodes
-                if strategy == 'pcr':
-                    params.setdefault('length', 8)
-                    params.setdefault('alphabet', 'ACGT')
-                    params.setdefault('gc_limits', (params['length']//4, 3*params['length']//4))
-                    params.setdefault('prevent_patterns', ["AAAA", "TTTT", "CCCC", "GGGG"])
-                elif strategy == 'sequencing':
-                    params.setdefault('length', 12)
-                    params.setdefault('alphabet', 'ACGT')
-                    params.setdefault('gc_limits', (params['length']//3, 2*params['length']//3))
-                    params.setdefault('prevent_patterns', ["AAA", "TTT", "CCC", "GGG"])
-            elif strategy == 'max_size':
-                if not k_constraint or not length:
-                    raise click.UsageError("Options '--k-constraint' and '--length' are required for max_size strategy.")
-                params['k_constraint'] = k_constraint
-            elif strategy == 'precomputed':
-                if not library_name:
-                    raise click.UsageError("Option '--library-name' is required for precomputed strategy.")
-                params['library_name'] = library_name
-            if save:
-                params['save_file'] = f"{name}.csv"           
-            if analyze:
-                params['analyze_quality'] = True
-            barcode_config = {name: params}
-            barcode_sets = uprobe.run_barcode_generation(barcode_config)            
-        else:
-            raise click.UsageError("Either '--protocol' or '--strategy' must be provided.")
-        if not barcode_sets:
+            cfg = yaml.safe_load(Path(protocol).read_text(encoding="utf-8"))
+            bg = cfg.get("barcode_generation")
+            if not bg:
+                raise click.UsageError(
+                    "Protocol YAML has no `barcode_generation` section. Add for example:\n\n"
+                    "  barcode_generation:\n"
+                    "    strategy: max_orthogonality\n"
+                    "    num_barcodes: <N>\n"
+                    "    length: <L>\n\n"
+                    "Or omit `-p/--protocol` and pass `--strategy max_orthogonality` instead."
+                )
+            strat = bg.get("strategy") or strat or "max_orthogonality"
+            nbc = bg.get("num_barcodes", nbc)
+            ln = bg.get("length", ln)
+            kc = bg.get("k_constraint", kc)
+            ab = bg.get("alphabet", ab)
+            glo = bg.get("gc_limits")
+            if glo is not None:
+                if isinstance(glo, (list, tuple)) and len(glo) == 2:
+                    gc_tuple = (int(glo[0]), int(glo[1]))
+                else:
+                    raise click.UsageError("barcode_generation.gc_limits must be a two-element list.")
+            plist = bg.get("prevent_patterns")
+            if plist is not None:
+                ptn_list = [str(x).strip() for x in plist if str(x).strip()]
+        elif not strat:
+            raise click.UsageError("Either `--strategy` or `-p/--protocol` (with `barcode_generation:`) must be provided.")
+
+        _allowed = frozenset({"max_orthogonality", "max_size", "precomputed", "pcr", "sequencing"})
+        if strat not in _allowed:
+            raise click.UsageError(f"Unknown strategy {strat!r}. Choose from {sorted(_allowed)}.")
+
+        if analyze:
+            log.warning("'--analyze' is not implemented; skipping.")
+
+        barcodes = _generate_barcodes_dispatch(
+            strategy=strat,
+            num_barcodes=nbc,
+            length=ln,
+            alphabet=ab,
+            gc_limits=gc_tuple,
+            prevent_patterns=ptn_list,
+            k_constraint=kc,
+        )
+        if not barcodes:
             log.warning("No barcodes were generated.")
+        elif save:
+            _save_generated_barcodes(output_dir, name, barcodes)
+            log.info(
+                "Generated %s barcodes → %s, %s",
+                len(barcodes),
+                output_dir / f"{name}.csv",
+                output_dir / f"{name}.txt",
+            )
         else:
-            log.info(f"Generated {len(barcode_sets)} barcode set(s) successfully!")
+            log.info("Generated %s barcodes (--no-save); not writing files.", len(barcodes))
+    except click.UsageError:
+        raise
     except Exception as e:
         log.error(f"Barcode generation failed: {e}", exc_info=log.getEffectiveLevel() == logging.DEBUG)
         sys.exit(1)
@@ -684,21 +806,15 @@ def generate_report(protocol, genomes, probes, output, no_plots, pdf, no_pdf):
         if df_probes.empty:
             log.error("No probe data found in the input file!")
             sys.exit(1)
-        generate_pdf = pdf and not no_pdf
-        results = uprobe.generate_report(df_probes, include_plots=not no_plots, generate_pdf=generate_pdf)
-        n_reports = len(results.get('reports', []))
-        n_plots = len(results.get('plots', []))
-        n_pdfs = len(results.get('pdfs', []))        
-        if n_reports + n_plots + n_pdfs == 0:
+        if pdf and not no_pdf:
+            log.warning("PDF report generation is not supported by the current API; generating HTML only.")
+        results = uprobe.generate_report(df_probes, include_plots=not no_plots)
+        n_html = len(results.get('html_reports', []))
+        if n_html == 0:
             log.warning("No reports or plots were generated. Check your protocol configuration.")
         else:
             log.info(f"Report generation completed!")
-            if n_reports > 0:
-                log.info(f"Generated {n_reports} markdown report(s)")
-            if n_pdfs > 0:
-                log.info(f"Generated {n_pdfs} PDF report(s)")
-            if n_plots > 0:
-                log.info(f"Generated {n_plots} visualization plot(s)")        
+            log.info(f"Generated {n_html} HTML report(s)")
     except Exception as e:
         log.error(f"Report generation failed: {e}")
         sys.exit(1)
@@ -729,6 +845,12 @@ def agent(workspace, force, memory_dir, log_level, quiet, resync, chat_id, model
 
     This command bootstraps the Pantheon REPL with the U-Probe team template,
     allowing you to design probes through natural language conversation.
+
+    Agent outputs default to a workspace-local layout:
+    ``<workspace>/outputs/agent/<login>/cli_<session>/``, or a stable folder derived from ``--chat-id``.
+    Override with env ``UPROBE_OUTPUT_DIR``; optional ``UPROBE_AGENT_USER`` and ``UPROBE_AGENT_SESSION``.
+    Pantheon shell ``cwd`` defaults to that output dir so ``./agent_runs`` stays in-session; use
+    ``UPROBE_AGENT_SHELL_CWD=workspace`` if you intentionally need repo-root cwd.
 
     Model selection: pass ``--model <id>`` or set ``UPROBE_AGENT_MODEL`` (or
     ``UPROBE_AGENT_DEFAULT_MODEL`` for bootstrap-only fallback). Without these,
