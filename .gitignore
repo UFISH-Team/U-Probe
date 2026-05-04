@@ -10,6 +10,7 @@ __pycache__/
 **/config.ini
 **/.notebook_contexts.json
 **/uprobe_*/
+config.ini
 
 # Windows Alternate Data Streams (Zone.Identifier files)
 *:Zone.Identifier
