@@ -14,8 +14,7 @@ plotly
 granian
 uvloop
 
-fire
-pyyaml
+pysam
 python-jose
 passlib==1.7.4
 python-multipart

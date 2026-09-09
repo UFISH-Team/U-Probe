@@ -311,7 +311,13 @@ def _validate_and_normalize_protocol(protocol_config: dict) -> dict:
 
 
 @click.group()
-@click.version_option(version=__version__, prog_name='uprobe')
+@click.version_option(
+    __version__,
+    '--version',
+    '-V',
+    prog_name='uprobe',
+    message='U-Probe %(version)s',
+)
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging.')
 @click.option('--quiet', '-q', is_flag=True, help='Suppress all output except errors.')
 @click.pass_context
