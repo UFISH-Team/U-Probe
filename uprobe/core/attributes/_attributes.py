@@ -12,8 +12,13 @@ Block = t.Tuple[str, str, t.List[Aln]]  # query_name, query_seq, alignments
 
 def read_sam_align_blocks(
         sam_path: str,
-        min_mapq: int = 30,  # minimum mapping quality
         ) -> t.Iterable[Block]:
+    """Yield all Bowtie2 alignments grouped by query name.
+
+    This intentionally mirrors fisheye: no MAPQ filter is applied.  The
+    mapped-gene metric is the number of genes among all alignments reported by
+    Bowtie2 (up to the ``-k`` limit), not the number of uniquely mapped genes.
+    """
     import pysam
     def yield_cond(old, rec, block, end=False):
         res = (old is not None)
@@ -25,8 +30,6 @@ def read_sam_align_blocks(
         old = None
         rec = None
         for rec in sam.fetch():
-            if rec.mapping_quality < min_mapq:
-                continue
             aln = rec.reference_name, rec.reference_start, rec.reference_end
             if yield_cond(old, rec, alns):
                 yield old.query_name, old.query_sequence, alns
@@ -175,8 +178,13 @@ def count_n_bowtie2_aligned_genes(
         recname2seq: t.Mapping[str, str],
         name: str,
         index_prefix: str,
-        min_mapq: int = 30,
         threads: int = 10):
+    """Count distinct genes hit by each query, matching fisheye semantics.
+
+    The Bowtie2 index must be built from ``transcript.fa`` whose record names
+    follow fisheye's ``{gene_id}_{transcript_id}`` convention.  Multiple
+    transcript hits from the same gene therefore contribute one mapped gene.
+    """
     fq_path = write_fastq(outdir, name, recname2seq)
     sam_path = f"{outdir}/{name}.sam"
     if not os.path.exists(sam_path):
@@ -184,9 +192,12 @@ def count_n_bowtie2_aligned_genes(
             fq_path, index_prefix,
             sam_path, threads=threads,
             log_file=f"{outdir}/{name}.bowtie2.log")
-    n_mapped_genes = {}
-    for rec_name, seq, alns in read_sam_align_blocks(sam_path, min_mapq=min_mapq):
-        n_genes = len(set(["_".join(chr_.split("_")[-4:]) for chr_, s, e in alns]))
+    # Include queries without an alignment explicitly as zero.
+    n_mapped_genes = {rec_name: 0 for rec_name in recname2seq}
+    for rec_name, seq, alns in read_sam_align_blocks(sam_path):
+        # Keep this extraction identical to fisheye/primer_design/seq_features.py.
+        n_genes = len(set([ref_name.split("_")[0]
+                           for ref_name, start, end in alns]))
         n_mapped_genes[rec_name] = n_genes
     return n_mapped_genes
 

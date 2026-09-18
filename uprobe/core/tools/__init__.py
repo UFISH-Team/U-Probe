@@ -7,20 +7,34 @@ from uprobe.core.utils import get_logger
 
 log = get_logger(__name__)
 
+_BOWTIE2_SMALL_SUFFIXES = (
+    ".1.bt2", ".2.bt2", ".3.bt2", ".4.bt2", ".rev.1.bt2", ".rev.2.bt2"
+)
+_BOWTIE2_LARGE_SUFFIXES = tuple(suffix + "l" for suffix in _BOWTIE2_SMALL_SUFFIXES)
+
+
+def _bowtie2_index_exists(index_prefix: Path) -> bool:
+    """Return True for either a complete .bt2 or .bt2l index."""
+    prefix = str(index_prefix)
+    return (
+        all(Path(prefix + suffix).exists() for suffix in _BOWTIE2_SMALL_SUFFIXES)
+        or all(Path(prefix + suffix).exists() for suffix in _BOWTIE2_LARGE_SUFFIXES)
+    )
+
 def build_transcripts_index(gtf: Path,
                              fasta: Path, 
                              outdir: Path, 
                              threads: int = 10
                             ) -> str:
-    trans_fasta_path = outdir.parent / "transcript.fa"
+    outdir.mkdir(parents=True, exist_ok=True)
+    trans_fasta_path = outdir / "transcript.fa"
     index_prefix = outdir / fasta.stem
     if trans_fasta_path.exists():
         log.info("transcript.fa found in output dir")
     else:
         log.info("transcript.fa not found, extracting sequences from gtf")
         extract_trans_seqs(gtf, fasta, trans_fasta_path)
-    index_flag = outdir.with_suffix(".bt2")
-    if index_flag.exists():
+    if _bowtie2_index_exists(index_prefix):
         log.info("bowtie2 index found in the output dir")
     else:
         log.info("no bowtie2 index found, building it now")
@@ -80,9 +94,10 @@ def build_genome(genome: dict,
                     build_mmseqs_index(fasta_path, str(index_dir))
             else:
                 raise NotImplementedError(f"aligner {aligner} is not implemented")
-    log.info(f"building {aligner} index for {prefix} transcript")
-    tran_index_dir = fasta_path.parent / f"blast_transcript"
-    if all((tran_index_dir / file_name).exists() for file_name in bowtie2_index_files):
+    log.info(f"building bowtie2 index for {prefix} transcript")
+    tran_index_dir = fasta_path.parent / "bowtie2_transcript"
+    transcript_index_prefix = tran_index_dir / prefix
+    if _bowtie2_index_exists(transcript_index_prefix):
         log.info(f"transcript index already exists: {tran_index_dir}")
     else:
         log.info(f"transcript index does not exist, building it now: {tran_index_dir}")

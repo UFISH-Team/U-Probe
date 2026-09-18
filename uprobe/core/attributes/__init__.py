@@ -81,22 +81,30 @@ def add_attributes(
                 shutil.rmtree(tmp_dir)
             else:
                 raise NotImplementedError(f"Aligner {attr['aligner']} is not implemented.")
-        elif attr_type == "mapped_genes":
+        elif attr_type in {"mapped_genes"}:
             if attr.get('aligner') == "bowtie2":
                 assert 'bowtie2' in genome.get('align_index', []), "bowtie2 must be enabled in genome align_index" 
                 fasta_path = Path(genome['fasta'])
-                index_prefix = fasta_path.parent / 'bowtie2_genome' / fasta_path.stem
+                # fisheye calculates mapped genes against a transcriptome index,
+                # not against the genomic chromosome index.
+                index_prefix = fasta_path.parent / 'bowtie2_transcript' / fasta_path.stem
                 tmp_dir = Path("tmp")
                 tmp_dir.mkdir(exist_ok=True, parents=True)
                 if 'exon_name' in df_probes.columns and 'start' in df_probes.columns:
                     # RNA format (source: exon)
                     recname2seq = {f"{row['exon_name']}_{row['start']}": row[actual_target] for _, row in df_probes.iterrows()}
-                    n_mapped_genes = count_n_bowtie2_aligned_genes(str(tmp_dir), recname2seq, task_id, str(index_prefix), attr.get("min_mapq", 30), attr.get("threads", 10))
+                    n_mapped_genes = count_n_bowtie2_aligned_genes(
+                        str(tmp_dir), recname2seq, task_id, str(index_prefix),
+                        attr.get("threads", 10)
+                    )
                     mapped_genes_values = [n_mapped_genes.get(f"{row['exon_name']}_{row['start']}", 0) for _, row in df_probes.iterrows()]
                 elif 'probe_id' in df_probes.columns:
                     # DNA format (source: genome)
                     recname2seq = {f"{row['probe_id']}": row[actual_target] for _, row in df_probes.iterrows()}
-                    n_mapped_genes = count_n_bowtie2_aligned_genes(str(tmp_dir), recname2seq, task_id, str(index_prefix), attr.get("min_mapq", 30), attr.get("threads", 10))
+                    n_mapped_genes = count_n_bowtie2_aligned_genes(
+                        str(tmp_dir), recname2seq, task_id, str(index_prefix),
+                        attr.get("threads", 10)
+                    )
                     mapped_genes_values = [n_mapped_genes.get(f"{row['probe_id']}", 0) for _, row in df_probes.iterrows()]
                 else:
                     raise ValueError(f"Unsupported DataFrame structure for n_mapped_genes attribute")

@@ -88,8 +88,7 @@ def _generate_default_attributes(protocol_config: dict) -> dict:
         attributes['target_mapped_genes'] = {
             'target': 'target_region',
             'type': 'mapped_genes',
-            'aligner': 'bowtie2',
-            'min_mapq': 30
+            'aligner': 'bowtie2'
         }
     
     # Extract probe targets and generate attributes
@@ -216,7 +215,7 @@ def _generate_default_post_process(protocol_config: dict, attributes: dict) -> d
     else:
         if 'target_mapped_genes' in attributes:
             post_process['filters']['target_mapped_genes'] = {
-                'condition': 'target_mapped_genes <= 10'
+                'condition': 'target_mapped_genes <= 4'
             }
     
     # Generate filters for probe/part attributes (only Tm filters for parts)
@@ -237,14 +236,15 @@ def _generate_default_post_process(protocol_config: dict, attributes: dict) -> d
             }
     
     # Generate sorts
-    # Ascending: GC and Tm (prefer moderate values)
+    # Ascending: GC, Tm and mapped genes. Fewer mapped genes are better.
     for attr_name in attributes.keys():
-        if attr_name.endswith('_gc') or attr_name.endswith('_tm'):
+        if (attr_name.endswith('_gc') or attr_name.endswith('_tm')
+                or attr_name.endswith('_mapped_genes')):
             post_process['sorts']['is_ascending'].append(attr_name)
     
-    # Descending: fold_score, self_match, mapped_genes, kmer_count (prefer lower values = better)
+    # Preserve the existing order for the remaining score types.
     for attr_name in attributes.keys():
-        if any(attr_name.endswith(suffix) for suffix in ['_fold', '_self_match', '_mapped_genes', '_kmer_count']):
+        if any(attr_name.endswith(suffix) for suffix in ['_fold', '_self_match', '_kmer_count']):
             post_process['sorts']['is_descending'].append(attr_name)
     
     return post_process
