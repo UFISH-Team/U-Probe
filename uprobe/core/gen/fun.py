@@ -211,7 +211,9 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
     log.info(f"extract transcript sequences from: {gtf_path}, {fa_path}")
     fa = Fasta(str(fa_path))
     exons_df = read_gtf(gtf_path, filter_by_type='exon', extract_fields=["gene_id", "transcript_id"])
-    #exons_df = remove_small_chromosomes_df(exons_df)
+    # Match fisheye: exclude alternative/small chromosome records containing
+    # an underscore before constructing the transcriptome reference.
+    exons_df = exons_df[~exons_df['chr'].astype(str).str.contains("_", na=False)]
     exons_df = exons_df[exons_df.start < exons_df.end]
     exons_df = exons_df[['chr','start','end','strand','gene_id','transcript_id']].dropna(axis=0, how="any", subset=['transcript_id'])
     trans = {}  # (gene_id, trans_id) -> [chr, strand, exons],  exons: (start, end)
@@ -233,21 +235,25 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
                 tmp_exons.append(exons[i])
         trans[key_] = [chrom, strand, tmp_exons]
     seq_dict = {}
+    fasta_keys = set(fa.keys())
     for key_, [chrom, strand, exons] in list(trans.items()):
+        # fisheye accepts both GTF/FASTA naming conventions (1 vs chr1).
+        chrom = str(chrom)
+        chrom_candidates = [chrom]
+        if chrom.startswith('chr'):
+            chrom_candidates.append(chrom[3:])
+        else:
+            chrom_candidates.append('chr' + chrom)
+        fasta_chrom = next((candidate for candidate in chrom_candidates
+                            if candidate in fasta_keys), None)
+        if fasta_chrom is None:
+            raise KeyError(
+                f"Chromosome {chrom!r} from GTF was not found in FASTA "
+                f"(also tried {chrom_candidates[1]!r})"
+            )
         seq_lst = []
         for i in range(len(exons)):
-            try:
-                seq = fa[chrom][exons[i][0]:exons[i][1]].seq
-            except KeyError:
-                log.warning(f"Sequence {chrom} not found in FASTA index, rebuilding index...")
-                fa.close()
-                import os
-                fai_file = str(fa_path) + '.fai'
-                if os.path.exists(fai_file):
-                    os.remove(fai_file)
-                    log.info(f"Removed corrupted index file: {fai_file}")
-                fa = Fasta(str(fa_path)) 
-                seq = fa[chrom][exons[i][0]:exons[i][1]].seq
+            seq = fa[fasta_chrom][exons[i][0]:exons[i][1]].seq
             if strand == '-':
                 seq = reverse_complement(seq)
                 seq_lst.append(seq)
