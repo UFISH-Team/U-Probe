@@ -210,15 +210,17 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
     """
     log.info(f"extract transcript sequences from: {gtf_path}, {fa_path}")
     fa = Fasta(str(fa_path))
-    exons_df = read_gtf(gtf_path, filter_by_type='exon', extract_fields=["gene_id", "transcript_id"])
+    # Match fisheye semantics: extract gene name (not gene_id) so transcript
+    # headers match the fisheye reference (`>{gene_name}_{transcript_id}`).
+    exons_df = read_gtf(gtf_path, filter_by_type='exon', extract_fields=["gene_name", "transcript_id"])
     # Match fisheye: exclude alternative/small chromosome records containing
     # an underscore before constructing the transcriptome reference.
     exons_df = exons_df[~exons_df['chr'].astype(str).str.contains("_", na=False)]
     exons_df = exons_df[exons_df.start < exons_df.end]
-    exons_df = exons_df[['chr','start','end','strand','gene_id','transcript_id']].dropna(axis=0, how="any", subset=['transcript_id'])
-    trans = {}  # (gene_id, trans_id) -> [chr, strand, exons],  exons: (start, end)
+    exons_df = exons_df[['chr','start','end','strand','gene_name','transcript_id']].dropna(axis=0, how="any", subset=['transcript_id'])
+    trans = {}  # (gene_name, trans_id) -> [chr, strand, exons],  exons: (start, end)
     for (_, row) in exons_df.iterrows():
-        key_ = (row['gene_id'], row['transcript_id'])
+        key_ = (row['gene_name'], row['transcript_id'])
         chrom, strand, left, right = str(row['chr']), row['strand'], row['start'], row['end']
         if key_ not in trans:
             trans[key_] = [chrom, strand, [[left, right]]]
@@ -263,8 +265,8 @@ def extract_trans_seqs(gtf_path, fa_path, output_fa_path):
         seq_dict[key_] = seq
     log.info(f"save results to {output_fa_path}")
     with open(output_fa_path, 'w') as f:
-        for (gene_id, tran_id), seq in seq_dict.items():
-            f.write(f">{gene_id}_{tran_id}\n")
+        for (gene_name, tran_id), seq in seq_dict.items():
+            f.write(f">{gene_name}_{tran_id}\n")
             f.write(f"{seq}\n")
 
 def generate_target_seqs(

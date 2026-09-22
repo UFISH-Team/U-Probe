@@ -11,6 +11,7 @@ __pycache__/
 **/.notebook_contexts.json
 **/uprobe_*/
 **/config.ini
+**/fisheye
 
 # Windows Alternate Data Streams (Zone.Identifier files)
 *:Zone.Identifier
