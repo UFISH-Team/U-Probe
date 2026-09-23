@@ -8,6 +8,11 @@ import yaml
 def run_uprobe_workflow(*, protocol_yaml: str, username: str, task_id: str, output_dir: str, threads: int, raw_csv: bool, continue_invalid_targets: bool, log_path: str) -> dict:
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    from uprobe.http.utils.task_control import (
+        cleanup_task_process,
+        register_task_process,
+    )
+    register_task_process(out_dir, task_id=task_id, username=username)
     log_file = Path(log_path)
     log_file.parent.mkdir(parents=True, exist_ok=True)
     f = open(log_file, "a", encoding="utf-8", buffering=1)
@@ -62,4 +67,4 @@ def run_uprobe_workflow(*, protocol_yaml: str, username: str, task_id: str, outp
             f.close()
         except Exception:
             pass
-
+        cleanup_task_process(out_dir)

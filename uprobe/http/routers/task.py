@@ -26,6 +26,25 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+_scheduled_tasks: Dict[tuple[str, str], asyncio.Task] = {}
+
+
+def _schedule_uprobe_task(username: str, task_id: str) -> None:
+    """Ensure a task has at most one queue coroutine in this server worker."""
+    key = (username, task_id)
+    existing = _scheduled_tasks.get(key)
+    if existing is not None and not existing.done():
+        return
+
+    background_task = asyncio.create_task(_run_uprobe_task(username, task_id))
+    _scheduled_tasks[key] = background_task
+
+    def _remove_scheduled_task(finished: asyncio.Task) -> None:
+        if _scheduled_tasks.get(key) is finished:
+            _scheduled_tasks.pop(key, None)
+
+    background_task.add_done_callback(_remove_scheduled_task)
+
 def get_user_tasks_file(username: str) -> Path:
     user_dir = get_tasks_dir() / username
     user_dir.mkdir(parents=True, exist_ok=True)
@@ -86,6 +105,7 @@ class TaskRead(TaskBase):
     result_url: Optional[str] = None
     yaml_content: Optional[str] = None
     error_message: Optional[str] = None
+    paused_from: Optional[Literal["pending", "running"]] = None
 
 # --- Helper Function ---
 def find_task_by_id(username: str, task_id: str) -> Optional[TaskRead]:
@@ -130,10 +150,16 @@ def reset_stuck_tasks_on_startup():
             tasks = load_user_tasks(username)
             modified = False
             for task_dict in tasks:
-                if task_dict.get("status") == "running":
+                was_active = task_dict.get("status") == "running"
+                was_active = was_active or (
+                    task_dict.get("status") == "paused"
+                    and task_dict.get("paused_from") == "running"
+                )
+                if was_active:
                     task_dict["status"] = "failed"
                     task_dict["progress"] = 0
                     task_dict["description"] = (task_dict.get("description") or "") + " [System restarted, task failed]"
+                    task_dict["paused_from"] = None
                     modified = True
             if modified:
                 save_user_tasks(username, tasks)
@@ -239,13 +265,24 @@ async def delete_task(
     """
     Delete a task by its ID.
     """
+    existing_task = find_task_by_id(current_user.username, task_id)
+    if existing_task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if existing_task.status == "running" or (
+        existing_task.status == "paused" and existing_task.paused_from == "running"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="A running task cannot be deleted; wait for it to finish",
+        )
+
     tasks = load_user_tasks(current_user.username)
     initial_length = len(tasks)
     tasks = [t for t in tasks if t.get("id") != task_id]
             
     if len(tasks) == initial_length:
         raise HTTPException(status_code=404, detail="Task not found")
-        
+
     save_user_tasks(current_user.username, tasks)
     return
 
@@ -255,9 +292,7 @@ async def pause_task(
     task_id: str,
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Set the status of a task to 'paused'.
-    """
+    """Pause a queued task or suspend a running worker process group."""
     task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -265,7 +300,20 @@ async def pause_task(
     if task.status not in ["running", "pending"]: # Can only pause running or pending tasks
          raise HTTPException(status_code=400, detail=f"Cannot pause task in '{task.status}' state")
 
+    previous_status = task.status
+    if previous_status == "running":
+        from uprobe.http.utils.task_control import pause_task_process
+        try:
+            pause_task_process(
+                get_results_dir() / task_id,
+                task_id=task_id,
+                username=current_user.username,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
     task.status = "paused"
+    task.paused_from = previous_status
     task.updated_at = datetime.now()
     update_task_in_db(current_user.username, task)
     return task
@@ -276,10 +324,7 @@ async def resume_task(
     task_id: str,
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Set the status of a paused task back to 'running'.
-    (Note: Frontend logic sets it to running, even if paused from pending)
-    """
+    """Requeue a paused pending task or continue its suspended worker."""
     task = find_task_by_id(current_user.username, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -287,10 +332,31 @@ async def resume_task(
     if task.status != "paused":
         raise HTTPException(status_code=400, detail=f"Cannot resume task in '{task.status}' state")
 
-    # Determine previous state if needed, but frontend implies -> running
-    task.status = "running" 
-    task.updated_at = datetime.now()
-    update_task_in_db(current_user.username, task)
+    paused_from = task.paused_from or "pending"
+    if paused_from == "running":
+        from uprobe.http.utils.task_control import resume_task_process
+        task.status = "running"
+        task.paused_from = None
+        task.updated_at = datetime.now()
+        update_task_in_db(current_user.username, task)
+        try:
+            resume_task_process(
+                get_results_dir() / task_id,
+                task_id=task_id,
+                username=current_user.username,
+            )
+        except RuntimeError as exc:
+            task.status = "paused"
+            task.paused_from = "running"
+            task.updated_at = datetime.now()
+            update_task_in_db(current_user.username, task)
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+    else:
+        task.status = "pending"
+        task.paused_from = None
+        task.updated_at = datetime.now()
+        update_task_in_db(current_user.username, task)
+        _schedule_uprobe_task(current_user.username, task_id)
     return task
     
 
@@ -318,7 +384,7 @@ async def run_task(
     update_task_in_db(current_user.username, task)
     
     # Run uprobe task asynchronously
-    asyncio.create_task(_run_uprobe_task(current_user.username, task_id))
+    _schedule_uprobe_task(current_user.username, task_id)
     
     return task
 
@@ -403,9 +469,11 @@ async def _run_uprobe_task(username: str, task_id: str):
                                             p = _progress_from_line(line)
                                             if p and p > last_progress[0] and p < 100:
                                                 last_progress[0] = p
-                                                task.progress = p
-                                                task.updated_at = datetime.now()
-                                                update_task_in_db(username, task)
+                                                current_task = find_task_by_id(username, task_id)
+                                                if current_task and current_task.status == "running":
+                                                    current_task.progress = p
+                                                    current_task.updated_at = datetime.now()
+                                                    update_task_in_db(username, current_task)
                         except Exception:
                             pass
                         await asyncio.sleep(0.5)
