@@ -12,7 +12,7 @@ __pycache__/
 **/uprobe_*/
 **/config.ini
 **/fisheye
-
+**/cloudflare deploy.md
 # Windows Alternate Data Streams (Zone.Identifier files)
 *:Zone.Identifier
 *:Zone.Identifier:Zone.Identifier
